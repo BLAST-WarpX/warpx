@@ -191,7 +191,6 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  * \param a_bins
  * \param box
- * \param geom
  * \param a_tbox_max_size
  * \param bin_size tile size to use for shared current deposition operations
  */
@@ -209,7 +208,6 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                                      [[maybe_unused]]const int n_rz_azimuthal_modes,
                                      const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
                                      const amrex::Box& box,
-                                     const amrex::Geometry& geom,
                                      const amrex::IntVect& a_tbox_max_size,
                                      const amrex::IntVect bin_size
                                      )
@@ -219,7 +217,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
     const auto *permutation = a_bins.permutationPtr();
 
 #if !defined(AMREX_USE_GPU)
-    amrex::ignore_unused(ix_type, a_bins, box, geom, a_tbox_max_size, bin_size);
+    amrex::ignore_unused(ix_type, a_bins, box, a_tbox_max_size, bin_size);
 #endif
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
@@ -237,9 +235,6 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
 
     // Loop over particles and deposit into rho_fab
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
-    const auto plo = geom.ProbLoArray();
-    const auto domain = geom.Domain();
-
     const amrex::Box sample_tbox(IntVect(AMREX_D_DECL(0, 0, 0)), a_tbox_max_size - 1);
     amrex::Box sample_tbox_x = convert(sample_tbox, ix_type);
 
@@ -279,25 +274,8 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
 
         if (bin_start == bin_stop) { return; }
 
-        amrex::Box buffer_box;
-        {
-          ParticleReal xp, yp, zp;
-          GetPosition(permutation[bin_start], xp, yp, zp);
-#if defined(WARPX_DIM_3D)
-          IntVect iv = IntVect(int(amrex::Math::floor((xp-plo[0])*dinv.x)),
-                               int(amrex::Math::floor((yp-plo[1])*dinv.y)),
-                               int(amrex::Math::floor((zp-plo[2])*dinv.z)));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-          IntVect iv = IntVect(int(amrex::Math::floor((xp-plo[0])*dinv.x)),
-                               int(amrex::Math::floor((zp-plo[1])*dinv.z)));
-#elif defined(WARPX_DIM_1D_Z)
-          IntVect iv = IntVect(int(amrex::Math::floor((zp-plo[0])*dinv.z)));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-          IntVect iv = IntVect(int(amrex::Math::floor((xp-plo[0])*dinv.x)));
-#endif
-          iv += domain.smallEnd();
-          getTileIndex(iv, box, true, bin_size, buffer_box);
-        }
+        // The tile of this bin defines the index space of the shared memory buffer
+        const amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
 
         Box tbx = convert( buffer_box, ix_type);
         tbx.grow(depos_order);
