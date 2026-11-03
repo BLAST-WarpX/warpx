@@ -103,13 +103,16 @@ for field in ["Ex", "Ez"]:
     print("%s: Max error: %.2e" % (field, max_error))
     error_rel = max(error_rel, max_error)
 
-# Plot the last field from the loop (Ez at iteration 40)
-fig, (ax1, ax2) = plt.subplots(1, 2, dpi=100)
+# Plot the last field from the loop (Ez at iteration 40) and By
+By_sim = data[("mesh", "By")].to_ndarray()[:, :, 0]
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4), dpi=100)
 # First plot
 vmin = E_sim.min()
 vmax = E_sim.max()
 cax1 = make_axes_locatable(ax1).append_axes("right", size="5%", pad="5%")
-im1 = ax1.imshow(E_sim, origin="lower", extent=edge, vmin=vmin, vmax=vmax)
+im1 = ax1.imshow(
+    E_sim, origin="lower", extent=edge, vmin=vmin, vmax=vmax, cmap="RdBu_r"
+)
 cb1 = fig.colorbar(im1, cax=cax1)
 ax1.set_xlabel(r"$z$")
 ax1.set_ylabel(r"$x$")
@@ -118,11 +121,22 @@ ax1.set_title(r"$E_z$ (sim)")
 vmin = E_th.min()
 vmax = E_th.max()
 cax2 = make_axes_locatable(ax2).append_axes("right", size="5%", pad="5%")
-im2 = ax2.imshow(E_th, origin="lower", extent=edge, vmin=vmin, vmax=vmax)
+im2 = ax2.imshow(E_th, origin="lower", extent=edge, vmin=vmin, vmax=vmax, cmap="RdBu_r")
 cb2 = fig.colorbar(im2, cax=cax2)
 ax2.set_xlabel(r"$z$")
 ax2.set_ylabel(r"$x$")
 ax2.set_title(r"$E_z$ (theory)")
+# Third plot (By is zero in theory, useful to spot numerical artifacts)
+vmin = By_sim.min()
+vmax = By_sim.max()
+cax3 = make_axes_locatable(ax3).append_axes("right", size="5%", pad="5%")
+im3 = ax3.imshow(
+    By_sim, origin="lower", extent=edge, vmin=vmin, vmax=vmax, cmap="RdBu_r"
+)
+cb3 = fig.colorbar(im3, cax=cax3)
+ax3.set_xlabel(r"$z$")
+ax3.set_ylabel(r"$x$")
+ax3.set_title(r"$B_y$ (sim)")
 # Save figure
 fig.tight_layout()
 fig.savefig("Langmuir_multi_2d_analysis.png", dpi=200)
