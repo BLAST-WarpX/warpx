@@ -283,7 +283,10 @@ Overall simulation parameters
             solver and to PETSc SNES.
             The first required linear solve always initializes the PC, including
             after restart. During adaptive implicit substepping, PC updates are forced
-            on every Newton iteration, overriding both intervals.
+            on every Newton iteration that requires a linear solve, overriding both intervals.
+            After adaptive substepping, the PC is rebuilt at the first subsequent Newton
+            iteration that requires a linear solve, regardless of both intervals, to
+            restore the coefficients for the full time-step size.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
             Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
