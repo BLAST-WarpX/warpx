@@ -10,8 +10,7 @@
 
 #include "SpectralKSpace_fwd.H"
 
-#include "Utils/WarpX_Complex.H"
-
+#include <ablastr/math/Complex.H>
 #include <ablastr/utils/Enums.H>
 
 #include <AMReX_Array.H>
@@ -32,7 +31,7 @@
 using RealKVector = amrex::Gpu::DeviceVector<amrex::Real>;
 using KVectorComponent = amrex::LayoutData< RealKVector >;
 using SpectralShiftFactor = amrex::LayoutData<
-                           amrex::Gpu::DeviceVector<Complex> >;
+                           amrex::Gpu::DeviceVector<ablastr::math::Complex> >;
 
 // Indicate the type of correction "shift" factor to apply
 // when the FFT is performed from/to a cell-centered grid in real space.

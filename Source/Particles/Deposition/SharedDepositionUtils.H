@@ -11,8 +11,9 @@
 #include "Particles/ShapeFactors.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
+
 #ifdef WARPX_DIM_RZ
-#   include "Utils/WarpX_Complex.H"
+#   include <ablastr/math/Complex.H>
 #endif
 
 #include <AMReX.H>
@@ -128,7 +129,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
         costheta = 1._rt;
         sintheta = 0._rt;
     }
-    const Complex xy0 = Complex{costheta, sintheta};
+    const auto xy0 = ablastr::math::Complex{costheta, sintheta};
     const amrex::Real wqx = wq*invvol*(+vx*costheta + vy*sintheta);
     const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
 #else
@@ -240,7 +241,7 @@ void depositComponent (const GetParticlePosition<PIdx>& GetPosition,
                                          &j_buff(lo.x+j_j+ix, lo.y+l_j+iz, 0, 0),
                                          sx_j[ix]*sz_j[iz]*pcurrent);
 #if defined(WARPX_DIM_RZ)
-            Complex xy = xy0; // Note that xy is equal to e^{i m theta}
+            ablastr::math::Complex xy = xy0; // Note that xy is equal to e^{i m theta}
             for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
                 // The factor 2 on the weighting comes from the normalization of the modes
                 amrex::Gpu::Atomic::AddNoRet( &j_buff(lo.x+j_j+ix, lo.y+l_j+iz, 0, 2*imode-1), 2._rt*sx_j[ix]*sz_j[iz]*wqx*xy.real());

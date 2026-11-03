@@ -16,8 +16,9 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
+
 #ifdef WARPX_DIM_RZ
-#   include "Utils/WarpX_Complex.H"
+#   include <ablastr/math/Complex.H>
 #endif
 
 #include <AMReX.H>
@@ -67,6 +68,7 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                               const amrex::Dim3 lo,
                               [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
+    using namespace ablastr::math;
     using namespace amrex::literals;
 
     constexpr int NODE = amrex::IndexType::NODE;
@@ -719,6 +721,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   bool enable_reduced_shape
                                   )
 {
+    using namespace ablastr::math;
     using namespace amrex;
     using namespace amrex::literals;
 
@@ -1171,6 +1174,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::Dim3 nodal_hi,
                                                  int* const position_error_count)
 {
+    using namespace ablastr::math;
     using namespace amrex;
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
@@ -1561,7 +1565,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                                        amrex::Real const invvol,
                                        [[maybe_unused]] int const n_rz_azimuthal_modes)
 {
-
+    using namespace ablastr::math;
     using namespace amrex::literals;
 
 #if (AMREX_SPACEDIM > 1)

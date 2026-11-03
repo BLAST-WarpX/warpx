@@ -8,7 +8,6 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpX_Complex.H"
 
 #include <AMReX.H>
 #include <AMReX_Extension.H>

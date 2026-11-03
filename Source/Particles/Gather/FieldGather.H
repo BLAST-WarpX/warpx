@@ -11,8 +11,9 @@
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
-#include "Utils/WarpX_Complex.H"
 #include "Utils/ParticleUtils.H"
+
+#include <ablastr/math/Complex.H>
 
 #include <AMReX.H>
 
@@ -52,6 +53,8 @@ void doDirectGatherVectorField (
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+    using namespace ablastr::math;
+
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
@@ -446,6 +449,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+    using namespace ablastr::math;
 
 #ifdef WARPX_ZINDEX
     constexpr int zdir = WARPX_ZINDEX;
@@ -943,6 +947,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
                      const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+    using namespace ablastr::math;
+
 #if !defined(WARPX_DIM_RZ)
     ignore_unused(n_rz_azimuthal_modes);
 #endif
@@ -1485,6 +1491,8 @@ void doGatherPicnicShapeN (
                      const int n_rz_azimuthal_modes)
 {
     using namespace amrex;
+    using namespace ablastr::math;
+
 #if !defined(WARPX_DIM_RZ)
     ignore_unused(n_rz_azimuthal_modes);
 #endif

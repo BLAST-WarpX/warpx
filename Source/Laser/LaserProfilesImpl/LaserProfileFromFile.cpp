@@ -8,9 +8,9 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpX_Complex.H"
 #include "Utils/WarpXConst.H"
 
+#include <ablastr/math/Complex.H>
 #include <ablastr/math/LinearInterpolation.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -47,6 +47,7 @@
     namespace io = openPMD;
 #endif
 
+using namespace ablastr::math;
 using namespace amrex;
 
 void

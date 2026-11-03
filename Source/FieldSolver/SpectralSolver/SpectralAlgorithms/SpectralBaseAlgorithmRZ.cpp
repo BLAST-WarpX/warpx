@@ -10,6 +10,7 @@
 
 #include <cmath>
 
+using namespace ablastr::math;
 using namespace amrex;
 using namespace amrex::literals;
 

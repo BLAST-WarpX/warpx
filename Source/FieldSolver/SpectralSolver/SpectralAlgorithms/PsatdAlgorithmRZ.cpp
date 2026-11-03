@@ -10,9 +10,12 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/math/Complex.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
+
 #include <cmath>
 
+using namespace ablastr::math;
 using namespace amrex::literals;
 
 /* \brief Initialize coefficients for the update equation */
