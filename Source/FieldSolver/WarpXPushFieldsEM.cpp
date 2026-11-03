@@ -11,6 +11,7 @@
 #include "BoundaryConditions/PML.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #if defined(WARPX_USE_FFT)
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #   ifdef WARPX_DIM_RZ
@@ -946,29 +947,41 @@ WarpX::PushPSATD (amrex::Real start_time)
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, subcycling_half, start_time);
+        EvolveB(lev, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 
     // Allow execution of Python callback after B-field push
+    if (apply_current_controlled_port) {
+        ApplyCompositeCurrentControlledPorts(start_time + a_dt);
+    }
     ExecutePythonCallback("afterBpush");
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     ABLASTR_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
+    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time,
+            apply_current_controlled_port);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time);
+        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt,
+                SubcyclingHalf subcycling_half, amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
@@ -987,15 +1000,18 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         } else {
             m_fdtd_solver_cp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         }
     }
 
     amrex::Real const new_time = start_time + a_dt;
     ApplyBfieldBoundary(lev, patch_type, subcycling_half, new_time);
+    if (apply_current_controlled_port) {
+        ApplyCurrentControlledPort(lev, patch_type, new_time);
+    }
 }
 
 
@@ -1027,39 +1043,29 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 {
     // Evolve E field in regular cells
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_eb_update_E_fp[lev],
-                                        a_dt );
+        m_fdtd_solver_fp[lev]->EvolveE(
+            m_fields, lev, patch_type,
+            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+            GetEBUpdateEFlag(patch_type)[lev], a_dt);
     } else {
-        m_fdtd_solver_cp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_eb_update_E_cp[lev],
-                                        a_dt );
+        m_fdtd_solver_cp[lev]->EvolveE(
+            m_fields, lev, patch_type,
+            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+            GetEBUpdateEFlag(patch_type)[lev], a_dt);
     }
 
     // Evolve E field in PML cells
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_fp(),
-                pml[lev]->GetMultiSigmaBox_fp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_fp(), a_dt, pml_has_particles);
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_cp(),
-                pml[lev]->GetMultiSigmaBox_cp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_cp(), a_dt, pml_has_particles);
         }
     }
 
@@ -1091,7 +1097,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 void
 WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1102,7 +1108,7 @@ WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     EvolveF(lev, PatchType::fine, a_dt, rho_comp);
     if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, rho_comp); }
@@ -1111,23 +1117,39 @@ WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveF()");
 
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
+        auto const& material =
+            *m_macroscopic_properties[lev][patch_type == PatchType::fine ? 0 : 1];
+        if (!material.IsVacuumPatch()) {
+            // Conductivity and impressed sources can create physical charge
+            // that is not present in the particle rho used by this cleaner.
+            if (material.CleanVacuumPatchesOnly()) { return; }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_dive_cleaning,
+                "Electric divergence cleaning with macroscopic media requires vacuum properties "
+                "on cleaned patches. Set macroscopic.dive_cleaning_vacuum_patches_only=1 "
+                "to leave material-bearing patches and their PML uncleaned.");
+        }
+    }
+
     // Evolve F field in regular cells
-    if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
-    } else {
-        m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+    if (do_dive_cleaning) {
+        if (patch_type == PatchType::fine) {
+            m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                            m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
+        } else {
+            m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                            m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+        }
     }
 
     // Evolve F field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml_dive_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
                 m_fields.get(FieldType::pml_F_fp, lev),
@@ -1145,7 +1167,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 void
 WarpX::EvolveG (amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1156,7 +1178,7 @@ WarpX::EvolveG (amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     EvolveG(lev, PatchType::fine, a_dt);
 
@@ -1169,21 +1191,21 @@ WarpX::EvolveG (int lev, amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveG()");
 
     bool const skip_lev0_coarse_patch = true;
 
     // Evolve G field in regular cells
-    if (patch_type == PatchType::fine)
+    if (do_divb_cleaning && patch_type == PatchType::fine)
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
         m_fdtd_solver_fp[lev]->EvolveG(
             m_fields.get(FieldType::G_fp, lev),
             Bfield_fp[lev], a_dt);
     }
-    else // coarse patch
+    else if (do_divb_cleaning) // coarse patch
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
         m_fdtd_solver_cp[lev]->EvolveG(
@@ -1191,7 +1213,13 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
             Bfield_cp_new[lev], a_dt);
     }
 
-    // TODO Evolution in PML cells will go here
+    if (do_pml_divb_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
+        bool const fine = patch_type == PatchType::fine;
+        auto* const solver = fine ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+        solver->EvolveGPML(m_fields.get(fine ? FieldType::pml_G_fp : FieldType::pml_G_cp, lev),
+                          m_fields.get_alldirs(fine ? FieldType::pml_B_fp : FieldType::pml_B_cp, lev),
+                          a_dt);
+    }
 }
 
 void
@@ -1200,6 +1228,9 @@ WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
     for (int lev = 0; lev <= finest_level; ++lev ) {
         MacroscopicEvolveE(lev, a_dt, start_time);
     }
+
+    // Match the vacuum and Hybrid-PIC electric-field advance callbacks.
+    ExecutePythonCallback("afterEpush");
 }
 
 void
@@ -1207,47 +1238,47 @@ WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
     ABLASTR_PROFILE("WarpX::MacroscopicEvolveE()");
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        lev == 0,
-        "Macroscopic EvolveE is not implemented for lev>0, yet."
-    );
-
     MacroscopicEvolveE(lev, PatchType::fine, a_dt, start_time);
+    if (lev > 0) {
+        MacroscopicEvolveE(lev, PatchType::coarse, a_dt, start_time);
+    }
 }
 
 void
 WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time) {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        patch_type == PatchType::fine,
-        "Macroscopic EvolveE is not implemented for lev>0, yet."
-    );
-
-    m_fdtd_solver_fp[lev]->MacroscopicEvolveE(
+    bool const fine_patch = patch_type == PatchType::fine;
+    auto const& material = *m_macroscopic_properties[lev][fine_patch ? 0 : 1];
+    if (m_fields.has(fine_patch ? FieldType::F_fp : FieldType::F_cp, lev)) {
+        if (material.IsVacuumPatch()) {
+            // The vacuum update includes grad(F); the material update does not.
+            EvolveE(lev, patch_type, a_dt, start_time);
+            return;
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(material.CleanVacuumPatchesOnly(),
+            "Electric divergence cleaning with macroscopic media requires vacuum properties "
+            "on cleaned patches.");
+    }
+    auto* const solver = fine_patch ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+    solver->MacroscopicEvolveE(
         m_macroscopic_solver_algo,
-        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-        m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-        m_fields.get_alldirs(FieldType::current_fp, lev),
-        m_eb_update_E_fp[lev],
-        a_dt, m_macroscopic_properties);
+        m_fields.get_alldirs(fine_patch ? FieldType::Efield_fp : FieldType::Efield_cp, lev),
+        m_fields.get_alldirs(fine_patch ? FieldType::Bfield_fp : FieldType::Bfield_cp, lev),
+        m_fields.get_alldirs(fine_patch ? FieldType::current_fp : FieldType::current_cp, lev),
+        GetEBUpdateEFlag(patch_type)[lev], a_dt, m_macroscopic_properties[lev][fine_patch ? 0 : 1],
+        lev);
 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_fp(),
-                pml[lev]->GetMultiSigmaBox_fp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_fp(), a_dt, pml_has_particles);
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_cp(),
-                pml[lev]->GetMultiSigmaBox_cp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_cp(), a_dt, pml_has_particles);
         }
     }
 

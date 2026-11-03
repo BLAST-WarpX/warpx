@@ -703,15 +703,7 @@ WarpX::MoveWindow (const int step, bool move_j)
     }
 
     // Recompute macroscopic properties of the medium
-    if (m_em_solver_medium == MediumForEM::Macroscopic) {
-        const int lev_zero = 0;
-        m_macroscopic_properties->InitData(
-            Geom(lev_zero),
-            m_fields.get(FieldType::Efield_fp, Direction{0}, lev_zero)->ixType().toIntVect(),
-            m_fields.get(FieldType::Efield_fp, Direction{1}, lev_zero)->ixType().toIntVect(),
-            m_fields.get(FieldType::Efield_fp, Direction{2}, lev_zero)->ixType().toIntVect()
-        );
-    }
+    InitMacroscopicProperties();
 
     return num_shift_base;
 }

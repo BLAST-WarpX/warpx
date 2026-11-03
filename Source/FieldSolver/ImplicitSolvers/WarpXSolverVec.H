@@ -42,7 +42,8 @@ class WarpX;
  *  This is a wrapper class around a Vector of pointers to MultiFabs that
  *  contains basic math operators and functionality needed to interact with nonlinear
  *  solvers in WarpX and linear solvers in AMReX, such as GMRES. The size of the
- *  Vector is the number of amr levels. Hardcoded for 1 right now.
+ *  Vector is the number of AMR levels. Theta-implicit solves also include
+ *  coarse-patch and exterior-PML electric fields as separate blocks.
  *
  *  A WarpXSolverVec can consist of an array size 3 of MultiFabs (for vector fields
  *  such as E, B, and A) or of a single MultiFab for scalar fields. Both the array
@@ -108,6 +109,7 @@ public:
                                        amrex::IntVect::TheZeroVector() );
             }
         }
+        ExtraLinComb(1.0, a_solver_vec, 0.0, a_solver_vec);
     }
 
     // Prohibit Copy assignment operator
@@ -120,6 +122,7 @@ public:
         if (this != &a_solver_vec) {
             m_array_vec = std::move(a_solver_vec.m_array_vec);
             m_scalar_vec = std::move(a_solver_vec.m_scalar_vec);
+            m_extra_fields = std::move(a_solver_vec.m_extra_fields);
             m_array_type = a_solver_vec.m_array_type;
             m_scalar_type = a_solver_vec.m_scalar_type;
             m_vector_type_name = a_solver_vec.m_vector_type_name;
@@ -146,6 +149,7 @@ public:
                 m_scalar_vec[lev]->plus(*(a_solver_vec.getScalarVec()[lev]), 0, 1, 0);
             }
         }
+        ExtraIncrement(a_solver_vec, 1.0);
     }
 
     inline
@@ -163,6 +167,7 @@ public:
                 m_scalar_vec[lev]->minus(*(a_solver_vec.getScalarVec()[lev]), 0, 1, 0);
             }
         }
+        ExtraIncrement(a_solver_vec, -1.0);
     }
 
     /**
@@ -189,6 +194,7 @@ public:
                                                              0, 1, 0);
             }
         }
+        ExtraLinComb(a, X, b, Y);
     }
 
     /**
@@ -210,6 +216,7 @@ public:
                                         0, 0, 1, amrex::IntVect::TheZeroVector() );
             }
         }
+        ExtraIncrement(X, a);
     }
 
     /**
@@ -229,6 +236,11 @@ public:
             }
             if (m_scalar_type != warpx::fields::FieldType::None) {
                 m_scalar_vec[lev]->mult(a_a, 0, 1);
+            }
+        }
+        for (auto& block : m_extra_fields) {
+            for (auto& field : block.values) {
+                field->mult(a_a, 0, field->nComp());
             }
         }
     }
@@ -252,6 +264,11 @@ public:
                 m_scalar_vec[lev]->setVal(a_val);
             }
         }
+        for (auto& block : m_extra_fields) {
+            for (auto& field : block.values) {
+                field->setVal(a_val);
+            }
+        }
     }
 
     inline
@@ -266,8 +283,10 @@ public:
     void assertSameType( const WarpXSolverVec&  a_solver_vec ) const
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            a_solver_vec.getArrayVecType()==m_array_type &&
-            a_solver_vec.getScalarVecType()==m_scalar_type,
+            a_solver_vec.getArrayVecType() == m_array_type &&
+                a_solver_vec.getScalarVecType() == m_scalar_type &&
+                a_solver_vec.m_num_amr_levels == m_num_amr_levels &&
+                a_solver_vec.m_extra_fields.size() == m_extra_fields.size(),
             "WarpXSolverVec::function(X) called with WarpXSolverVec X of different type");
     }
 
@@ -328,30 +347,62 @@ public:
     // return DOFs object pointer
     [[nodiscard]] inline static const auto& getDOFsObject () { return m_dofs; }
 
+    /** Additional electric unknowns carried by the theta-implicit field solve. */
+    struct ExtraField {
+        warpx::fields::FieldType type;
+        int level;
+        std::array<std::unique_ptr<amrex::MultiFab>, 3> values;
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> dot_masks;
+
+        [[nodiscard]] ablastr::fields::VectorField
+        get () const
+        {
+            return {values[0].get(), values[1].get(), values[2].get()};
+        }
+    };
+
+    [[nodiscard]] std::vector<ExtraField> const&
+    getExtraFields () const
+    {
+        return m_extra_fields;
+    }
+    [[nodiscard]] ablastr::fields::VectorField getExtraField (warpx::fields::FieldType type,
+                                                              int level) const;
+
+    /** Copy only CP/PML blocks; keep the previous fine-patch initial guess. */
+    void
+    CopyExtra (WarpXSolverVec const& source)
+    {
+        ExtraLinComb(1.0, source, 0.0, source);
+    }
+
 private:
+  void ExtraLinComb (RT a, WarpXSolverVec const& X, RT b, WarpXSolverVec const& Y);
+  void ExtraIncrement (WarpXSolverVec const& X, RT a);
+  std::vector<ExtraField> m_extra_fields;
 
-    bool m_is_defined = false;
+  bool m_is_defined = false;
 
-    ablastr::fields::MultiLevelVectorField m_array_vec;
-    ablastr::fields::MultiLevelScalarField m_scalar_vec;
+  ablastr::fields::MultiLevelVectorField m_array_vec;
+  ablastr::fields::MultiLevelScalarField m_scalar_vec;
 
-    warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
-    warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;
+  warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
+  warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;
 
-    std::string m_vector_type_name = "none";
-    std::string m_scalar_type_name = "none";
+  std::string m_vector_type_name = "none";
+  std::string m_scalar_type_name = "none";
 
-    static constexpr int m_ncomp = 1;
-    int m_num_amr_levels = 1;
+  static constexpr int m_ncomp = 1;
+  int m_num_amr_levels = 1;
 
-    /** The WarpX instance whose fields this vector mirrors.
-     *
-     * Set by Define() and scoped to a single vector, so that a process running
-     * several simulations one after another gets the instance it is solving for.
-     */
-    WarpX* m_WarpX = nullptr;
+  /** The WarpX instance whose fields this vector mirrors.
+   *
+   * Set by Define() and scoped to a single vector, so that a process running
+   * several simulations one after another gets the instance it is solving for.
+   */
+  WarpX* m_WarpX = nullptr;
 
-    static std::unique_ptr<WarpXSolverDOF> m_dofs;
+  static std::unique_ptr<WarpXSolverDOF> m_dofs;
 };
 
 #endif

@@ -17,6 +17,7 @@
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
+#include "FieldSolver/CurrentControlledPort_fwd.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
@@ -129,6 +130,7 @@ public:
                                                int  bdry_side ) const;
 
     void InitData ();
+    void InitMacroscopicProperties ();
 
     void Evolve (int numsteps = -1);
 
@@ -163,12 +165,29 @@ public:
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
+    [[nodiscard]] std::array<amrex::Real, 3> GetCurrentControlledPortStatus () const;
+    [[nodiscard]] std::vector<std::array<amrex::Real, 3>>
+    GetCurrentControlledPortStatuses () const;
+    [[nodiscard]] bool
+    HasCurrentControlledPorts () const {
+        return !m_current_controlled_ports.empty();
+    }
     /** Return the implicit solver, or nullptr when the evolve scheme is explicit */
     [[nodiscard]] ImplicitSolver * get_pointer_ImplicitSolver () const { return m_implicit_solver.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag_fp() { return m_eb_update_E_fp; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag_fp() { return m_eb_update_B_fp; }
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>&
+    GetEBUpdateEFlag_fp () { return m_eb_update_E_fp; }
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>&
+    GetEBUpdateBFlag_fp () { return m_eb_update_B_fp; }
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>&
+    GetEBUpdateEFlag (PatchType patch_type = PatchType::fine) {
+        return patch_type == PatchType::fine ? m_eb_update_E_fp : m_eb_update_E_cp;
+    }
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>&
+    GetEBUpdateBFlag (PatchType patch_type = PatchType::fine) {
+        return patch_type == PatchType::fine ? m_eb_update_B_fp : m_eb_update_B_cp;
+    }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
     /**
@@ -470,13 +489,19 @@ public:
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (amrex::Real dt, SubcyclingHalf subcycling_half,
+                  amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
+    void EvolveB (int lev, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveF (         amrex::Real dt, int rho_comp);
     void EvolveF (int lev, amrex::Real dt, int rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
@@ -614,6 +639,8 @@ public:
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
+    void ApplyCurrentControlledPort (int lev, PatchType patch_type, amrex::Real cur_time);
+    void ApplyCompositeCurrentControlledPorts (amrex::Real time);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -1072,6 +1099,11 @@ public:
 #endif
 
     FiniteDifferenceSolver * get_pointer_fdtd_solver_fp (int lev) { return m_fdtd_solver_fp[lev].get(); }
+    FiniteDifferenceSolver*
+    get_pointer_fdtd_solver_cp (int lev)
+    {
+        return m_fdtd_solver_cp[lev].get();
+    }
 
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
@@ -1080,6 +1112,15 @@ public:
     //! Use this function to override the Level 0 grids made by AMReX.
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
+
+    [[nodiscard]] MacroscopicProperties*
+    get_pointer_MacroscopicProperties (int lev = 0, PatchType patch_type = PatchType::fine) const
+    {
+        if (m_macroscopic_properties.empty()) {
+            return nullptr;
+        }
+        return m_macroscopic_properties[lev][patch_type == PatchType::fine ? 0 : 1].get();
+    }
 
 #ifdef AMREX_USE_EB
     amrex::EB2::IndexSpace const* GetEBIndexSpace (int lev) const {
@@ -1362,8 +1403,10 @@ private:
      */
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_fp;
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_fp;
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_cp;
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_cp;
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>
+        m_eb_update_E_cp;
+    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>, 3>>
+        m_eb_update_B_cp;
 
     /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
      *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.
@@ -1450,13 +1493,17 @@ private:
     bool m_verboncoeur_axis_correction = true;
 
     // Macroscopic properties
-    std::unique_ptr<MacroscopicProperties> m_macroscopic_properties;
+    amrex::Vector<std::array<std::unique_ptr<MacroscopicProperties>, 2>> m_macroscopic_properties;
 
     // Electrostatic solver
     std::unique_ptr<ElectrostaticSolver> m_electrostatic_solver;
 
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
+
+    // Independent waveform-driven paired terminal constraints
+    std::vector<std::unique_ptr<CurrentControlledPort>>
+        m_current_controlled_ports;
 
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file

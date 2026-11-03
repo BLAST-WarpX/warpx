@@ -639,12 +639,14 @@ WarpX::OneStep_nosub (
         }
     } else {
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/0);
-        EvolveG(0.5_rt * dt[0]);
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
         EvolveB(0.5_rt * dt[0], SubcyclingHalf::FirstHalf, a_cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+        // G shares the electric-field time staggering and is advanced with B at n+1/2.
+        EvolveG(dt[0]);
 
         if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
@@ -658,7 +660,7 @@ WarpX::OneStep_nosub (
         FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/1);
-        EvolveG(0.5_rt * dt[0]);
+        FillBoundaryG(guard_cells.ng_FieldSolverG);
         EvolveB(0.5_rt * dt[0], SubcyclingHalf::SecondHalf, a_cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
@@ -676,6 +678,7 @@ WarpX::OneStep_nosub (
         }
     } // !PSATD
 
+    ApplyCompositeCurrentControlledPorts(a_cur_time + a_dt);
     ExecutePythonCallback("afterEsolve");
 }
 

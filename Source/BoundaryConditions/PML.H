@@ -156,6 +156,10 @@ public:
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
          amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
 
+    /** Add -dt*sigma*src to dst, or solve dst=src/(1+dt*sigma). */
+    void ApplyImplicitSigma (ablastr::fields::VectorField dst, ablastr::fields::VectorField src,
+                             amrex::Real dt, bool inverse, PatchType patch_type) const;
+
     void ComputePMLFactors (amrex::Real dt);
 
     [[nodiscard]] const MultiSigmaBox& GetMultiSigmaBox_fp () const
@@ -170,17 +174,20 @@ public:
 
     /** Flags indicating on which grid points the E field (and the PML current)
      *  should be updated, depending on their position relative to the embedded
-     *  boundary, on the fine patch. */
-    [[nodiscard]] std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const & GetEBUpdateEFlag_fp () const
-    {
+     *  boundary. */
+    [[nodiscard]] std::array<std::unique_ptr<amrex::iMultiFab>, 3> const&
+    GetEBUpdateEFlag_fp () const {
         return m_eb_update_E_fp;
     }
 
-    /** Same as `GetEBUpdateEFlag_fp`, for the coarse patch. The arrays are empty
-     *  when this PML has no coarse patch (i.e. at level 0). */
-    [[nodiscard]] std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const & GetEBUpdateEFlag_cp () const
-    {
+    [[nodiscard]] std::array<std::unique_ptr<amrex::iMultiFab>, 3> const&
+    GetEBUpdateEFlag_cp () const {
         return m_eb_update_E_cp;
+    }
+
+    [[nodiscard]] std::array<std::unique_ptr<amrex::iMultiFab>, 3> const&
+    GetEBUpdateEFlag (PatchType patch_type = PatchType::fine) const {
+        return patch_type == PatchType::fine ? m_eb_update_E_fp : m_eb_update_E_cp;
     }
 
 #ifdef WARPX_USE_FFT
@@ -210,11 +217,12 @@ public:
     [[nodiscard]] bool ok () const { return m_ok; }
 
     void CheckPoint (ablastr::fields::MultiFabRegister& fields, const std::string& dir) const;
-    void Restart (ablastr::fields::MultiFabRegister& fields, const std::string& dir);
+    void Restart (ablastr::fields::MultiFabRegister& fields, const std::string& dir) const;
 
     static void Exchange (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom, int do_pml_in_domain);
 
 private:
+    int m_level;
     bool m_ok;
 
     bool m_dive_cleaning;
@@ -231,9 +239,8 @@ private:
 
     // Flags indicating on which grid points the E field (and PML current) should
     // be updated, depending on their position relative to the embedded boundary.
-    // The coarse-patch flags are only allocated when this PML has a coarse patch.
     std::array< std::unique_ptr<amrex::iMultiFab>, 3 > m_eb_update_E_fp;
-    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > m_eb_update_E_cp;
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> m_eb_update_E_cp;
 
 #ifdef WARPX_USE_FFT
     std::unique_ptr<SpectralSolver> spectral_solver_fp;

@@ -1,0 +1,48 @@
+# The box source is an impressed-current antenna, not a Hybrid-PIC ion species.
+# This input must fail during construction with the explicit compatibility error.
+
+max_step = 0
+amr.n_cell = 4 4 4
+amr.max_level = 0
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+
+geometry.dims = 3
+geometry.prob_lo = -0.5 -0.5 -0.5
+geometry.prob_hi =  0.5  0.5  0.5
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+warpx.const_dt = 1.0e-12
+warpx.grid_type = collocated
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = ions
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 1 1 1
+ions.profile = constant
+ions.density = 1.0e8
+ions.momentum_distribution_type = constant
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e8
+hybrid_pic_model.n_floor = 1.0e4
+hybrid_pic_model.substeps = 2
+
+warpx.current_injection = 1
+warpx.current_injection.type = antenna
+warpx.current_injection.n_pairs = 1
+warpx.current_injection.pair_0.drive.xlo = -0.25
+warpx.current_injection.pair_0.drive.xhi =  0.25
+warpx.current_injection.pair_0.drive.ylo = -0.25
+warpx.current_injection.pair_0.drive.yhi =  0.25
+warpx.current_injection.pair_0.drive.zlo = -0.25
+warpx.current_injection.pair_0.drive.zhi =  0.25
+warpx.current_injection.pair_0.drive.A = 0.25
+warpx.current_injection.pair_0.drive.dir = 0

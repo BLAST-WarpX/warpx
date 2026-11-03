@@ -35,19 +35,23 @@
 using namespace amrex;
 using namespace ablastr::fields;
 
-void FiniteDifferenceSolver::MacroscopicEvolveE (
-    const MacroscopicSolverAlgo macroscopic_solver_algo,
-    ablastr::fields::VectorField const& Efield,
-    ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& Jfield,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
-    amrex::Real const dt,
-    std::unique_ptr<MacroscopicProperties> const& macroscopic_properties)
+void
+FiniteDifferenceSolver::MacroscopicEvolveE (
+    const MacroscopicSolverAlgo macroscopic_solver_algo, ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& Bfield, ablastr::fields::VectorField const& Jfield,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_E, amrex::Real const dt,
+    std::unique_ptr<MacroscopicProperties> const& macroscopic_properties, int level)
 {
 
+    amrex::ignore_unused(level);
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#ifdef WARPX_DIM_RZ
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_fdtd_algo == ElectromagneticSolverAlgo::Yee,
+                                     "Cylindrical macroscopic evolution requires Yee.");
+    MacroscopicEvolveECylindrical(macroscopic_solver_algo, Efield, Bfield, Jfield, eb_update_E, dt,
+                                  macroscopic_properties, level);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::ignore_unused(macroscopic_solver_algo, Efield, Bfield, Jfield, eb_update_E, dt, macroscopic_properties);
 
     WARPX_ABORT_WITH_MESSAGE("currently macro E-push does not work for RZ");

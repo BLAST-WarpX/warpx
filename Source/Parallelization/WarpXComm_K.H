@@ -12,8 +12,8 @@
 
 /**
  * \brief Interpolation function called within WarpX::UpdateAuxiliaryDataSameType
- * with electromagnetic solver to interpolate data from the coarse and fine grids to the fine aux grid,
- * assuming that all grids have the same staggering (either collocated or staggered).
+ * with electromagnetic solver to interpolate data from the coarse and fine grids to the fine aux
+ * grid, assuming that all grids have the same staggering (either collocated or staggered).
  *
  * \param[in] j index along x of the output array
  * \param[in] k index along y (in 3D) or z (in 2D) of the output array
@@ -23,24 +23,24 @@
  * \param[in] arr_coarse input coarse-patch array storing the values to interpolate
  * \param[in] arr_stag IndexType of the arrays
  * \param[in] rr mesh refinement ratios along each direction
+ * \param[in] component field component (azimuthal mode in RZ)
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void warpx_interp (int j, int k, int l,
-                   amrex::Array4<amrex::Real      > const& arr_aux,
-                   amrex::Array4<amrex::Real const> const& arr_fine,
-                   amrex::Array4<amrex::Real const> const& arr_coarse,
-                   const amrex::IntVect& arr_stag,
-                   const amrex::IntVect& rr)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
+warpx_interp (int j, int k, int l, amrex::Array4<amrex::Real> const& arr_aux,
+              amrex::Array4<amrex::Real const> const& arr_fine,
+              amrex::Array4<amrex::Real const> const& arr_coarse, const amrex::IntVect& arr_stag,
+              const amrex::IntVect& rr, int component = 0)
 {
     using namespace amrex;
 
     // Pad arr_coarse with zeros beyond ghost cells for out-of-bound accesses
-    const auto arr_coarse_zeropad = [arr_coarse] (const int jj, const int kk, const int ll) noexcept
-    {
-        return arr_coarse.contains(jj,kk,ll) ? arr_coarse(jj,kk,ll) : 0.0_rt;
+    const auto arr_coarse_zeropad = [arr_coarse, component] (const int jj, const int kk,
+                                                             const int ll) noexcept {
+        return arr_coarse.contains(jj, kk, ll) ? arr_coarse(jj, kk, ll, component) : 0.0_rt;
     };
 
-    // NOTE Indices (j,k,l) in the following refer to (z,-,-) in 1D, (x,z,-) in 2D, and (x,y,z) in 3D
+    // NOTE Indices (j,k,l) in the following refer to (z,-,-) in 1D, (x,z,-) in 2D, and (x,y,z) in
+    // 3D
 
     // Refinement ratio
     const int rj = rr[0];
@@ -58,9 +58,9 @@ void warpx_interp (int j, int k, int l,
     const int nk = (AMREX_SPACEDIM > 1) ? 2 : 1;
     const int nl = (AMREX_SPACEDIM > 2) ? 2 : 1;
 
-    const int jc = (sj == 0) ? amrex::coarsen(j - rj/2, rj) : amrex::coarsen(j, rj);
-    const int kc = (sk == 0) ? amrex::coarsen(k - rk/2, rk) : amrex::coarsen(k, rk);
-    const int lc = (sl == 0) ? amrex::coarsen(l - rl/2, rl) : amrex::coarsen(l, rl);
+    const int jc = (sj == 0) ? amrex::coarsen(j - rj / 2, rj) : amrex::coarsen(j, rj);
+    const int kc = (sk == 0) ? amrex::coarsen(k - rk / 2, rk) : amrex::coarsen(k, rk);
+    const int lc = (sl == 0) ? amrex::coarsen(l - rl / 2, rl) : amrex::coarsen(l, rl);
 
     // Interpolate from coarse grid to fine grid using 2 points
     // with weights depending on the distance, for both nodal and cell-centered grids
@@ -70,17 +70,20 @@ void warpx_interp (int j, int k, int l,
 
     amrex::Real res = 0.0_rt;
 
-    for         (int jj = 0; jj < nj; jj++) {
-        for     (int kk = 0; kk < nk; kk++) {
+    for (int jj = 0; jj < nj; jj++) {
+        for (int kk = 0; kk < nk; kk++) {
             for (int ll = 0; ll < nl; ll++) {
-                const amrex::Real wj = (rj - amrex::Math::abs(j + hj - (jc + jj + hj) * rj)) / static_cast<amrex::Real>(rj);
-                const amrex::Real wk = (rk - amrex::Math::abs(k + hk - (kc + kk + hk) * rk)) / static_cast<amrex::Real>(rk);
-                const amrex::Real wl = (rl - amrex::Math::abs(l + hl - (lc + ll + hl) * rl)) / static_cast<amrex::Real>(rl);
-                res += wj * wk * wl * arr_coarse_zeropad(jc+jj,kc+kk,lc+ll);
+                const amrex::Real wj = (rj - amrex::Math::abs(j + hj - (jc + jj + hj) * rj)) /
+                                       static_cast<amrex::Real>(rj);
+                const amrex::Real wk = (rk - amrex::Math::abs(k + hk - (kc + kk + hk) * rk)) /
+                                       static_cast<amrex::Real>(rk);
+                const amrex::Real wl = (rl - amrex::Math::abs(l + hl - (lc + ll + hl) * rl)) /
+                                       static_cast<amrex::Real>(rl);
+                res += wj * wk * wl * arr_coarse_zeropad(jc + jj, kc + kk, lc + ll);
             }
         }
     }
-    arr_aux(j,k,l) = arr_fine(j,k,l) + res;
+    arr_aux(j, k, l, component) = arr_fine(j, k, l, component) + res;
 }
 
 /**

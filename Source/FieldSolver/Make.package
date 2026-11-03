@@ -1,3 +1,5 @@
+CEXE_sources += CurrentControlledPort.cpp
+CEXE_sources += CompositeCurrentControlledPort.cpp
 CEXE_sources += WarpXPushFieldsEM.cpp
 CEXE_sources += WarpXPushFieldsHybridPIC.cpp
 CEXE_sources += ElectrostaticSolver.cpp

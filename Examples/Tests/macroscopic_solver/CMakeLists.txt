@@ -30,3 +30,45 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
+
+foreach(mode IN ITEMS vacuum conductor refined)
+    add_warpx_test(
+        test_3d_macroscopic_cleaning_${mode}
+        3
+        1
+        "inputs_base_3d_macroscopic_cleaning.py --mode ${mode}"
+        OFF
+        OFF
+        OFF
+    )
+endforeach()
+
+if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
+    add_warpx_test(
+        test_3d_macroscopic_cleaning_material_rejected
+        3
+        1
+        "inputs_base_3d_macroscopic_cleaning.py --mode reject"
+        OFF
+        OFF
+        OFF
+    )
+    set_tests_properties(
+        test_3d_macroscopic_cleaning_material_rejected.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "macroscopic.dive_cleaning_vacuum_patches_only=1"
+    )
+endif()
+
+foreach(medium IN ITEMS vacuum backwardeuler laxwendroff)
+    foreach(levels IN ITEMS 1 2)
+        add_warpx_test(
+            test_3d_after_e_push_callback_${medium}_${levels}levels
+            3
+            1
+            "inputs_base_3d_after_e_push_callback.py --medium ${medium} --levels ${levels}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+endforeach()
