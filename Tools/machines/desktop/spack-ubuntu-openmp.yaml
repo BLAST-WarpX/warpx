@@ -14,38 +14,38 @@
 #
 spack:
   specs:
-  - adios2
-  - blaspp ~cuda +openmp ~rocm
-  - boost
-  - ccache
-  - cmake
-  - ecp-data-vis-sdk +adios2 +ascent +hdf5 +sensei
-  - fftw
-  - hdf5
-  - lapackpp ~cuda ~rocm ^blaspp ~cuda +openmp ~rocm
-  - mpi
-  - pkgconfig
-  - python
-  - py-cython
-  - py-h5py
-  - py-libensemble +nlopt
-  - py-mpi4py
-  - py-numpy
-  - py-pip
-  - py-setuptools
-  - py-wheel
-# skipped to save time: 3D post-processing
-#  - paraview +adios2 +python3 +qt
-# skipped to save time, because they are faster installed via pip afterwards
-# python3 -m pip install jupyter matplotlib numpy openpmd-api openpmd-viewer pandas scipy yt
-#  - py-jupyter
-#  - py-matplotlib +animation +fonts +latex +movies
-#  - openpmd-api +python
-#  - py-openpmd-viewer +numba +jupyter
-#  - py-pandas
-#  - py-pyqt5
-#  - py-scipy
-#  - py-yt
+    - adios2
+    - blaspp ~cuda +openmp ~rocm
+    - boost
+    - ccache
+    - cmake
+    - ecp-data-vis-sdk +adios2 +ascent +hdf5 +sensei
+    - fftw
+    - hdf5
+    - lapackpp ~cuda ~rocm ^blaspp ~cuda +openmp ~rocm
+    - mpi
+    - pkgconfig
+    - python
+    - py-cython
+    - py-h5py
+    - py-libensemble +nlopt
+    - py-mpi4py
+    - py-numpy
+    - py-pip
+    - py-setuptools
+    - py-wheel
+  # skipped to save time: 3D post-processing
+  #  - paraview +adios2 +python3 +qt
+  # skipped to save time, because they are faster installed via pip afterwards
+  # python3 -m pip install jupyter matplotlib numpy openpmd-api openpmd-viewer pandas scipy yt
+  #  - py-jupyter
+  #  - py-matplotlib +animation +fonts +latex +movies
+  #  - openpmd-api +python
+  #  - py-openpmd-viewer +numba +jupyter
+  #  - py-pandas
+  #  - py-pyqt5
+  #  - py-scipy
+  #  - py-yt
 
   packages:
     all:
@@ -53,74 +53,71 @@ spack:
     # default blocks at HDF5 1.8, resulting in unmergable solution
     conduit:
       variants: ~hdf5_compat
-
   compilers:
-  # Ubuntu
-  - compiler:
-      spec: gcc@11.2.0
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      operating_system: ubuntu22.04
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-  - compiler:
-      spec: gcc@9.4.0
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      operating_system: ubuntu20.04
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-  # Debian
-  - compiler:
-      spec: gcc@12.2.0
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      # unstable/sid
-      operating_system: debianunstable
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-  - compiler:
-      spec: gcc@10.2.1
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      operating_system: debian11
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-
+    # Ubuntu
+    - compiler:
+        spec: gcc@11.2.0
+        paths:
+          cc: /usr/bin/gcc
+          cxx: /usr/bin/g++
+          f77: /usr/bin/gfortran
+          fc: /usr/bin/gfortran
+        flags: {}
+        operating_system: ubuntu22.04
+        target: x86_64
+        modules: []
+        environment: {}
+        extra_rpaths: []
+    - compiler:
+        spec: gcc@9.4.0
+        paths:
+          cc: /usr/bin/gcc
+          cxx: /usr/bin/g++
+          f77: /usr/bin/gfortran
+          fc: /usr/bin/gfortran
+        flags: {}
+        operating_system: ubuntu20.04
+        target: x86_64
+        modules: []
+        environment: {}
+        extra_rpaths: []
+    # Debian
+    - compiler:
+        spec: gcc@12.2.0
+        paths:
+          cc: /usr/bin/gcc
+          cxx: /usr/bin/g++
+          f77: /usr/bin/gfortran
+          fc: /usr/bin/gfortran
+        flags: {}
+        # unstable/sid
+        operating_system: debianunstable
+        target: x86_64
+        modules: []
+        environment: {}
+        extra_rpaths: []
+    - compiler:
+        spec: gcc@10.2.1
+        paths:
+          cc: /usr/bin/gcc
+          cxx: /usr/bin/g++
+          f77: /usr/bin/gfortran
+          fc: /usr/bin/gfortran
+        flags: {}
+        operating_system: debian11
+        target: x86_64
+        modules: []
+        environment: {}
+        extra_rpaths: []
   # binary caches
   mirrors:
     E4S: https://cache.e4s.io
     LLNL: https://mirror.spack.io
-
   # do not try to reuse existing packages, which can confuse the concretizer
   concretizer:
     reuse: false
     unify: true
+    # limit the build parallelism (default: call virtual cores)
 
-  # limit the build parallelism (default: call virtual cores)
 #  config:
 #    build_jobs: 6

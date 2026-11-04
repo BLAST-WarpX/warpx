@@ -15,17 +15,17 @@
 #
 spack:
   specs:
-  # note: the spec "doxygen+graphviz" causes an environment issue for me
-  - doxygen
-  - graphviz
-  - python
-  - py-openpmd-viewer
-  - py-breathe
-  - py-myst-parser
-  - py-pybtex
-  - py-pygments
-  - py-sphinx
-  - py-sphinx-copybutton
-  - py-sphinx-design
-  - py-sphinx-rtd-theme
-  - py-yt
+    # note: the spec "doxygen+graphviz" causes an environment issue for me
+    - doxygen
+    - graphviz
+    - python
+    - py-openpmd-viewer
+    - py-breathe
+    - py-myst-parser
+    - py-pybtex
+    - py-pygments
+    - py-sphinx
+    - py-sphinx-copybutton
+    - py-sphinx-design
+    - py-sphinx-rtd-theme
+    - py-yt

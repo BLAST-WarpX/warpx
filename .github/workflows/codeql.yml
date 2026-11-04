@@ -1,16 +1,13 @@
 name: 🔍 CodeQL
-
 on:
   push:
-    branches: [ "development" ]
+    branches: ["development"]
   pull_request:
-    branches: [ "development" ]
+    branches: ["development"]
     types: [opened, synchronize, reopened, ready_for_review]
-
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-codeql
   cancel-in-progress: true
-
 jobs:
   analyze:
     name: Analyze
@@ -20,21 +17,17 @@ jobs:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
-        language: [ python, cpp ]
-
+        language: [python, cpp]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         name: Install Python
         with:
           python-version: '3.x'
-
       - name: Install Packages (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
@@ -46,7 +39,6 @@ jobs:
           python -m pip install --upgrade wheel
           python -m pip install --upgrade cmake
           python -m pipx install cmake
-
       - name: Set Up Cache
         if: ${{ matrix.language == 'cpp' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -54,24 +46,20 @@ jobs:
           path: ~/.cache/ccache
           key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
           restore-keys: |
-               ccache-${{ github.workflow }}-${{ github.job }}-git-
-
+            ccache-${{ github.workflow }}-${{ github.job }}-git-
       - name: Configure (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
           cmake -S . -B build -DWarpX_OPENPMD=ON
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           config-file: ./.github/codeql/warpx-codeql.yml
           languages: ${{ matrix.language }}
           queries: +security-and-quality
-
       - name: Build (py)
         uses: github/codeql-action/autobuild@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         if: ${{ matrix.language == 'python' }}
-
       - name: Build (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
@@ -89,14 +77,12 @@ jobs:
           touch Source/Utils/WarpXVersion.cpp
           export CCACHE_DISABLE=1
           cmake --build build -j 4
-
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: "/language:${{ matrix.language }}"
           upload: False
           output: sarif-results
-
       - name: filter-sarif
         uses: advanced-security/filter-sarif@2da736ff05ef065cb2894ac6892e47b5eac2c3c0 # v1.1
         with:
@@ -110,7 +96,6 @@ jobs:
             -build/_deps/*/*/*/*/*/*/*/*
           input: sarif-results/${{ matrix.language }}.sarif
           output: sarif-results/${{ matrix.language }}.sarif
-
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:

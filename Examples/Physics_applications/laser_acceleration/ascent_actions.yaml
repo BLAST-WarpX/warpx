@@ -1,5 +1,4 @@
--
-  action: "add_pipelines"
+- action: "add_pipelines"
   pipelines:
     clipped_volume:
       f0:
@@ -56,7 +55,6 @@
               x: -0.7
               y: -0.7
               z: 0.0
-
 # Uncomment this block if you want to create "Conduit Blueprint files" that can
 # be used with Ascent "replay" after the simulation run.
 # Replay is a workflow to visualize individual steps without running the simulation again.
@@ -68,9 +66,7 @@
 #      params:
 #        path: "./conduit_blueprint"
 #        protocol: "blueprint/mesh/hdf5"
-
--
-  action: "add_scenes"
+- action: "add_scenes"
   scenes:
     scene1:
       plots:

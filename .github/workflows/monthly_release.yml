@@ -1,14 +1,11 @@
 name: Monthly release
-
 on:
   schedule:
-    - cron: "0 9 2 * *"  # every second day of the month at 1:00am PST (9:00am UTC)
+    - cron: "0 9 2 * *" # every second day of the month at 1:00am PST (9:00am UTC)
   workflow_dispatch:
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   autoupdate:
     name: Autoupdate
