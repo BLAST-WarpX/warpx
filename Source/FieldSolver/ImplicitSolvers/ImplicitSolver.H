@@ -115,7 +115,7 @@ public:
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve (bool update_pc);
+    void PreLinearSolve (bool update_pc, int nl_iter);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -351,6 +351,11 @@ protected:
      * \brief Whether to use mass matrices to compute J during linear stage of JFNK
      */
     bool m_use_mass_matrices_jacobian = false;
+
+    /**
+     * \brief Newton interval to update mass matrices for Jacobian
+     */
+    int m_update_mass_matrices_newton_interval = 1;
 
     /**
      * \brief Whether to use mass matrices in the preconditioner
