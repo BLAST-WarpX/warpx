@@ -4521,7 +4521,11 @@ Additional parameters
     :default: s: ``-1``
     :optional:
 
-    When running with tiny profiling, this allows the profiling information to be written out at times during the simulation, specified using the `Time intervals`_ syntax, in addition to at the end.
+    When WarpX is built with the AMReX tiny profiler, write the profiling report at the time steps specified using the `Time intervals`_ syntax, in addition to the report at the end of the simulation.
+    Each report contains timings (and memory usage, if memory profiling is enabled) accumulated since the start of the run.
+    Timers that are still active when the report is written, such as the enclosing ``WarpX::Evolve()`` timer, are only complete in the final report.
+    If the last step of the simulation is included in the intervals, the report is written twice at the end.
+    Writing the report involves collective communication over all timers, so very frequent intervals may slow the simulation down.
 
 .. pp:param:: warpx.sort_intervals
     :type: ``string``
