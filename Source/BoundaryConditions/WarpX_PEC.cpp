@@ -365,7 +365,6 @@ namespace
      * \param[in] sum_on_boundary   whether the guards are summed on the boundary (for J|| and PECInsulator)
      * \param[in] nguards           number of guard cells to sum over
      * \param[in] idim              boundary direction
-     * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -378,8 +377,6 @@ namespace
                         const amrex::GpuArray<int,2> & sum_on_boundary,
                         int const nguards,
                         [[maybe_unused]]int const idim,
-                        [[maybe_unused]]int const is_nodal_r,
-                        [[maybe_unused]]bool const is_rho_field,
                         amrex::Box const& fabbox)
     {
 
@@ -438,7 +435,6 @@ namespace
      * \param[in] is_reflective     whether the given boundary is reflective
      * \param[in] psign             sign for reflecting the field value across the boundary
      * \param[in] idim              boundary direction
-     * \param[in] is_nodal_r        whether data is nodal along r
      * \param[in] fabbox            multifab box including ghost cells
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -449,8 +445,6 @@ namespace
                     const amrex::GpuArray<int,2> & is_reflective,
                     const amrex::GpuArray<amrex::Real,2> & psign,
                     [[maybe_unused]]int const idim,
-                    [[maybe_unused]]int const is_nodal_r,
-                    [[maybe_unused]]bool const is_rho_field,
                           amrex::Box const& fabbox)
     {
 
@@ -800,9 +794,9 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::ReflectJorRho( n, iv, rho_array, mirrorfac[idim],
-                                 is_reflective[idim], psign[idim], sum_on_boundary[idim], Ng[idim],
-                                 idim, rho_nodal[0], /*is_rho_field*/true, rho_fabbox );
+                ::ReflectJorRho(n, iv, rho_array, mirrorfac[idim],
+                                is_reflective[idim], psign[idim], sum_on_boundary[idim], Ng[idim],
+                                idim, rho_fabbox);
             });
 
         }
@@ -839,9 +833,9 @@ PEC::ApplyReflectiveBoundarytoRhofield (
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::SetJorRho( n, iv, rho_array, mirrorfac[idim],
-                             is_reflective[idim], psign[idim], idim,
-                             rho_nodal[0], /*is_rho_field*/true, rho_fabbox );
+                ::SetJorRho(n, iv, rho_array, mirrorfac[idim],
+                            is_reflective[idim], psign[idim], idim,
+                            rho_fabbox);
             });
 
         }
@@ -1008,25 +1002,25 @@ PEC::ApplyReflectiveBoundarytoJfield (
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::ReflectJorRho( n, iv, Jx_array, mirrorfac[idim][0],
-                                 is_reflective[idim], psign[idim][0], sum_on_boundary[idim], Ng[idim],
-                                 idim, Jx_nodal[0], /*is_rho_field*/false, Jx_fabbox );
+                ::ReflectJorRho(n, iv, Jx_array, mirrorfac[idim][0],
+                                is_reflective[idim], psign[idim][0], sum_on_boundary[idim], Ng[idim],
+                                idim, Jx_fabbox);
             },
             Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::ReflectJorRho( n, iv, Jy_array, mirrorfac[idim][1],
-                                 is_reflective[idim], psign[idim][1], sum_on_boundary[idim], Ng[idim],
-                                 idim, Jy_nodal[0], /*is_rho_field*/false, Jy_fabbox );
+                ::ReflectJorRho(n, iv, Jy_array, mirrorfac[idim][1],
+                                is_reflective[idim], psign[idim][1], sum_on_boundary[idim], Ng[idim],
+                                idim, Jy_fabbox);
             },
             Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::ReflectJorRho( n, iv, Jz_array, mirrorfac[idim][2],
-                                 is_reflective[idim], psign[idim][2], sum_on_boundary[idim], Ng[idim],
-                                 idim, Jz_nodal[0], /*is_rho_field*/false, Jz_fabbox );
+                ::ReflectJorRho(n, iv, Jz_array, mirrorfac[idim][2],
+                                is_reflective[idim], psign[idim][2], sum_on_boundary[idim], Ng[idim],
+                                idim, Jz_fabbox);
             });
 
         }
@@ -1069,25 +1063,25 @@ PEC::ApplyReflectiveBoundarytoJfield (
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::SetJorRho( n, iv, Jx_array, mirrorfac[idim][0],
-                             is_reflective[idim], psign[idim][0], idim,
-                             Jx_nodal[0], /*is_rho_field*/false, Jx_fabbox );
+                ::SetJorRho(n, iv, Jx_array, mirrorfac[idim][0],
+                            is_reflective[idim], psign[idim][0], idim,
+                            Jx_fabbox);
             },
             Jy_box, Jy->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::SetJorRho( n, iv, Jy_array, mirrorfac[idim][1],
-                             is_reflective[idim], psign[idim][1], idim,
-                             Jy_nodal[0], /*is_rho_field*/false, Jy_fabbox );
+                ::SetJorRho(n, iv, Jy_array, mirrorfac[idim][1],
+                            is_reflective[idim], psign[idim][1], idim,
+                            Jy_fabbox);
             },
             Jz_box, Jz->nComp(), [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 amrex::ignore_unused(j,k);
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
-                ::SetJorRho( n, iv, Jz_array, mirrorfac[idim][2],
-                             is_reflective[idim], psign[idim][2], idim,
-                             Jz_nodal[0], /*is_rho_field*/false, Jz_fabbox );
+                ::SetJorRho(n, iv, Jz_array, mirrorfac[idim][2],
+                            is_reflective[idim], psign[idim][2], idim,
+                            Jz_fabbox);
             });
 
         }

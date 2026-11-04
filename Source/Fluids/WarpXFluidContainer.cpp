@@ -1436,7 +1436,9 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
     // Assertion, make sure rho is at the same location as N
     AMREX_ALWAYS_ASSERT(rho.ixType().nodeCentered());
 
-    // Deposit fluid charge in the unscaled PIC representation
+    // Multiply physical fluid charge density by the volume factor to match
+    // the raw charge deposited by PIC particles. The inverse-volume scaling
+    // in FinalizeRho restores physical charge density.
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1464,7 +1466,6 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
 #else
                     const amrex::Real volume_factor = 1.0_rt;
 #endif
-                    // Match PIC deposits before radial inverse-volume scaling.
                     rho_arr(i,j,k,icomp) += volume_factor*q*N_arr(i,j,k);
                 }
             }
@@ -1588,8 +1589,10 @@ void WarpXFluidContainer::DepositCurrent(
         const amrex::GpuArray<int, 3U> coarsening_ratio = {1, 1, 1};
 
 
-        // Interpolate physical fluid current, then match unscaled PIC deposits
-        // using the volume factor at each destination component's location.
+        // Interpolate physical fluid current density, then multiply by the volume
+        // factor at each destination component's location to match the raw current
+        // deposited by PIC particles. The inverse-volume scaling in FinalizeJ
+        // restores physical current density.
         // ( mask double counting )
         amrex::ParallelFor( tile_box_x, tile_box_y, tile_box_z,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
