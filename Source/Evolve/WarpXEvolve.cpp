@@ -393,10 +393,14 @@ WarpX::Evolve (int numsteps)
             break;
         }
 
+#if defined(AMREX_TINY_PROFILING) && !defined(BL_PROFILING)
+        // Collective (MPI reductions/gathers): must be called on the same steps on all ranks.
         if (m_tiny_profiler_flush_interval.contains(step+1)) {
+            amrex::Print() << "Tiny profiler flush at step " << step+1 << "\n";
+            BL_PROFILE("WarpX::TinyProfilerFlush");
             BL_PROFILE_TINY_FLUSH();
         }
-
+#endif
     } // End loop on time steps
 
     // This if statement is needed for PICMI, which allows the Evolve routine to be
