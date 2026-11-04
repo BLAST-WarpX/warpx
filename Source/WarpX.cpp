@@ -702,6 +702,18 @@ WarpX::ReadParameters ()
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
             ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
+        std::vector<std::string> tiny_profiler_flush_interval_vec = {"-1"};
+        pp_warpx.queryarr("tiny_profiler_flush_interval", tiny_profiler_flush_interval_vec);
+        m_tiny_profiler_flush_interval =
+            ablastr::utils::text::IntervalsParser(tiny_profiler_flush_interval_vec);
+#if !defined(AMREX_TINY_PROFILING) || defined(BL_PROFILING)
+        if (m_tiny_profiler_flush_interval.isActivated()) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Profiling",
+                "warpx.tiny_profiler_flush_interval is ignored because WarpX was not built with the tiny profiler.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+#endif
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
@@ -1101,10 +1113,6 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "particle_io_nfiles", particle_io_nfiles);
             ParmParse pp_particles("particles");
             pp_particles.add("particles_nfiles", particle_io_nfiles);
-
-            std::vector<std::string> tiny_profiler_flush_interval_vec = {"-1"};
-            pp_warpx.queryarr("tiny_profiler_flush_interval", tiny_profiler_flush_interval_vec);
-            m_tiny_profiler_flush_interval = ablastr::utils::text::IntervalsParser(tiny_profiler_flush_interval_vec);
         }
 
         if (maxLevel() > 0) {
