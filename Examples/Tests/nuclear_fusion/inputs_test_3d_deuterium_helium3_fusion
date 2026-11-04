@@ -1,0 +1,148 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+## With these parameters, each cell has a size of exactly 1 by 1 by 1
+# Run two steps. The first step to check the fusion collisions, the
+# second step to provide a comparison for the rerun.
+max_step = 2
+amr.n_cell = 8 8 16
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo     = 0.    0.    0.
+geometry.prob_hi     = 8.    8.   16.
+
+warpx.random_seed = 4
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.cfl = 1.0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = deuterium_1 helium3_1 helium4_1 proton_1 deuterium_2 helium3_2 proton_2 helium4_2
+
+my_constants.m_deuterium = 2.01410177812*m_u - m_e
+my_constants.m_helium3 = 3.016029*m_u - 2*m_e
+my_constants.m_reduced = m_deuterium*m_helium3/(m_deuterium+m_helium3)
+my_constants.keV_to_J = 1.e3*q_e
+my_constants.Energy_step = 22. * keV_to_J
+
+deuterium_1.species_type = deuterium
+deuterium_1.injection_style = "NRandomPerCell"
+deuterium_1.num_particles_per_cell = 10000
+deuterium_1.profile = constant
+deuterium_1.density = 1.
+deuterium_1.momentum_distribution_type = "parse_momentum_function"
+deuterium_1.momentum_function_ux(x,y,z) = 0.
+deuterium_1.momentum_function_uy(x,y,z) = 0.
+## Thanks to the floor, all particles in the same cell have the exact same momentum
+deuterium_1.momentum_function_uz(x,y,z) = sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_deuterium*clight)
+deuterium_1.do_not_push = 1
+deuterium_1.do_not_deposit = 1
+
+helium3_1.species_type = helium3
+helium3_1.injection_style = "NRandomPerCell"
+helium3_1.num_particles_per_cell = 10000
+helium3_1.profile = constant
+helium3_1.density = 1.
+helium3_1.momentum_distribution_type = "parse_momentum_function"
+helium3_1.momentum_function_ux(x,y,z) = 0.
+helium3_1.momentum_function_uy(x,y,z) = 0.
+## Thanks to the floor, all particles in the same cell have the exact same momentum
+helium3_1.momentum_function_uz(x,y,z) = -sqrt(2*m_reduced*Energy_step*(floor(z)**2))/(m_helium3*clight)
+helium3_1.do_not_push = 1
+helium3_1.do_not_deposit = 1
+
+helium4_1.species_type = helium4
+helium4_1.do_not_push = 1
+helium4_1.do_not_deposit = 1
+
+proton_1.species_type = proton
+proton_1.do_not_push = 1
+proton_1.do_not_deposit = 1
+
+my_constants.background_dens = 1.e26
+my_constants.beam_dens = 1.e20
+
+## A tenth of the macroparticles in each cell is made of immobile high-density background deuteriums.
+## The other nine tenths are made of fast low-density beam deuteriums.
+deuterium_2.species_type = deuterium
+deuterium_2.injection_sources = high_density low_density
+deuterium_2.profile = constant
+deuterium_2.high_density.injection_style = "NRandomPerCell"
+deuterium_2.high_density.num_particles_per_cell = 100
+deuterium_2.high_density.density = 10.*background_dens
+deuterium_2.high_density.momentum_distribution_type = at_rest
+deuterium_2.low_density.injection_style = "NRandomPerCell"
+deuterium_2.low_density.num_particles_per_cell = 900
+deuterium_2.low_density.density = 10./9.*beam_dens
+deuterium_2.low_density.momentum_distribution_type = "parse_momentum_function"
+deuterium_2.low_density.momentum_function_ux(x,y,z) = 0.
+deuterium_2.low_density.momentum_function_uy(x,y,z) = 0.
+deuterium_2.low_density.momentum_function_uz(x,y,z) = sqrt(2*m_deuterium*Energy_step*(floor(z)**2))/(m_deuterium*clight)
+deuterium_2.do_not_push = 1
+deuterium_2.do_not_deposit = 1
+
+helium3_2.species_type = helium3
+helium3_2.injection_style = "NRandomPerCell"
+helium3_2.num_particles_per_cell = 100
+helium3_2.profile = constant
+helium3_2.density = background_dens
+helium3_2.momentum_distribution_type = "constant"
+helium3_2.do_not_push = 1
+helium3_2.do_not_deposit = 1
+
+helium4_2.species_type = helium4
+helium4_2.do_not_push = 1
+helium4_2.do_not_deposit = 1
+
+proton_2.species_type = proton
+proton_2.do_not_push = 1
+proton_2.do_not_deposit = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = DHeF1 DHeF2
+
+# The two tests list the product species in opposite orders, so that both ways of
+# matching each product with the reactant of the same charge are exercised.
+DHeF1.species = deuterium_1 helium3_1
+DHeF1.product_species = helium4_1 proton_1
+DHeF1.type = nuclearfusion
+DHeF1.event_multiplier = 1.e50
+DHeF1.create_products = 1
+DHeF1.save_particle_production = 1
+
+DHeF2.species = deuterium_2 helium3_2
+DHeF2.product_species = proton_2 helium4_2
+DHeF2.type = nuclearfusion
+DHeF2.event_multiplier = 1.e15
+DHeF2.probability_target_value = 0.02
+DHeF2.create_products = 1
+DHeF2.save_particle_production = 1
+
+# Diagnostics
+diagnostics.diags_names = diag1 checkpoint
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = rho DHeF1_particle_production DHeF2_particle_production
+
+checkpoint.format = checkpoint
+checkpoint.diag_type = Full
+checkpoint.intervals = 1:1:1
+checkpoint.dump_last_timestep = 0
