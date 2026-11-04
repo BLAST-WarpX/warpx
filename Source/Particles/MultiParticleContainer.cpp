@@ -142,6 +142,12 @@ MultiParticleContainer::ReadParameters ()
                        m_B_ext_particle_s.end(),
                        m_B_ext_particle_s.begin(),
                        ::tolower);
+#if defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_B_ext_particle_s == "none",
+            "RSPHERE does not support external magnetic fields: "
+            "particles.B_ext_particle_init_style must be none.");
+#endif
         pp_particles.query("E_ext_particle_init_style", m_E_ext_particle_s);
         std::transform(m_E_ext_particle_s.begin(),
                        m_E_ext_particle_s.end(),

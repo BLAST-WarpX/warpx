@@ -481,8 +481,6 @@ void FiniteDifferenceSolver::EvolveESpherical (
 
         // Extract field data for this grid/tile
         Array4<Real> const& Er = Efield[0]->array(mfi);
-        Array4<Real> const& Etheta = Efield[1]->array(mfi);
-        Array4<Real> const& Ephi = Efield[2]->array(mfi);
         Array4<Real> const& jr = Jfield[0]->array(mfi);
 
         // Extract stencil coefficients
@@ -491,25 +489,15 @@ void FiniteDifferenceSolver::EvolveESpherical (
 
         // Extract tileboxes for which to loop
         Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
-        Box const& tet  = mfi.tilebox(Efield[1]->ixType().toIntVect());
-        Box const& tep  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
         Real constexpr c2 = PhysConst::c2;
 
         // Loop over the cells and update the fields
-        amrex::ParallelFor(ter, tet, tep,
+        amrex::ParallelFor(ter,
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
                 Er(i, 0, 0, 0) += c2 * dt*(
                     - PhysConst::mu0 * jr(i, 0, 0, 0) );
-            },
-
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Etheta(i, 0, 0, 0) = 0.;
-            },
-
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Ephi(i, 0, 0, 0) = 0.;
             }
 
         ); // end of loop over cells

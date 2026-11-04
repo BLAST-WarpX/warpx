@@ -450,8 +450,7 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void CalculateCurrentAmpereSpherical (
-            ablastr::fields::VectorField& Jfield,
-            int lev
+            ablastr::fields::VectorField& Jfield
         );
 
         template<typename T_Algo>
