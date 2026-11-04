@@ -70,8 +70,7 @@ public:
                       const WarpXSolverVec&  a_Z,
                       amrex::Real      start_time,
                       int              a_nl_iter,
-                      bool             a_from_jacobian,
-                      bool update_pc = true ) override;
+                      bool             a_from_jacobian ) override;
 
     /** \brief Pointer back to the main WarpX class, used by DarwinLinearFieldOperator */
     [[nodiscard]] WarpX* GetWarpX () const { return m_WarpX; }
