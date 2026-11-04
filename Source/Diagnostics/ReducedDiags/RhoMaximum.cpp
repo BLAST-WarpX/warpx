@@ -33,7 +33,7 @@ RhoMaximum::RhoMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // RZ coordinate is not working
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "RhoMaximum reduced diagnostics does not work for RZ coordinate.");
 #endif

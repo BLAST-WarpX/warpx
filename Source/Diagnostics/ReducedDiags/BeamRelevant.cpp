@@ -76,7 +76,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
     //       12: beta-function x
     //       13: charge
     m_data.resize(14, 0.0_rt);
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
     //       0 : mean z
     //   1,2,3 : mean px,py,pz
     //       4 : gamma
@@ -163,7 +163,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
             ofs << "[" << c++ << "]alpha_x()";        ofs << m_sep;
             ofs << "[" << c++ << "]beta_x(m)";        ofs << m_sep;
             ofs << "[" << c++ << "]charge(C)";        ofs << "\n";
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
             int c = 0;
             ofs << "#";
             ofs << "[" << c++ << "]step()";           ofs << m_sep;
@@ -381,7 +381,7 @@ void BeamRelevant::ComputeDiags (int step)
         m_data[19] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
         m_data[20] = (PhysConst::c * y_ms) / std::sqrt(y_ms*uy_ms-yuy*yuy);
         m_data[21] = charge;
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
         m_data[0]  = x_mean;
         m_data[1]  = z_mean;
         m_data[2]  = ux_mean * m;
@@ -416,7 +416,7 @@ void BeamRelevant::ComputeDiags (int step)
         m_data[12] = (PhysConst::c * x_ms) / std::sqrt(x_ms*ux_ms-xux*xux);
         m_data[13] = charge;
         amrex::ignore_unused(y_ms, yuy, z_mean, z_ms, zuz);
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
         m_data[0]  = z_mean;
         m_data[1]  = ux_mean * m;
         m_data[2]  = uy_mean * m;

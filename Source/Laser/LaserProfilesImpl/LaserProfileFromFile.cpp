@@ -255,7 +255,7 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (const std::string& 
         if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to read sizes from binary file"); }
         if(m_params.nt <= 1) { WARPX_ABORT_WITH_MESSAGE("nt in binary file must be >=2"); }
         if(m_params.nx <= 1) { WARPX_ABORT_WITH_MESSAGE("nx in binary file must be >=2"); }
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
         if(m_params.ny <= 1) { WARPX_ABORT_WITH_MESSAGE("ny in binary file must be >=2 in 3D"); }
 #elif defined(WARPX_DIM_XZ)
         if(m_params.ny != 1) { WARPX_ABORT_WITH_MESSAGE("ny in binary file must be 1 in 2D"); }
@@ -264,7 +264,7 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (const std::string& 
         Vector<double> dbuf_t, dbuf_x, dbuf_y;
         dbuf_t.resize(2);
         dbuf_x.resize(2);
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
         dbuf_y.resize(2);
 #elif defined(WARPX_DIM_XZ)
         dbuf_y.resize(1);
@@ -281,7 +281,7 @@ WarpXLaserProfiles::FromFileLaserProfile::parse_binary_file (const std::string& 
         m_params.t_max = static_cast<amrex::Real>(dbuf_t[1]);
         m_params.x_min = static_cast<amrex::Real>(dbuf_x[0]);
         m_params.x_max = static_cast<amrex::Real>(dbuf_x[1]);
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
         m_params.y_min = static_cast<amrex::Real>(dbuf_y[0]);
         m_params.y_max = static_cast<amrex::Real>(dbuf_y[1]);
 #endif
@@ -386,7 +386,7 @@ WarpXLaserProfiles::FromFileLaserProfile::read_binary_data_t_chunk (int t_begin,
         std::ifstream inp(m_params.binary_file_name, std::ios::binary);
         if(!inp) { WARPX_ABORT_WITH_MESSAGE("Failed to open binary file"); }
         inp.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-#if (defined(WARPX_DIM_3D))
+#if defined(WARPX_DIM_3D)
         auto skip_amount = 1 +
         3*sizeof(uint32_t) +
         2*sizeof(double) +
@@ -622,7 +622,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
     const auto tmp_e_max = m_common_params.e_max;
     const auto tmp_x_min = m_params.x_min;
     const auto tmp_x_max = m_params.x_max;
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
     const auto tmp_y_min = m_params.y_min;
     const auto tmp_y_max = m_params.y_max;
     const auto tmp_ny = m_params.ny;
@@ -638,7 +638,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
         (m_params.t_max-m_params.t_min)/(m_params.nt-1) +
         m_params.t_min;
 
-#if (defined WARPX_DIM_1D_Z) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ABORT_WITH_MESSAGE("WarpXLaserProfiles::FromFileLaserProfile Not implemented for 1D");
 #endif
 
@@ -651,7 +651,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
             amplitude[i] = 0.0_rt;
             return;
         }
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
         if (Yp[i] <= tmp_y_min || Yp[i] >= tmp_y_max){
             amplitude[i] = 0.0_rt;
             return;
@@ -668,7 +668,7 @@ WarpXLaserProfiles::FromFileLaserProfile::internal_fill_amplitude_uniform_binary
         const auto x_1 =
             idx_x_right*(tmp_x_max-tmp_x_min)/(tmp_nx-1) + tmp_x_min;
 
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
         //Find indices and coordinates along y
         const int temp_idx_y_right = static_cast<int>(
             std::ceil((tmp_ny-1)*(Yp[i]- tmp_y_min)/(tmp_y_max-tmp_y_min)));
