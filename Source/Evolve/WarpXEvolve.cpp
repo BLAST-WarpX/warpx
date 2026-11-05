@@ -593,7 +593,7 @@ WarpX::OneStep_nosub (
         if (do_dive_cleaning) {
             mypc->DepositChargeComponent(m_fields, /*rho_comp=*/1);
         }
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
         // Normal particle deposits, remapping J, and post-split rho_new are all
         // still unscaled. Apply the radial normalization once to their sum.
         for (int lev = 0; lev <= finest_level; ++lev) {
@@ -1531,9 +1531,9 @@ WarpX::PushParticlesandDeposit (
     if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // Skip scaling J for implicit solvers: it is scaled after current accumulation.
-        // With explicit RZ splitting, scaling is instead applied after remapping J and
-        // post-split rho_new have been deposited.
-#if defined(WARPX_DIM_RZ)
+        // With explicit RZ/RSPHERE splitting, scaling is instead applied after remapping J
+        // and post-split rho_new have been deposited.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
         if (implicit_options || m_do_subcycling || !mypc->hasParticleSplitting()) {
             ApplyInverseVolumeScalingToDepositedFields(lev, !implicit_options);
         }

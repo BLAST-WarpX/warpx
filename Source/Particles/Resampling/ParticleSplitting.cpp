@@ -183,16 +183,17 @@ void ParticleSplitting::operator() (
     auto * const AMREX_RESTRICT z = soa.GetRealData(PIdx::z).data();
 #endif
     // Virtual remap: child prev_* = parent SoA (already x^{n+1} after the push).
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ) || \
+    defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT x_old = pc->HasRealComp("prev_x") ?
         pti.GetAttribs("prev_x").dataPtr() : nullptr;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT y_old = pc->HasRealComp("prev_y") ?
         pti.GetAttribs("prev_y").dataPtr() : nullptr;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z) || \
-    defined(WARPX_DIM_RZ)
+    defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
     auto * const AMREX_RESTRICT z_old = pc->HasRealComp("prev_z") ?
         pti.GetAttribs("prev_z").dataPtr() : nullptr;
 #endif
@@ -456,11 +457,31 @@ void ParticleSplitting::operator() (
 
 #if defined(WARPX_DIM_RZ)
                 if (x_old && y_old) {
-                    const amrex::ParticleReal x_parent = xp * std::cos(theta[parent_idx]);
-                    const amrex::ParticleReal y_parent = xp * std::sin(theta[parent_idx]);
+                    const amrex::ParticleReal x_parent =
+                        xp * std::cos(theta[parent_idx]);
+                    const amrex::ParticleReal y_parent =
+                        xp * std::sin(theta[parent_idx]);
                     for (int k = 0; k < np_split_per_parent; ++k) {
                         x_old[child_base + k] = x_parent;
                         y_old[child_base + k] = y_parent;
+                    }
+                }
+#elif defined(WARPX_DIM_RSPHERE)
+                if (x_old && y_old && z_old) {
+                    const amrex::ParticleReal r_p = xp;
+                    const amrex::ParticleReal theta_p = theta[parent_idx];
+                    const amrex::ParticleReal phi_p = phi[parent_idx];
+                    const amrex::ParticleReal cos_th_p = std::cos(theta_p);
+                    const amrex::ParticleReal sin_th_p = std::sin(theta_p);
+                    const amrex::ParticleReal cos_phi_p = std::cos(phi_p);
+                    const amrex::ParticleReal sin_phi_p = std::sin(phi_p);
+                    const amrex::ParticleReal x_parent = r_p * cos_th_p * cos_phi_p;
+                    const amrex::ParticleReal y_parent = r_p * sin_th_p * cos_phi_p;
+                    const amrex::ParticleReal z_parent = r_p * sin_phi_p;
+                    for (int k = 0; k < np_split_per_parent; ++k) {
+                        x_old[child_base + k] = x_parent;
+                        y_old[child_base + k] = y_parent;
+                        z_old[child_base + k] = z_parent;
                     }
                 }
 #elif defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)

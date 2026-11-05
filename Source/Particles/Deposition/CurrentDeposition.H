@@ -756,6 +756,12 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
         "XZ Esirkepov deposition requires both stored old-position components");
 #elif defined(WARPX_DIM_1D_Z)
     bool const using_stored_old_position = (zp_old_data != nullptr);
+#elif defined(WARPX_DIM_RSPHERE)
+    bool const using_stored_old_position = (xp_old_data != nullptr);
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        using_stored_old_position == (yp_old_data != nullptr) &&
+            using_stored_old_position == (zp_old_data != nullptr),
+        "RSPHERE Esirkepov deposition requires all stored old-position components");
 #endif
 
 #if (AMREX_SPACEDIM > 1)
@@ -825,19 +831,34 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const Complex xy_old0 = Complex{costheta_old, sintheta_old};
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
-            Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
-            Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
-            Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
-            Real const xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
-            Real const yp_mid = yp_new - 0.5_rt*dt*uyp[ip]*gaminv;
-            Real const zp_mid = zp_new - 0.5_rt*dt*uzp[ip]*gaminv;
-            Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
-            Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+            Real xp_new, yp_new, zp_new, xp_mid, yp_mid, zp_mid, xp_old, yp_old, zp_old;
+            if (using_stored_old_position) {
+                xp_new = xp;
+                yp_new = yp;
+                zp_new = zp;
+                xp_old = xp_old_data[ip];
+                yp_old = yp_old_data[ip];
+                zp_old = zp_old_data[ip];
+                xp_mid = 0.5_rt * (xp_old + xp_new);
+                yp_mid = 0.5_rt * (yp_old + yp_new);
+                zp_mid = 0.5_rt * (zp_old + zp_new);
+            } else {
+                xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+                yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+                zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+                xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
+                yp_mid = yp_new - 0.5_rt*dt*uyp[ip]*gaminv;
+                zp_mid = zp_new - 0.5_rt*dt*uzp[ip]*gaminv;
+                xp_old = xp_new - dt*uxp[ip]*gaminv;
+                yp_old = yp_new - dt*uyp[ip]*gaminv;
+                zp_old = zp_new - dt*uzp[ip]*gaminv;
+            }
             Real const rpxy_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
             Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
             Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
-            Real const rp_mid = (rp_new + rp_old)*0.5_rt;
+            Real const rp_mid = using_stored_old_position
+                ? std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid + zp_mid*zp_mid)
+                : (rp_new + rp_old)*0.5_rt;
 
             amrex::Real const costheta_mid = (rpxy_mid > 0. ? xp_mid/rpxy_mid : 1._rt);
             amrex::Real const sintheta_mid = (rpxy_mid > 0. ? yp_mid/rpxy_mid : 0._rt);
@@ -941,8 +962,12 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             Real const vz = uzp[ip]*gaminv;
 #elif defined(WARPX_DIM_RSPHERE)
             // convert from Cartesian to spherical
-            Real const vy = (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
-            Real const vz = (-uxp[ip]*costheta_mid*sinphi_mid - uyp[ip]*sintheta_mid*sinphi_mid + uzp[ip]*cosphi_mid)*gaminv;
+            Real const vy = using_stored_old_position
+                ? 0._rt
+                : (-uxp[ip]*sintheta_mid + uyp[ip]*costheta_mid)*gaminv;
+            Real const vz = using_stored_old_position
+                ? 0._rt
+                : (-uxp[ip]*costheta_mid*sinphi_mid - uyp[ip]*sintheta_mid*sinphi_mid + uzp[ip]*cosphi_mid)*gaminv;
 #endif
 
             // --- Compute shape factors

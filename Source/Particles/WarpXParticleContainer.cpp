@@ -753,13 +753,13 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 #else
                 const ParticleReal* xp_old_data = nullptr;
 #endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
                 const ParticleReal* yp_old_data = (use_stored_old_position && HasRealComp("prev_y")) ?
                     pti.GetAttribs("prev_y").dataPtr() + offset : nullptr;
 #else
                 const ParticleReal* yp_old_data = nullptr;
 #endif
-#if defined(WARPX_ZINDEX)
+#if defined(WARPX_ZINDEX) || defined(WARPX_DIM_RSPHERE)
                 const ParticleReal* zp_old_data = (use_stored_old_position && HasRealComp("prev_z")) ?
                     pti.GetAttribs("prev_z").dataPtr() + offset : nullptr;
 #else
