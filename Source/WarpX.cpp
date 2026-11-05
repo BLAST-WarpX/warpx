@@ -1279,9 +1279,10 @@ WarpX::ReadParameters ()
         // Ensure code aborts if "none" is used for particles anywhere else than at r=0
         // for cylindrical and spherical geometries
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            bool none_allowed_lo = false;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            none_allowed_lo = (idim == 0) && (Geom(0).ProbLo(0) == 0);
+            const bool none_allowed_lo = (idim == 0) && (Geom(0).ProbLo(0) == 0);
+#else
+            const bool none_allowed_lo = false;
 #endif
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 none_allowed_lo || WarpX::particle_boundary_lo[idim] != ParticleBoundaryType::None,
