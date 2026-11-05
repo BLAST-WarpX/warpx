@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# nodal file resampled onto the Yee grid with the default n-linear
+# interpolation: the per-component half-cell averaging imprints an m=4
+# azimuthal mode on the axisymmetric input
+warpx.read_fields_from_path = "../test_3d_external_field_staggering_prepare/ext_fields_nodal.h5"
