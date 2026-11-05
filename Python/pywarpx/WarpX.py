@@ -5,6 +5,7 @@
 #
 # License: BSD-3-Clause-LBNL
 
+import os
 import re
 import sys
 
@@ -101,8 +102,6 @@ class WarpX(Bucket):
         """Parse an AMReX input file (and its includes) and return the
         geometry.dims value as a string or None if not found.
         """
-        import os
-
         if visited is None:
             visited = set()
         filename = os.path.abspath(filename)
@@ -145,6 +144,50 @@ class WarpX(Bucket):
 
         return dims_value
 
+    @staticmethod
+    def _amrex_argv(filename):
+        """The AMReX command line that loads an inputs file.
+
+        AMReX guesses whether its first argument is an inputs file: it is not
+        if it contains "=", and if it starts with "-", the parser is skipped
+        entirely (amrex::Initialize). A Jupyter kernel's sys.argv is
+        ["...launcher.py", "-f", "...json"], which would hide the inputs file
+        and every parameter in it. The file is thus included with an explicit
+        FILE directive, which also loads a path that contains "=".
+
+        Overrides as in `python run.py max_step=10 amr.n_cell=64 64 128` are
+        passed on the way AMReX sees them after an inputs file: arguments are
+        skipped up to the first "name=value", "name= value" or "name = value"
+        and passed on verbatim from there, since a value can span several
+        arguments. Arguments of the script itself thus go before the first
+        override or after a "--" separator, where AMReX stops parsing.
+        argv[0] is absolute for AMReX backtraces, as in init().
+        """
+        args = sys.argv[1:]
+        # AMReX does not parse past "--", so no override starts there
+        end = args.index("--") if "--" in args else len(args)
+
+        def starts_override(i):
+            # AMReX ends a definition only at the next "name =", so any other word
+            # before it joins FILE's values. FILE with more than one value is not
+            # included.
+            name, equals, _ = args[i].partition("=")
+            if not equals and not (i + 1 < end and args[i + 1].startswith("=")):
+                return False
+            words = name.split()
+            # a leading "-" marks an option of the script, e.g.,
+            # --opt=val or a kernel's --f=kernel.json
+            return len(words) == 1 and not words[0].startswith("-")
+
+        first = next((i for i in range(end) if starts_override(i)), end)
+        filename = os.fsdecode(filename)
+        if '"' in filename:
+            raise ValueError(
+                f"AMReX cannot include an inputs file with a double quote in its path: {filename}"
+            )
+        # quoted, since "=" and blanks split an unquoted value
+        return [sys.executable, f'FILE = "{filename}"'] + args[first:]
+
     def load_inputs_file(self, filename):
         from .Geometry import geometry
 
@@ -154,7 +197,7 @@ class WarpX(Bucket):
                 f"Error: Could not find the geometry.dims in the input file '{filename}' or its included files."
             )
 
-        libwarpx.initialize(sys.argv + [filename])
+        libwarpx.initialize(self._amrex_argv(filename))
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces

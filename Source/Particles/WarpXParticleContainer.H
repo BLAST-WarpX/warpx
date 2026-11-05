@@ -280,9 +280,10 @@ public:
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                                       int lev,
-                                      amrex::Real dt)
+                                      amrex::Real dt,
+                                      ImplicitOptions const& implicit_options)
     {
-        amrex::ignore_unused(fields,lev,dt);
+        amrex::ignore_unused(fields,lev,dt,implicit_options);
     }
 
     virtual void PostRestart () = 0;
@@ -333,10 +334,13 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time,
-                         PushType push_type = PushType::Explicit);
+                         PushType push_type = PushType::Explicit,
+                         std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
@@ -349,31 +353,47 @@ public:
      *                          the particle position will be temporarily modified to match
      *                          the time of the deposition.
      */
-    void DepositCurrent (const std::string& mf_name, int lev,
-                         amrex::Real dt, amrex::Real relative_time);
+    void DepositCurrentOnLevel (const std::string& mf_name, int lev,
+                                amrex::Real dt, amrex::Real relative_time);
 
     /**
-     * \brief Deposit charge density.
+     * \brief Deposit charge without physical boundary folding or radial volume scaling.
      *
-     * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
-     * \param[in] local if false, exchange the data in the guard cells after the deposition
-     * \param[in] reset if true, reset all values of rho to zero
-     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the
-     *            final density by some volume norm in cylindrical and spherical geometry
+     * \param[in,out] rho Charge deposits, one MultiFab per mesh refinement level.
+     * \param[in] local If false, sum overlapping valid- and guard-cell deposits.
+     * \param[in] reset If true, zero the deposited time component and its guard cells.
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */
     void DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                         bool local = false, bool reset = false,
-                        bool apply_boundary_and_scale_volume = false,
                         bool interpolate_across_levels = true,
                         int icomp = 0);
-    void DepositCharge (amrex::MultiFab* rho, int lev,
+
+    /**
+     * \brief Deposit charge on one level without physical boundary folding or radial
+     *        volume scaling.
+     *
+     * \param[in,out] rho MultiFab receiving the charge deposits.
+     * \param[in] lev Mesh refinement level for deposition.
+     * \param[in] local If false, sum overlapping valid- and guard-cell deposits.
+     * \param[in] reset If true, zero the deposited time component and its guard cells.
+     * \param[in] icomp Time component of rho to deposit into (old or new).
+     */
+    void DepositChargeOnLevel (amrex::MultiFab* rho, int lev,
                         bool local = false, bool reset = false,
-                        bool apply_boundary_and_scale_volume = false,
                         int icomp = 0);
 
-    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
+    /**
+     * \brief Deposit charge from this species on one level with optional summation and finalization.
+     *
+     * \param[in] lev Mesh refinement level for deposition.
+     * \param[in] local If false, sum overlapping valid- and guard-cell deposits.
+     * \param[in] finalize If true, apply physical boundary conditions and radial volume
+     *                     scaling to return physical charge density; requires local=false.
+     *                     If false, leave boundary handling and radial scaling to the caller.
+     */
+    std::unique_ptr<amrex::MultiFab> GetChargeDensityOnLevel (int lev, bool local, bool finalize);
 
     virtual void DepositCharge (WarpXParIter& pti,
                                RealVector const & wp,
@@ -402,7 +422,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                int particle_shape);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *
@@ -470,7 +491,8 @@ public:
                               int thread_num,
                               int lev,
                               int depos_lev,
-                              amrex::Real dt);
+                              amrex::Real dt,
+                              ImplicitOptions const& implicit_options);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and
