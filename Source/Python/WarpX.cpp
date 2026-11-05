@@ -214,14 +214,37 @@ void init_WarpX (py::module& m)
         )
 
         // Expose functions used to sync the current and charge density multifabs
-        // accross tiles and apply appropriate boundary conditions
+        // across boxes and mesh refinement levels
         .def("sync_current",
             [](WarpX& wx, const std::string& current_fp_string){ wx.SyncCurrent(current_fp_string); },
             py::arg("current_fp_string"),
-            R"pbdoc(Sum the guard cells of a current-like vector field into the valid cells)pbdoc"
+            R"pbdoc(Synchronize a current-like vector field across boxes and mesh refinement levels.
+
+If current centering is used, first center ``current_fp_nodal`` onto this field.
+Then apply the filter (if used), sum the guard cells into the valid cells,
+and add the contributions of finer levels to coarser levels.
+
+This does not apply boundary conditions. In cylindrical and spherical geometries,
+it also does not apply the inverse radial volume scaling: if the field was filled
+with raw particle deposits, the result is the current density multiplied by the
+radial volume factor, not a physical current density.
+
+Parameters
+----------
+current_fp_string: string
+  Name of the vector field to synchronize)pbdoc"
         )
         .def("sync_rho",
-            [](WarpX& wx){ wx.SyncRho(); }
+            [](WarpX& wx){ wx.SyncRho(); },
+            R"pbdoc(Synchronize ``rho_fp`` across boxes and mesh refinement levels.
+
+Apply the filter (if used), sum the guard cells into the valid cells,
+and add the contributions of finer levels to coarser levels.
+
+This does not apply boundary conditions. In cylindrical and spherical geometries,
+it also does not apply the inverse radial volume scaling: if ``rho_fp`` was filled
+with raw particle deposits (e.g. with ``deposit_charge``), the result is the charge
+density multiplied by the radial volume factor, not a physical charge density.)pbdoc"
         )
 
         // Expose functions to get the current simulation step and time

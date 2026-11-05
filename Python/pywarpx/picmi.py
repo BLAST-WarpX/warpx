@@ -3906,7 +3906,10 @@ class Simulation(picmistandard.PICMI_Simulation):
     self_fields_verbosity: int | None = Field(
         default=None, alias="warpx_self_fields_verbosity"
     )
-
+    tiny_profiler_flush_interval: int | str | None = Field(
+        default=None,
+        description="Sets interval(s) to write out tiny profiler data. When not set, the tiny profiler data will only be written out at the end of the simulation.",
+    )
     macroscopic_properties: list[MacroscopicProperty] = Field(
         default_factory=list,
         description="Macroscopic material properties added with add_macroscopic_property",
@@ -3994,6 +3997,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         reduced_diags.intervals = self.reduced_diags_intervals
         reduced_diags.separator = self.reduced_diags_separator
         reduced_diags.precision = self.reduced_diags_precision
+
+        pywarpx.warpx.tiny_profiler_flush_interval = self.tiny_profiler_flush_interval
 
         particle_shape = self.particle_shape
         for s in self.species:

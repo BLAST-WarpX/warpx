@@ -931,11 +931,13 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 
+#if !defined(WARPX_DIM_RSPHERE)
     // Get nodal flags for each component of J
     const ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, 0);
     const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
     const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
     const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
+#endif
 
     // Compute the total number of components for each mass matrices container.
     // This depends on the particle shape factor and the type of current deposition.
@@ -954,6 +956,7 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct) {
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 m_ncomp_xx[dir] = 1 + 2*shape;
+#if !defined(WARPX_DIM_RSPHERE)
                 m_ncomp_xy[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jy_nodal[dir]) % 2 );
                 m_ncomp_xz[dir] = 1 + 2*shape + ( (Jx_nodal[dir] + Jz_nodal[dir]) % 2 );
                 m_ncomp_yy[dir] = 1 + 2*shape;
@@ -962,7 +965,7 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
                 m_ncomp_zz[dir] = 1 + 2*shape;
                 m_ncomp_zx[dir] = 1 + 2*shape + ( (Jz_nodal[dir] + Jx_nodal[dir]) % 2 );
                 m_ncomp_zy[dir] = 1 + 2*shape + ( (Jz_nodal[dir] + Jy_nodal[dir]) % 2 );
-                //
+#endif
                 Nc_tot_xx *= m_ncomp_xx[dir];
                 Nc_tot_xy *= m_ncomp_xy[dir];
                 Nc_tot_xz *= m_ncomp_xz[dir];
@@ -1020,9 +1023,10 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
             m_ncomp_zx[0] = 0 + 2*shape + 2*max_grid_crossings;
             m_ncomp_zy[0] = 0 + 2*shape + 2*max_grid_crossings;
             m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RSPHERE) || defined(WARPX_DIM_RCYLINDER)
             // x is centered, y and z are nodal
             m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
+#if defined(WARPX_DIM_RCYLINDER)
             m_ncomp_xy[0] = 0 + 2*shape + 2*max_grid_crossings;
             m_ncomp_xz[0] = 0 + 2*shape + 2*max_grid_crossings;
             m_ncomp_yx[0] = 0 + 2*shape + 2*max_grid_crossings;
@@ -1031,6 +1035,7 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
             m_ncomp_zx[0] = 0 + 2*shape + 2*max_grid_crossings;
             m_ncomp_zy[0] = 1 + 2*shape + 2*max_grid_crossings;
             m_ncomp_zz[0] = 1 + 2*shape + 2*max_grid_crossings;
+#endif
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // dir = 0: x is centered, y and z are nodal
             m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
@@ -1075,20 +1080,27 @@ void ImplicitSolver::InitializeMassMatrices (int particle_shape)
     }
 
     int ncomp_tot_pc_xx = 1;
+#if defined(WARPX_DIM_RSPHERE)
+    int ncomp_tot_pc_yy = 0;
+    int ncomp_tot_pc_zz = 0;
+#else
     int ncomp_tot_pc_yy = 1;
     int ncomp_tot_pc_zz = 1;
+#endif
     const int ncomp_dir_pc = m_use_mass_matrices_pc ? 1 + 2*m_mass_matrices_pc_width : 1;
     for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
         m_ncomp_pc_xx[dir] = std::min(m_ncomp_xx[dir], ncomp_dir_pc);
+        ncomp_tot_pc_xx *= m_ncomp_pc_xx[dir];
+#if !defined(WARPX_DIM_RSPHERE)
 #if defined(WARPX_EM_TEY)
         m_ncomp_pc_yy[dir] = 1;
 #else
         m_ncomp_pc_yy[dir] = std::min(m_ncomp_yy[dir], ncomp_dir_pc);
 #endif
         m_ncomp_pc_zz[dir] = std::min(m_ncomp_zz[dir], ncomp_dir_pc);
-        ncomp_tot_pc_xx *= m_ncomp_pc_xx[dir];
         ncomp_tot_pc_yy *= m_ncomp_pc_yy[dir];
         ncomp_tot_pc_zz *= m_ncomp_pc_zz[dir];
+#endif
     }
 
     if (!m_use_mass_matrices_jacobian) {
@@ -1256,20 +1268,9 @@ void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
         CumulateJ();
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Apply the inverse volume scaling for radial geometries after the total
-    // current has been accumulated from all containers above.
-    // Rho (if used) is scaled inside WarpX::FinalizeRho().
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
-    }
-#endif
-
-    // Apply BCs to J and communicate
-    m_WarpX->SyncCurrentAndRho();
-    m_WarpX->FinalizeRho();
-    m_WarpX->FinalizeJ();
+    m_WarpX->SyncCurrentAndRho(); // Sum guard cells
+    m_WarpX->FinalizeRho(); // Apply BCs to rho, then apply inverse volume scaling
+    m_WarpX->FinalizeJ();   // Apply Bcs to J, then apply inverse volume scaling
 
 }
 
@@ -1367,9 +1368,6 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
                 });
         }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
-#endif
     }
 
     // Do addOp Exchange on MassMatrices_PC
@@ -1377,11 +1375,11 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
 
     // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_WarpX->ApplyJfieldBoundary(lev,
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
+        ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        m_WarpX->ApplyJfieldBoundary(lev, MM_PC[0], MM_PC[1], MM_PC[2], PatchType::fine);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 }
 

@@ -114,10 +114,12 @@ public:
         amrex::Real t, int lev);
 
     /**
-     * DepositCurrent interpolates the fluid current density comps. onto the Yee grid and
-     * sums the contributions to the particle current density
+     * DepositCurrent interpolates physical fluid current onto the Yee grid and
+     * adds it to the PIC deposits, weighted by the radial volume factor at each
+     * destination component's location.
      *
-     * \brief Deposit fluid current density.
+     * \brief Deposit fluid current in the same unscaled representation as PIC.
+     * Physical boundary handling and radial volume scaling are left to the caller.
      *
      * \param[in,out] m_fields MultiFab register of fields
      * \param[in,out] jx current density MultiFab x comp.
