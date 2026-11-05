@@ -115,7 +115,7 @@ public:
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve (bool update_pc);
+    void PreLinearSolve (bool update_pc, int nl_iter);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -225,6 +225,14 @@ public:
      */
     void FinishMassMatricesDeposition ();
 
+#if defined(WARPX_EM_TEY)
+    /**
+     * \brief Construct Szx from the negative transpose of unscaled deposited Sxz.
+     * Entries whose source row lies outside the local Sxz box are left unchanged.
+     */
+    void CopyMassMatrixXZToZX ();
+#endif
+
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions
      */
@@ -234,6 +242,10 @@ public:
      * \brief Finish the implicit particle update after the converged time-centered solve
      */
     void FinishImplicitParticleUpdate (amrex::Real time, int step);
+
+    const amrex::Array<bool,3>& GetBlankElectricField () const {
+        return m_blank_electric_field;
+    }
 
 protected:
 
@@ -263,6 +275,15 @@ protected:
      * \brief Time-biasing parameter for fields used on RHS to advance system.
      */
     amrex::Real m_theta = 0.5;
+
+    /**
+     * \brief Flags to turn off evolving select components of the electric field
+     */
+#if defined(WARPX_EM_TEY)
+    amrex::Array<bool,3> m_blank_electric_field{false,true,false};
+#else
+    amrex::Array<bool,3> m_blank_electric_field{false,false,false};
+#endif
 
     /**
      * \brief Nonlinear solver type and object
@@ -332,6 +353,11 @@ protected:
     bool m_use_mass_matrices_jacobian = false;
 
     /**
+     * \brief Newton interval to update mass matrices for Jacobian
+     */
+    int m_update_mass_matrices_newton_interval = 1;
+
+    /**
      * \brief Whether to use mass matrices in the preconditioner
      */
     bool m_use_mass_matrices_pc = false;
@@ -376,6 +402,8 @@ protected:
      * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)
      */
     std::unique_ptr<SparseJacobianMatrix> m_sparse_jacobian;
+
+    void parseBaseImplicitSolverParams ();
 
     /**
      * \brief parse nonlinear solver parameters (if one is used)

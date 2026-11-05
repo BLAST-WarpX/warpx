@@ -99,6 +99,12 @@ public:
 
     [[nodiscard]] bool IsDefined () const { return m_is_defined; }
 
+    /** Set electric-field components to exclude from curl-curl and mass-matrix terms. */
+    void SetBlankElectricField (const amrex::Array<bool,3>& a_flags)
+    {
+        m_blank_electric_field = a_flags;
+    }
+
     /**
      * \brief Assemble the sparse matrix, reallocating if needed.
      *
@@ -144,6 +150,12 @@ private:
     bool m_is_defined = false;
     bool m_verbose = true;
     bool m_include_mass_matrices = false;
+
+#if defined(WARPX_EM_TEY)
+    amrex::Array<bool,3> m_blank_electric_field{false, true, false};
+#else
+    amrex::Array<bool,3> m_blank_electric_field{false, false, false};
+#endif
 
     int m_ndofs_l = 0;
     int m_ndofs_g = 0;

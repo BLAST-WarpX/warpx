@@ -308,9 +308,14 @@ WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_op
     ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
 
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+#if defined(WARPX_EM_TEY)
+        const bool valid_ncomp_yy = implicit_options.ncomp_yy[dir] == 0;
+#else
+        const bool valid_ncomp_yy = implicit_options.ncomp_yy[dir] > 0;
+#endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             implicit_options.ncomp_xx[dir] > 0 &&
-            implicit_options.ncomp_yy[dir] > 0 &&
+            valid_ncomp_yy &&
             implicit_options.ncomp_zz[dir] > 0,
             "DepositMassMatrices requires initialized mass-matrix component counts. "
             "Call InitData before depositing mass matrices.");
