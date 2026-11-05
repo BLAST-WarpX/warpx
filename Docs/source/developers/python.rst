@@ -50,15 +50,14 @@ Conversion from PICMI
 
 In the PICMI implementation, defined in ``Python/pywarpx/picmi.py``, for each PICMI class, a class was written that
 inherits the PICMI class and does the processing of the input.
-Each of the WarpX classes has two methods, ``init`` and ``initialize_inputs``.
-The ``init`` method is called during the creation of the class instances that happens in the user's PICMI input file.
-This is part of the standard - each of the PICMI classes call the method ``handle_init`` from the constructor ``__init__`` routines.
-The main purpose is to process application specific keyword arguments (those that start with ``warpx_`` for example).
-These are then passed into the ``init`` methods.
-In the WarpX implementation, in the ``init``, each of the WarpX specific arguments are saved as attributes of the implementation
-class instances.
+The PICMI classes are `pydantic <https://docs.pydantic.dev>`__ models: their parameters are typed fields, which are validated
+when an object is created in the user's PICMI input file and whenever a parameter is changed later on.
+The WarpX classes add the WarpX specific parameters as further fields, which users give with the prefix ``warpx_``
+(see :ref:`developers-how-to-add-picmi-parameter`).
+Initialization that is needed when an object is created is done in the ``model_post_init`` method of the classes.
 
-It is in the second method, ``initialize_inputs``, where the PICMI input parameters are translated into WarpX input parameters.
+It is in a second method, e.g., ``grid_initialize_inputs`` of the grids or ``solver_initialize_inputs`` of the field solvers,
+where the PICMI input parameters are translated into WarpX input parameters.
 This method is called later during the initialization.
 The prefix instances described above are all accessible in the implementation classes (via the ``pywarpx`` module).
 For each PICMI input quantity, the appropriate WarpX input parameters are set in the prefix classes.
@@ -73,7 +72,7 @@ or through ``add_`` methods.
 Its ``initialize_inputs`` routine initializes the input parameters it handles and also calls the ``initialize_inputs``
 methods of all of the PICMI class instances that have been passed in, such as the field solver, the particles species,
 and the diagnostics.
-As with other PICMI classes, the ``init`` routine is called by the constructor and ``initialize_inputs`` is called during
+As with other PICMI classes, its parameters are validated when it is created, and ``initialize_inputs`` is called during
 initialization.
 The initialization happens when either the ``write_input_file`` method is called or the ``step`` method.
 After ``initialize_inputs`` is finished, the attributes of the prefix instances have been filled in, and the process described
