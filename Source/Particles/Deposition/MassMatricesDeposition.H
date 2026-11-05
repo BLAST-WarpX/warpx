@@ -127,6 +127,7 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     fpzy = arogp*(bpz*bpy - bpx);
     fpzz = arogp*(bpz*bpz + 1.0_prt);
 #endif
+#endif
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 

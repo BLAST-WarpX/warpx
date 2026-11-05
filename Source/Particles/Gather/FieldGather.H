@@ -2324,6 +2324,7 @@ void doGatherPicnicShapeN (
     doDirectGatherFieldTEY<depos_order_perp>(
 #else
     doDirectGatherVectorField<depos_order_perp,depos_order_para>(
+#endif
 #if defined(WARPX_DIM_RCYLINDER)
                                     rp_mid, 0._prt, 0._prt,
 #elif defined(WARPX_DIM_RZ)
