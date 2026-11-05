@@ -99,8 +99,9 @@ WarpX::ComputeDt ()
         } else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");
         }
+    }
 
-        if (m_const_dt.has_value()) {
+    if (m_const_dt.has_value()) {
             if (m_const_dt.value() > deltat) {
                 std::string const warnMsg = "Specified const_dt (" + std::to_string(m_const_dt.value())
                 + ") is too large to respect the CFL condition (" + std::to_string(deltat) + ")."
@@ -113,7 +114,6 @@ WarpX::ComputeDt ()
             }
             deltat = m_const_dt.value();
         }
-    }
 
     dt.resize(0);
     dt.resize(max_level+1,deltat);
