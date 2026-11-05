@@ -1,30 +1,30 @@
 {
   "deuterium": {
-    "particle_momentum_x": 6.213448529441421e-18,
-    "particle_momentum_y": 6.213803502086621e-18,
-    "particle_momentum_z": 6.2037378076789094e-18,
+    "particle_momentum_x": 6.213448521888203e-18,
+    "particle_momentum_y": 6.213803492234383e-18,
+    "particle_momentum_z": 6.203737810590688e-18,
     "particle_position_x": 3360.0000491400915,
-    "particle_position_y": 191.99999940472054,
-    "particle_theta": 2.3516969913595847,
+    "particle_position_y": 191.9999994047206,
+    "particle_theta": 2.351696991864318,
     "particle_weight": 8.078381109230896e+16
   },
   "electrons": {
-    "particle_momentum_x": 1.0218011807092176e-19,
-    "particle_momentum_y": 1.0217195064442426e-19,
-    "particle_momentum_z": 1.021819045734162e-19,
-    "particle_position_x": 3360.000045238301,
-    "particle_position_y": 191.99997840863617,
-    "particle_theta": 47.22035800957113,
+    "particle_momentum_x": 1.0218014026597626e-19,
+    "particle_momentum_y": 1.021719319560256e-19,
+    "particle_momentum_z": 1.0218191064490723e-19,
+    "particle_position_x": 3360.000045238416,
+    "particle_position_y": 191.99997840866416,
+    "particle_theta": 47.22035883040222,
     "particle_weight": 8.078381109230896e+16
   },
   "lev=0": {
-    "Br": 7.216643897129233,
-    "Bt": 17.494815015498492,
-    "Bz": 11.876533948387975,
-    "Er": 2378281849.2638826,
-    "Et": 1527477612.157793,
-    "Ez": 2067438824.6756513,
-    "divE": 26679072124547.0,
-    "rho": 236.20346188985923
+    "Br": 7.216634220416198,
+    "Bt": 17.49481177749515,
+    "Bz": 11.876527520404043,
+    "Er": 2378282482.7120647,
+    "Et": 1527476872.3091788,
+    "Ez": 2067438822.0083218,
+    "divE": 26679066299873.195,
+    "rho": 236.20341029873853
   }
 }

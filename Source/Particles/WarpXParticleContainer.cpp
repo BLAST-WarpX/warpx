@@ -163,6 +163,14 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 
     utils::parser::queryArrWithParser(pp_particles, "E_external_particle", m_E_external_particle);
     utils::parser::queryArrWithParser(pp_particles, "B_external_particle", m_B_external_particle);
+#if defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_B_external_particle[0] == 0. &&
+        m_B_external_particle[1] == 0. &&
+        m_B_external_particle[2] == 0.,
+        "RSPHERE does not support external magnetic fields: "
+        "particles.B_external_particle must be 0 0 0.");
+#endif
 
     // Initialize temporary local arrays for charge/current deposition
 #ifdef AMREX_USE_OMP
@@ -1530,12 +1538,6 @@ void WarpXParticleContainer::DepositCurrentOnLevel (
     };
 
     DepositCurrent(current, dt, relative_time);
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        warpx.ApplyInverseVolumeScalingToCurrentDensity(
-            current[lev][0], current[lev][1], current[lev][2], lev
-        );
-#endif
 
     // Sum guard cells
     warpx.SyncCurrent(mf_name);
