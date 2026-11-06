@@ -232,6 +232,12 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     rel_errors = np.array(rel_errors)
     peak_snr = np.array(peak_snr)
     n_bands = len(rel_errors)
+    # The Darwin runs only write 17 time snapshots, which leaves just two
+    # frequency bands below the electron cyclotron resonance; the Ohm runs
+    # resolve eleven.
+    assert n_bands >= 2, (
+        f"too few resolved frequency bands ({n_bands}) to test dispersion"
+    )
     median_error = float(np.median(rel_errors))
     frac_on_curve = float(np.mean(rel_errors < 0.15))
     median_snr = float(np.median(peak_snr))
@@ -241,12 +247,6 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     print(f"    fraction of bands within 15% : {frac_on_curve:.2f} (tol 0.75)")
     print(f"    median peak signal-to-noise  : {median_snr:.1f} (tol 30)")
 
-    # The Darwin runs only write 17 time snapshots, which leaves just two
-    # frequency bands below the electron cyclotron resonance; the Ohm runs
-    # resolve eleven.
-    assert n_bands >= 2, (
-        f"too few resolved frequency bands ({n_bands}) to test dispersion"
-    )
     assert median_error < 0.10, (
         f"measured spectrum departs from the analytic R-mode dispersion "
         f"(median relative error {median_error:.3f} >= 0.10)"
