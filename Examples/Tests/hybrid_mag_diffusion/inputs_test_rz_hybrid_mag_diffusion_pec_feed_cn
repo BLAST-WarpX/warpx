@@ -1,0 +1,83 @@
+# RZ hybrid implicit magnetic diffusion with a Dirichlet tangential-B feed on
+# the upper-r face, Crank-Nicolson (theta=0.5). pec_insulator drives B_t through
+# insulator.By_x_hi(y,z,t). The matrix-free CN solve includes the feed in the
+# operator (homogeneous part) and RHS (affine offset), plus the (1-theta)
+# explicit curl term; the feed is evaluated at g(t_new) for both terms.
+#
+# CN is not L-stable: with stiff vacuum eta=129 and dt >> R^2/chi, the stiff
+# modes have amplification g -> -1 and so reach the diffusion equilibrium only
+# slowly (they oscillate rather than being killed in one step like backward
+# Euler). analysis_rz_pec_feed_cn.py therefore checks finite / feed-injected /
+# axis-regular / stable -- NOT the theta=1 "feed face held near B0" steady-state
+# check (which BE passes because it is L-stable).
+
+max_step = 5
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+# r=0 is the axis (None), the upper-r face is the pec_insulator feed, z periodic.
+boundary.field_lo = none periodic
+boundary.field_hi = pec_insulator periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+# Dirichlet B_t feed on the whole upper-r face: ramps 0 -> B0 over 1 ns, then
+# held. (area>0 selects the insulator/feed region; By is the toroidal B_t.)
+insulator.area_x_hi(y,z) = 1.0
+insulator.By_x_hi(y,z,t) = min(t/1.0e-9, 1.0)*1.0e-4
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# Start from zero B; the feed is the only source of B_t.
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 0.0 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 0.5
+hybrid_pic_model.mag_diff_constant_eta = 129.0
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+# Matrix-free GMRES with the Dirichlet feed baked into operator + RHS.
+# rtol=1e-4 matches the RZ eta=129 stability smokes (no cylindrical MG PC).
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 1
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile
