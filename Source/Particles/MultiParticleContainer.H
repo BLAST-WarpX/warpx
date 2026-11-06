@@ -373,6 +373,10 @@ public:
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
+    void doSecondaryEmission (int step, bool do_eb);
+
+    void InitSecondaryEmissionBoundaryBuffer (class ParticleBoundaryBuffer& particle_boundary_buffer) const;
+
     std::string m_B_ext_particle_s = "none";
     std::string m_E_ext_particle_s = "none";
     // Parser for B_external on the particle
@@ -457,6 +461,11 @@ protected:
     std::vector<bool> m_gather_from_main_grid;
 
     std::vector<PCTypes> species_types;
+
+    bool m_do_secondary_emission = false;
+    std::vector<int> m_secondary_emission_product_species;
+    std::vector<amrex::Real> m_secondary_emission_coefficient;
+    std::vector<amrex::Real> m_secondary_emission_energy_eV;
 
     template<typename ...Args>
     [[nodiscard]]

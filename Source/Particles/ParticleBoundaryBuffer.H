@@ -70,6 +70,8 @@ public:
 
     std::string boundaryName (int const ibuffer) {return m_boundary_names[ibuffer];}
 
+    void enableForSpecies (int ispecies);
+
 private:
     // over boundary, then number of species
     std::vector<std::vector<WarpXParticleContainer::Base> > m_particle_containers;
