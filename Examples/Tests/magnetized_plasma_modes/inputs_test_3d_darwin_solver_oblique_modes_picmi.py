@@ -1,49 +1,28 @@
 #!/usr/bin/env python3
 #
-# --- 3D Darwin semi-implicit solver verification: noise-seeded low-frequency
-# --- EM waves in a cubic, fully periodic box with the background field B0
-# --- OBLIQUE to every grid axis (b = (1,1,1)/sqrt(3)). Unlike the other
-# --- magnetized_plasma_modes tests (B0 along or perpendicular to a single
-# --- grid axis), every term of the Boris/mass-matrix kernel that couples
-# --- field components is nonzero here and all nine 3D mass-matrix blocks
-# --- carry a full stencil, so this specifically exercises 3D mass-matrix
-# --- indexing/symmetry bugs that a grid-aligned B0 cannot reach.
+# --- 3D Darwin solver test: noise-seeded low-frequency EM waves in a periodic
+# --- box with B0 along (1,1,1)/sqrt(3), oblique to every grid axis, so all nine
+# --- 3D mass-matrix blocks carry a full stencil. Runs with ES off, using global
+# --- particle shape 3 but particle shape 1 for the MS part of the solve.
 # ---
-# --- This is a heavily reduced version (see Examples/Tests/CMakeLists.txt
-# --- wall-clock budget) of a full verification run described in the analysis
-# --- script's docstring; it is not, on its own, a precision dispersion-
-# --- relation test. See analysis_oblique_modes.py for what is actually
-# --- checked and why the tolerances are as loose as they are.
-# ---
-# --- Diagnostic: every step a callback FFTs dB = B - B0 on the whole grid
-# --- and stores the complex amplitude of each field component at 6 low-k
-# --- wave vectors that form two permutation groups (same |k| and theta_kB
-# --- for b=(1,1,1)/sqrt3, so physically equivalent):
+# --- Each step, the dB = B - B0 Fourier amplitudes are recorded at two groups of
+# --- wave vectors that are physically equivalent under axis permutation:
 # ---   (1,0,0), (0,1,0), (0,0,1)   theta_kB = 54.7 deg
 # ---   (1,1,0), (0,1,1), (1,0,1)   theta_kB = 35.3 deg
+# --- Particles are loaded symmetric under the cyclic permutation
+# --- (x,y,z)->(y,z,x) (each macroparticle plus 2 permuted copies at 1/3 weight),
+# --- so the members of each group should agree to roundoff.
 # ---
-# --- Particle loading is made EXACTLY symmetric under the cyclic axis
-# --- permutation (x,y,z)->(y,z,x) that relates the two groups above: after
-# --- the normal random loading, 2 more copies of every macroparticle are
-# --- added with position and velocity cyclically permuted (and weight
-# --- rescaled by 1/3 so the physical density is unchanged). This makes the
-# --- permutation-symmetry check a near-machine-precision comparison rather
-# --- than a statistical one (see analysis_oblique_modes.py for measurements).
-# --- A side effect: the k=(1,1,1) mode (the only one left invariant by this
-# --- rotation) is then a selection-rule-forbidden mode for the *transverse*
-# --- field (its only rotation-invariant polarization is parallel to k, which
-# --- div(B)=0 forbids), so it carries no signal here and is not recorded.
+# --- This is a reduced version of a longer verification run; see
+# --- analysis_oblique_modes.py for what is checked and why.
 
 import os
 import sys
-import warnings
 
-import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
 from pywarpx import callbacks, libwarpx, picmi
-from pywarpx.particle_containers import ParticleContainerWrapper
 
 constants = picmi.constants
 comm = mpi.COMM_WORLD
@@ -115,8 +94,6 @@ class ObliqueModes(object):
         self.k_list = K_LIST
 
         if comm.rank == 0:
-            with open("sim_parameters.dpkl", "wb") as f:
-                dill.dump(self, f)
             print(
                 f"ObliqueModes: M/m={self.m_ion:.0f} beta={self.beta} "
                 f"vA/c={self.vA_over_c}\n"
@@ -153,10 +130,8 @@ class ObliqueModes(object):
             # explicit seed keeps the checksum comparison reproducible
             simulation.random_seed = self.seed
 
-        # a handful of small boxes is fine here: the wall-clock cost of this
-        # test is entirely dominated by the GMRES/MLMG field solve, not by
-        # the particle or grid work, so MPI decomposition granularity barely
-        # matters (see the analysis script docstring for measured timings)
+        # the cost is dominated by the GMRES/MLMG field solve, so the box
+        # decomposition barely matters
         mgs = self.N // 2 if self.nprocs > 1 else self.N
         self.grid = picmi.Cartesian3DGrid(
             number_of_cells=[self.N] * 3,
@@ -255,38 +230,23 @@ class ObliqueModes(object):
         locally on each rank, right after the normal random loading; added
         particles that land outside the calling rank's box are moved to
         their owner by the normal per-step Redistribute()."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # ParticleContainerWrapper is
-            # nominally deprecated in favor of simulation.particles.get(),
-            # which returns the raw (wrapper-less) container instead
-            for name in ("ions", "electrons"):
-                pc = ParticleContainerWrapper(name)
-
-                def cat(getter):
-                    return np.concatenate(
-                        [np.asarray(a) for a in getter(copy_to_host=True)]
-                    )
-
-                x, y, z = (
-                    cat(pc.get_particle_x),
-                    cat(pc.get_particle_y),
-                    cat(pc.get_particle_z),
-                )
-                ux, uy, uz = (
-                    cat(pc.get_particle_ux),
-                    cat(pc.get_particle_uy),
-                    cat(pc.get_particle_uz),
-                )
-                w = cat(pc.get_particle_weight)
+        comps = ("x", "y", "z", "ux", "uy", "uz", "w")
+        for name in ("ions", "electrons"):
+            pc = simulation.particles.get(name)
+            tiles = []
+            for pti in pc.iterator(level=0):
+                soa = pti.soa()
+                tiles.append([soa.get_real_data(c).to_numpy(copy=True) for c in comps])
                 # scale the ORIGINAL (live) particles' weight down by 1/3 in
-                # place, so tripling the macroparticle count (original + 2
-                # permuted copies, all at 1/3 weight) leaves the physical
+                # place, so tripling the macroparticle count leaves the physical
                 # density unchanged
-                for live_w in pc.get_particle_weight(copy_to_host=False):
-                    live_w[:] = np.asarray(live_w) / 3.0
-                w = w / 3.0
-                pc.add_particles(x=y, y=z, z=x, ux=uy, uy=uz, uz=ux, w=w)
-                pc.add_particles(x=z, y=x, z=y, ux=uz, uy=ux, uz=uy, w=w)
+                pti["w"][:] /= 3.0
+            x, y, z, ux, uy, uz, w = (
+                np.concatenate([t[i] for t in tiles]) for i in range(len(comps))
+            )
+            w = w / 3.0
+            pc.add_particles(x=y, y=z, z=x, ux=uy, uy=uz, uz=ux, w=w)
+            pc.add_particles(x=z, y=x, z=y, ux=uz, uy=ux, uz=uy, w=w)
         if comm.rank == 0 and self.test:
             print("symmetrize_particles: added 2 cyclic-permuted copies per species")
 
