@@ -209,8 +209,18 @@ def check_parallel_dispersion(field_kw, k_vals, w):
         # snapshots, which leaves their bands broad enough to carry several
         # comparable local maxima; picking the strongest of those is close to a
         # coin toss (it moves by >10% between the 1D and 2D runs), while the
-        # centroid of the band is stable to a few percent.
-        sel = cand[band_power > PEAK_FRACTION * peak]
+        # centroid of the band is stable to a few percent. Starting from the
+        # maximum, extend the selection bin by bin towards lower and higher k
+        # and stop at the first bin on each side that falls below the
+        # threshold. A separate, unrelated peak elsewhere in k is then excluded
+        # from the centroid, even if it is above the threshold.
+        above = band_power > PEAK_FRACTION * peak
+        lo = hi = np.argmax(band_power)
+        while lo > 0 and above[lo - 1]:
+            lo -= 1
+        while hi < len(above) - 1 and above[hi + 1]:
+            hi += 1
+        sel = cand[lo : hi + 1]
         k_measured = np.sum(k_vals[sel] * power[i][sel]) / np.sum(power[i][sel])
         rel_errors.append(abs(k_measured - k_analytic) / k_analytic)
         peak_snr.append(peak / np.median(band_power))
