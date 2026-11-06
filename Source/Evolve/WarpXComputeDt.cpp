@@ -65,6 +65,10 @@ WarpX::ComputeDt ()
     const amrex::Real* dx = geom[max_level].CellSize();
     amrex::Real deltat = 0.;
 
+    if (m_const_dt.has_value()) {
+        deltat = m_const_dt.value();
+    } 
+    
     if (electrostatic_solver_id  != ElectrostaticSolverAlgo::None) {
         // Set dt for electrostatic algorithm
         if (m_max_dt.has_value()) {
@@ -97,8 +101,7 @@ WarpX::ComputeDt ()
             deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
 #endif
         } else if (m_const_dt.has_value()) {
-            // No algorithm is selected, but a constant timestep is provided
-            deltat = m_const_dt.value();
+            // No algorithm is selected, but a constant timestep is provided, don't abort
         }
         else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");
