@@ -489,6 +489,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
     // optional parameters
     utils::parser::queryWithParser(pp_species, source_name, "q_tot", q_tot);
     utils::parser::queryWithParser(pp_species, source_name, "z_shift",z_shift);
+    utils::parser::query(pp_species, source_name, "external_file_species_name", m_external_file_species_name);
 
 #ifdef WARPX_USE_OPENPMD
     const bool charge_is_specified = pp_species.contains("charge");
@@ -502,12 +503,16 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             series.iterations.size() == 1u,
             "External file should contain only 1 iteration\n");
+
         openPMD::Iteration it = series.iterations.begin()->second;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            it.particles.size() == 1u,
-            "External file should contain only 1 species\n");
-        std::string const ps_name = it.particles.begin()->first;
-        openPMD::ParticleSpecies ps = it.particles.begin()->second;
+            !m_external_file_species_name.empty() or it.particles.size() == 1u,
+            "External file should contain only 1 species when the species in the file is not specified\n");
+
+        std::string const ps_name = m_external_file_species_name.empty() ?
+                                        it.particles.begin()->first :
+                                        m_external_file_species_name;
+        openPMD::ParticleSpecies ps = it.particles.at(ps_name);
 
         charge_from_source = ps.contains("charge");
         mass_from_source = ps.contains("mass");
