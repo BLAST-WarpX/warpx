@@ -86,8 +86,8 @@ print(f"Spatial resolution is {resolution}")
 
 # The Ohm solver carries the electrons as a massless fluid, so its parallel
 # modes follow the mu -> infinity limit of the relations below. The Darwin
-# solver pushes the electrons kinetically, at a mass ratio of only
-# mu = w_ce / w_ci = m_ion = 10 here, which puts the electron cyclotron
+# solver pushes the electrons kinetically, at the finite mass ratio
+# mu = w_ce / w_ci of the input, which can put the electron cyclotron
 # resonance inside the plotted frequency range.
 INV_MASS_RATIO = sim.w_ci / sim.w_ce if is_darwin else 0.0
 
@@ -100,17 +100,9 @@ def get_analytic_R_mode(w):
         (k l_i)^2 = x * [ 1 / (1 - x r) - 1 / (1 + x) ]
                   = (1 + r) x^2 / [ (1 - x r) (1 + x) ] ,
 
-    the second form being the one evaluated below: it is the more compact of the
-    two and avoids the cancellation the difference suffers from at small x.
-
-    This reduces to the familiar (k l_i)^2 = x^2 / (1 + x) when the electrons
-    are a massless fluid, as they are for the Ohm solver. The Darwin solver
-    instead pushes them kinetically, at a mass ratio of only m_ion = 10 in this
-    example, so its electron cyclotron resonance lands well inside the resolved
-    frequency range and has to be kept: at w = 2.5 w_ci the massless form is
-    already off by 20%, while the expression above is accurate to a fraction of
-    a percent. ``check_parallel_dispersion`` asserts against this same function,
-    so the curve drawn here is the curve that is tested.
+    the second form being the one evaluated below, as it avoids the
+    cancellation the difference suffers from at small x. It reduces to
+    (k l_i)^2 = x^2 / (1 + x) for massless electrons (r = 0).
 
     ``nan`` is returned where the branch does not propagate.
     """
@@ -166,9 +158,7 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     analytic R-mode (right-hand polarized / whistler) dispersion relation. Here
     we verify that quantitatively: for every frequency band that the run
     resolves, the wavenumber where the band's spectral power is concentrated
-    must lie on the analytic curve of ``get_analytic_R_mode`` -- the very curve
-    drawn on the figure. This turns the previously plot-only comparison into an
-    automated pass/fail test.
+    must lie on the analytic curve of ``get_analytic_R_mode``.
 
     Because the diagnostic field ``Bl = (Bx + i By) / sqrt(2)`` keeps only the
     circular polarization that rotates with the electrons, the whole R branch
@@ -212,15 +202,12 @@ def check_parallel_dispersion(field_kw, k_vals, w):
         peak = band_power.max()
         # Measure the wavenumber as the power-weighted centroid of the bins
         # within PEAK_FRACTION of that maximum, rather than as the position of
-        # the single strongest bin. The Darwin runs only resolve 17 time
-        # snapshots, which leaves their bands broad enough to carry several
-        # comparable local maxima; picking the strongest of those is close to a
-        # coin toss (it moves by >10% between the 1D and 2D runs), while the
-        # centroid of the band is stable to a few percent. Starting from the
-        # maximum, extend the selection bin by bin towards lower and higher k
-        # and stop at the first bin on each side that falls below the
-        # threshold. A separate, unrelated peak elsewhere in k is then excluded
-        # from the centroid, even if it is above the threshold.
+        # the single strongest bin. Runs with few time snapshots have bands
+        # broad enough to carry several comparable local maxima. Starting from
+        # the maximum, extend the selection bin by bin towards lower and higher k
+        # and stop at the first bin on each side that falls below the threshold.
+        # A separate, unrelated peak elsewhere in k is then excluded from the centroid,
+        # even if it is above the threshold.
         above = band_power > PEAK_FRACTION * peak
         lo = hi = np.argmax(band_power)
         while lo > 0 and above[lo - 1]:
@@ -239,9 +226,8 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     rel_errors = np.array(rel_errors)
     peak_snr = np.array(peak_snr)
     n_bands = len(rel_errors)
-    # The Darwin runs only write 17 time snapshots, which leaves just two
-    # frequency bands below the electron cyclotron resonance; the Ohm runs
-    # resolve eleven.
+    # Runs with few time snapshots and a low electron cyclotron resonance
+    # (Darwin) resolve only a handful of bands below that resonance.
     assert n_bands >= 2, (
         f"too few resolved frequency bands ({n_bands}) to test dispersion"
     )
