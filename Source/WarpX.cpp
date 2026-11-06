@@ -1287,11 +1287,11 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 none_allowed_lo || WarpX::particle_boundary_lo[idim] != ParticleBoundaryType::None,
                 "Error : Particle boundary ``none`` is only allowed at r=0 "
-                "in cylindrical and spherical geometries (boundary.particle_lo). \n");
+                "in cylindrical and spherical geometries (boundary.particle_lo).");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::particle_boundary_hi[idim] != ParticleBoundaryType::None,
                 "Error : Particle boundary ``none`` is only allowed at r=0 "
-                "in cylindrical and spherical geometries (boundary.particle_hi). \n");
+                "in cylindrical and spherical geometries (boundary.particle_hi).");
         }
 
 #if defined(WARPX_DIM_RZ)
