@@ -371,7 +371,7 @@ if sim.B_dir == "z":
             c="pink",
             ls="-.",
             lw=1.25,
-            label="$\omega = \Omega_{e} + 3v_{th,e} k$",
+            label=r"$\omega = \Omega_{e} + 3v_{th,e} k$",
         )
         ax1.plot(
             k,
@@ -394,12 +394,12 @@ else:
             c="limegreen",
             ls="-.",
             lw=1.5,
-            label="$\omega = v_Ak$",
+            label=r"$\omega = v_Ak$",
         )
 
         w_pi_SI = sim.w_pi * sim.w_pe_SI / sim.w_pe
         w_LH = 1.0 / np.sqrt(1.0 / (sim.w_ci * sim.w_ce) + 1.0 / w_pi_SI**2)
-        ax1.axhline(w_LH / w_norm, ls="--", c="pink", label="$\omega_{LH}$")
+        ax1.axhline(w_LH / w_norm, ls="--", c="pink", label=r"$\omega_{LH}$")
 
     else:
         # digitized values from Munoz et al. (2018)
@@ -575,7 +575,7 @@ fig.legend(loc=7, fontsize=14 if (is_darwin and sim.B_dir == "z") else 18)
 
 if sim.B_dir == "z":
     ax1.set_xlabel(r"$k l_i$")
-    ax1.set_title("$B_{R/L} = B_x \pm iB_y$")
+    ax1.set_title(r"$B_{R/L} = B_x \pm iB_y$")
     fig.suptitle("Parallel EM modes")
     if is_darwin:
         ax1.set_xlim(-4.5, 4.5)
@@ -586,7 +586,7 @@ if sim.B_dir == "z":
     dir_str = "par"
 else:
     ax1.set_xlabel(r"$k \rho_i$")
-    ax1.set_title("$E_z(k, \omega)$")
+    ax1.set_title(r"$E_z(k, \omega)$")
     fig.suptitle(f"Perpendicular EM modes (ion Bernstein) - {sim.dim}D")
     ax1.set_xlim(-3, 3)
     ax1.set_ylim(0, 8)
