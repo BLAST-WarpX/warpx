@@ -165,14 +165,18 @@ def check_parallel_dispersion(field_kw, num_steps, resolution, dt, dz):
 
     Because the diagnostic field ``Bl = (Bx + i By) / sqrt(2)`` keeps only the
     circular polarization that rotates with the electrons, the whole R branch
-    sits at positive frequency (for both directions of propagation), while the
-    negative-frequency half of the spectrum holds the L branch, which does not
-    propagate above w_ci. Only positive frequencies are therefore tested.
+    sits at positive raw FFT frequency (for both directions of propagation),
+    while the negative raw FFT frequencies hold the L branch, which does not
+    propagate above w_ci. Only positive raw FFT frequencies are therefore
+    tested. Note that ``freq`` below is the raw FFT frequency, which is -w on
+    the figure (the plot uses ``w = -np.flipud(...)``), so the tested R branch
+    appears at negative w on the figure.
     """
     power = np.abs(field_kw) ** 2
 
     # Frequency axis (rows of field_kw) and wavenumber axis (columns),
     # normalized by the ion cyclotron frequency and ion skin depth.
+    # freq is the raw (unflipped) FFT frequency, i.e. -w on the figure.
     freq = 2 * np.pi * np.fft.fftshift(np.fft.fftfreq(num_steps, dt)) / sim.w_ci
     k_vals = 2 * np.pi * np.fft.fftshift(np.fft.fftfreq(resolution, dz)) * sim.l_i
     k_cut = MAX_K_FRACTION * k_vals.max()
