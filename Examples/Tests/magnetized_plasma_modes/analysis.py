@@ -183,6 +183,13 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     # stand out against the full thermal spectrum, not merely against a narrow
     # window placed around the expected answer.
     cand = np.where(k_vals > 0.05)[0]
+    # The R branch appears at both +k and -k in the same frequency band (waves
+    # propagating in either direction along B), so add the power at each -k bin
+    # to its +k partner to double the statistics before taking the centroid.
+    # This matters most for the noisy bands of the Darwin runs. On the fftshifted
+    # axis, the bin at index j mirrors the bin at 2 * i0 - j, where i0 is the
+    # index of k = 0; this holds for both even and odd numbers of grid points.
+    power[:, cand] += power[:, 2 * np.argmin(np.abs(k_vals)) - cand]
 
     rel_errors = []
     peak_snr = []
