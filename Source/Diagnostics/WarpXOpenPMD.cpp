@@ -6,6 +6,7 @@
  */
 #include "WarpXOpenPMD.H"
 
+#include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleIO.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FieldIO.H"
@@ -1380,6 +1381,20 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     mesh_comp.resetDataset(dataset);
 
     ::detail::setOpenPMDUnit( mesh, field_name );
+    // Temperatures: match exact names (not a prefix) so that user-defined
+    // particle fields such as "T_par_<species>" are not tagged by mistake
+    std::string const base_name = field_name.substr(0, field_name.rfind("_lvl")); // strip MR level
+    bool is_species_temperature = false; // T_<species>, stored in eV
+    for (auto const& species : WarpX::GetInstance().GetPartContainer().GetSpeciesNames()) {
+        if (base_name == "T_" + species) { is_species_temperature = true; }
+    }
+    if (is_species_temperature || base_name == "Te") { // Te (hybrid-PIC) is stored in K
+        mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
+    }
+    if (is_species_temperature) {
+        // Readers multiply by unitSI to get K
+        mesh_comp.setUnitSI(PhysConst::q_e / PhysConst::kb);
+    }
     auto relative_cell_pos = ablastr::utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
     std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
