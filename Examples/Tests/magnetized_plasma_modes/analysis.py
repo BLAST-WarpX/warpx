@@ -152,7 +152,7 @@ MAX_K_FRACTION = 0.6
 PEAK_FRACTION = 0.25
 
 
-def check_parallel_dispersion(field_kw, num_steps, resolution, dt, dz):
+def check_parallel_dispersion(field_kw, k_vals, w):
     """Automated physics check for the parallel-propagating (B_dir='z') case.
 
     The plotted spectrum shows that spectral power concentrates along the
@@ -174,11 +174,9 @@ def check_parallel_dispersion(field_kw, num_steps, resolution, dt, dz):
     """
     power = np.abs(field_kw) ** 2
 
-    # Frequency axis (rows of field_kw) and wavenumber axis (columns),
-    # normalized by the ion cyclotron frequency and ion skin depth.
-    # freq is the raw (unflipped) FFT frequency, i.e. -w on the figure.
-    freq = 2 * np.pi * np.fft.fftshift(np.fft.fftfreq(num_steps, dt)) / sim.w_ci
-    k_vals = 2 * np.pi * np.fft.fftshift(np.fft.fftfreq(resolution, dz)) * sim.l_i
+    # Undo the flip and sign of the plotted w axis to recover the raw FFT
+    # frequency that indexes the rows of field_kw.
+    freq = -np.flipud(w)
     k_cut = MAX_K_FRACTION * k_vals.max()
 
     # Search the whole positive-k half apart from the DC bin: the mode has to
@@ -613,4 +611,4 @@ if not sim.test:
 # perpendicular (Bernstein) case is only compared to digitized reference points
 # and is left as a visual comparison.
 if sim.B_dir == "z":
-    check_parallel_dispersion(field_kw, num_steps, resolution, dt, dz)
+    check_parallel_dispersion(field_kw, k, w)
