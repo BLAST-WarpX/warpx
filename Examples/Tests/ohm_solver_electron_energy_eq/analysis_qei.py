@@ -3,9 +3,8 @@
 electron-side sink AND the conjugate ion heating -- i.e. that the exchange is
 energy-conserving.
 
-The companion deck evolves a uniform, unmagnetized, zero-resistivity plasma
-with the ions at rest and hot electrons (Te0 >> Ti0), with ONLY the Q_ei
-exchange active:
+The companion deck evolves a uniform, zero-resistivity plasma with the ions at
+rest and hot electrons (Te0 >> Ti0), with ONLY the Q_ei exchange active:
 
     dU_e/dt = -Q_ei,   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),     (electron sink)
     ions GAIN exactly Q_ei via a thermal-velocity rescale.     (ion source)
@@ -27,9 +26,21 @@ so the difference decays exponentially,
 
 For gamma_e=5/3, C_e=C_i so T_e and T_i meet at (T_e0+T_i0)/2.
 
-This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) and checks
+A force-free magnetic field supplies an electron-ion relative drift without a
+J x B force. Because Q_ei is a temperature-relaxation operator, it must act on
+the ion thermal velocity about the ion bulk, not relax the ion bulk toward the
+electron flow. The deposited ion current projected onto the force-free mode
+must therefore remain at its initial shot-noise level.
+
+This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) from the
+post-step dumps -- the iteration-0 dump is skipped, since it is written before
+the first field solve while T_e still holds its zero allocation value (T_e is
+filled from the closure at the first step) -- so (Te0, Ti0) is the first
+post-step dump; the exponential fit does not depend on the normalisation
+point. It checks
   (1) the difference-decay rate vs [3(gamma_e-1)+2] nu_ei, and
-  (2) energy conservation: C_e T_e + C_i T_i constant over the run.
+  (2) energy conservation: C_e T_e + C_i T_i constant over the run, and
+  (3) ion bulk momentum remains unchanged despite the electron-ion drift.
 """
 
 import argparse
@@ -41,19 +52,25 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
+from scipy.constants import mu_0
 
 Q_E = 1.602176634e-19
 K_B = 1.380649e-23
 K_PER_EV = Q_E / K_B  # T[eV] * this = T[K];  T[K] / this = T[eV]
 
 
-def domain_means(diag_dir):
-    """Return (t[s], <Te>[eV], <Ti>[eV]) density-weighted domain means."""
-    ts = OpenPMDTimeSeries(str(diag_dir))
-    t = np.asarray(ts.t, dtype=float)
+def post_step_iterations(ts):
+    """Iterations to analyse: all dumps except iteration 0 (T_e = 0 there)."""
+    return [it for it in ts.iterations if it > 0]
+
+
+def domain_means(ts, its):
+    """Return (t[s], <Te>[eV], <Ti>[eV]) density-weighted domain means over
+    the iterations `its`."""
+    t = np.asarray(ts.t, dtype=float)[-len(its) :]
 
     Te_m, Ti_m = [], []
-    for it in ts.iterations:
+    for it in its:
         Te, _ = ts.get_field("Te", iteration=it)
         Ti, _ = ts.get_field("T_ions", iteration=it)
         rho, _ = ts.get_field("rho", iteration=it)
@@ -94,22 +111,36 @@ def main(argv=None):
         default=0.02,
         help="allowed relative drift of total thermal energy",
     )
+    ap.add_argument("--B0", type=float, default=0.1, help="force-free B amplitude (T)")
+    ap.add_argument("--Lx", type=float, default=0.5, help="domain length in x (m)")
+    ap.add_argument(
+        "--momentum-tol",
+        type=float,
+        default=0.08,
+        help="max allowed force-free ion-current projection relative to curl(B)/mu0",
+    )
     ap.add_argument("--out", default="qei_check.png")
     args = ap.parse_args(argv)
 
-    t, Te, Ti = domain_means(args.diag_dir)
+    ts = OpenPMDTimeSeries(args.diag_dir)
+    its = post_step_iterations(ts)
+    t, Te, Ti = domain_means(ts, its)
     if t.size < 3:
-        print(f"ERROR: need >=3 dumps, found {t.size} in {args.diag_dir}")
+        print(f"ERROR: need >=3 post-step dumps, found {t.size} in {args.diag_dir}")
         return 1
 
     g = args.gamma
     # rate at which (Te - Ti) decays = [3(g-1) + 2] nu_ei.
     rate_pred = (3.0 * (g - 1.0) + 2.0) * args.nu_ei
+    # Reference = first post-step dump (t[0] > 0); the fitted slope is
+    # independent of where the difference is normalised.
     Te0, Ti0 = Te[0], Ti[0]
 
-    # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate t.
+    # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate (t - t0).
     d = (Te - Ti) / (Te0 - Ti0)
-    good = d > 1e-3
+    # Fit only while the difference is well above the particle-noise floor;
+    # long (multi-tau) runs otherwise flatten the tail and bias the rate low.
+    good = d > max(1e-3, 0.05 * d[0])
     rate_fit = -np.polyfit(t[good], np.log(d[good]), 1)[0]
     rel_err = abs(rate_fit - rate_pred) / rate_pred
 
@@ -120,6 +151,23 @@ def main(argv=None):
     E_drift = (E - E[0]) / E[0]
     e_max = float(np.max(np.abs(E_drift)))
     T_eq_pred = (ce * Te0 + ci * Ti0) / (ce + ci)
+
+    # Project the deposited ion current onto the force-free pattern. The
+    # pattern amplitude is J0 = k B0 / mu0; a thermal-only Q_ei operator must
+    # not transfer any of this electron current to the ion bulk.
+    k = 2.0 * np.pi / args.Lx
+    J0 = k * args.B0 / mu_0
+    current_projection = []
+    for iteration in its:
+        Jy, info_y = ts.get_field(field="j", coord="y", iteration=iteration)
+        Jz, info_z = ts.get_field(field="j", coord="z", iteration=iteration)
+        ay = np.mean(Jy * np.sin(k * info_y.x)[np.newaxis, :])
+        az = np.mean(Jz * np.cos(k * info_z.x)[np.newaxis, :])
+        current_projection.append(ay + az)
+    current_projection = np.asarray(current_projection)
+    current_fraction = np.abs(current_projection) / J0
+    current_fraction_max = float(np.max(current_fraction))
+    broken_prediction = 1.0 - np.exp(-args.nu_ei * t[-1])
 
     print("=" * 66)
     print("Electron-ion relaxation (Q_ei), energy-conserving exchange")
@@ -135,6 +183,9 @@ def main(argv=None):
     print(
         f"  total-energy max drift    = {e_max * 100:.3f}%   (tol {args.etol * 100:.2f}%)"
     )
+    print(f"  max |projected J_i|/J0    = {current_fraction_max:.4f}")
+    print(f"  momentum tolerance        = {args.momentum_tol:.4f}")
+    print(f"  bulk-relaxing bug predicts ~ {broken_prediction:.4f}")
     print("=" * 66)
 
     tus = t * 1e6
@@ -150,10 +201,18 @@ def main(argv=None):
 
     ax[1].semilogy(tus[good], d[good], "o", ms=5, label="measured")
     ax[1].semilogy(
-        tus, np.exp(-rate_fit * t), "-", lw=2, label=f"fit  rate={rate_fit:.2e}"
+        tus,
+        np.exp(-rate_fit * (t - t[0])),
+        "-",
+        lw=2,
+        label=f"fit  rate={rate_fit:.2e}",
     )
     ax[1].semilogy(
-        tus, np.exp(-rate_pred * t), "--", lw=2, label=f"pred rate={rate_pred:.2e}"
+        tus,
+        np.exp(-rate_pred * (t - t[0])),
+        "--",
+        lw=2,
+        label=f"pred rate={rate_pred:.2e}",
     )
     ax[1].set_xlabel(r"time ($\mu$s)")
     ax[1].set_ylabel(r"$(T_e-T_i)/(T_{e0}-T_{i0})$")
@@ -173,7 +232,11 @@ def main(argv=None):
     fig.savefig(args.out, dpi=150)
     print(f"[saved] {args.out}")
 
-    ok = (rel_err <= args.rtol) and (e_max <= args.etol)
+    ok = (
+        (rel_err <= args.rtol)
+        and (e_max <= args.etol)
+        and (current_fraction_max <= args.momentum_tol)
+    )
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
 

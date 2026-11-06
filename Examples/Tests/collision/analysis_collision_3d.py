@@ -54,8 +54,9 @@ if last_fn[-1] == "/":
 last_it = last_fn[-6:]  # i.e., 000100
 prefix = last_fn[:-6]  # i.e., diags/diag1
 
-# Collect all output files in fn_list (names match pattern prefix + arbitrary number)
-fn_list = glob.glob(prefix + "*[0-9]")
+# Collect all output files in fn_list (names match pattern prefix + 6-digit step number;
+# assumes the default diagnostics file_min_digits = 6 and fewer than 10^6 steps)
+fn_list = glob.glob(prefix + 6 * "[0-9]")
 fn_list.sort(key=lambda fn: int(fn[-6:]))
 
 time_arr = []

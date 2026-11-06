@@ -117,6 +117,9 @@ sim.add_diagnostic(reduced_diag_one_eighth)
 
 sim.step(1)
 
-sim.extension.warpx.set_potential_on_eb("2.")
+# A space-dependent potential, then back to a time-only one (2 V for t > 0):
+# the solver must evaluate the latter as a function of t, not of x
+sim.extension.warpx.set_potential_on_eb("x")
+sim.extension.warpx.set_potential_on_eb("if(t > 0., 2., 0.)")
 
 sim.step(1)

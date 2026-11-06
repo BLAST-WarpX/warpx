@@ -36,7 +36,7 @@ If you encountered the issue installing from source with CMake, please provide t
 2. project build: output of `cmake --build build` (include your specific build options, e.g., `-j 4`)
 
 If applicable, please add any additional information about your software environment:
-- [ ] CMake: e.g., 3.24.0
+- [ ] CMake: e.g., 3.25.0
 - [ ] C++ compiler: e.g., GNU 11.3 with NVCC 12.0.76
 - [ ] Python: e.g., CPython 3.12
 - [ ] MPI: e.g., OpenMPI 4.1.1

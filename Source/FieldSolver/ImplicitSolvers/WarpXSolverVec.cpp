@@ -29,11 +29,11 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         !IsDefined(),
         "WarpXSolverVec::Define() called on already defined WarpXSolverVec");
 
-    // Define static member pointer to WarpX
-    if (!m_warpx_ptr_defined) {
-        m_WarpX = a_WarpX;
-        m_warpx_ptr_defined = true;
-    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        a_WarpX != nullptr,
+        "WarpXSolverVec::Define() called with a nullptr WarpX instance");
+
+    m_WarpX = a_WarpX;
 
     m_num_amr_levels = 1;
 
@@ -47,7 +47,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type = FieldType::Bfield_fp;
     }
     else if (m_vector_type_name=="vector_potential_fp_nodal") {
-        m_array_type = FieldType::vector_potential_fp;
+        m_array_type = FieldType::vector_potential_fp_nodal;
     }
     else if (m_vector_type_name!="none") {
         WARPX_ABORT_WITH_MESSAGE(a_vector_type_name+" "

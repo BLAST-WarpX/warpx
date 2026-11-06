@@ -1,0 +1,93 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 10
+amr.n_cell = 8 8 8
+amr.max_grid_size = 8
+amr.blocking_factor = 2
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -1e-6 -1e-6 -1e-6
+geometry.prob_hi =  1e-6  1e-6  1e-6
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.const_dt = 1e-15
+algo.maxwell_solver = none
+algo.particle_shape = 1
+warpx.use_filter = 0
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = photonA photonB electron positron
+
+photonA.species_type = photon
+photonA.injection_style = "NRandomPerCell"
+photonA.num_particles_per_cell = 200
+photonA.profile = constant
+photonA.density = 1.e35
+photonA.momentum_distribution_type = "constant"
+photonA.ux = 2.8
+photonA.uy = 0.
+photonA.uz = 0.
+photonA.do_not_push = 1
+
+photonB.species_type = photon
+photonB.injection_style = "NRandomPerCell"
+photonB.num_particles_per_cell = 200
+photonB.profile = constant
+photonB.density = 1.e35
+photonB.momentum_distribution_type = "constant"
+photonB.ux = -2.8
+photonB.uy = 0.
+photonB.uz = 0.
+photonB.do_not_push = 1
+
+electron.species_type = electron
+electron.injection_style = none
+electron.do_not_push = 1
+electron.do_not_gather = 1
+
+positron.species_type = positron
+positron.injection_style = none
+positron.do_not_push = 1
+positron.do_not_deposit = 1
+positron.do_not_gather = 1
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = lbw
+lbw.species = photonA photonB
+lbw.product_species = electron positron
+lbw.type = linear_breit_wheeler
+lbw.event_multiplier = 1.
+lbw.probability_threshold = 0.1
+lbw.probability_target_value = 0.01
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = -1
+diag1.diag_type = Full
+diag1.format = openpmd
+diag1.openpmd_backend = h5
+diag1.write_species = 1
+diag1.species = electron positron
+diag1.fields_to_plot = none
+diag1.dump_last_timestep = 1
+
+warpx.reduced_diags_names = ParticleEnergy ParticleMomentum ParticleNumber
+
+ParticleEnergy.type = ParticleEnergy
+ParticleEnergy.intervals = 1
+
+ParticleMomentum.type = ParticleMomentum
+ParticleMomentum.intervals = 1
+
+ParticleNumber.type = ParticleNumber
+ParticleNumber.intervals = 1

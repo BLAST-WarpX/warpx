@@ -11,6 +11,7 @@
 
 #include "EmbeddedBoundaryInit.H"
 
+#include "EmbeddedBoundary/WarpXFaceInfoBox.H"
 #include "Fields.H"
 #include "Utils/TextMsg.H"
 
@@ -420,12 +421,10 @@ web::MarkExtensionCells (
 
                 // Does this face need to be extended?
                 // The difference between flag_info_face and flag_ext_face is that:
-                //     - for every face flag_info_face contains a:
-                //          * 0 if the face needs to be extended
-                //          * 1 if the face is large enough to lend area to other faces
-                //          * 2 if the face is actually intruded by other face
-                //       Here we only take care of the first two cases. The entries corresponding
-                //       to the intruded faces are going to be set in the function ComputeFaceExtensions
+                //     - for every face flag_info_face contains one of the FaceInfo::Flag values.
+                //       Here we only take care of FaceInfo::extended and FaceInfo::available. The
+                //       entries corresponding to the intruded faces are going to be set in the
+                //       function ComputeFaceExtensions
                 //     - for every face flag_ext_face contains a:
                 //          * 1 if the face needs to be extended
                 //          * 0 otherwise
@@ -434,12 +433,12 @@ web::MarkExtensionCells (
                 //       track of which cells could not be extended
                 flag_ext_face_data(i, j, k) = int(S(i, j, k) < S_stab && S(i, j, k) > 0);
                 if(flag_ext_face_data(i, j, k)){
-                    flag_info_face_data(i, j, k) = 0;
+                    flag_info_face_data(i, j, k) = FaceInfo::extended;
                 }
                 // Is this face available to lend area to other faces?
                 // The criterion is that the face has to be interior and not already unstable itself
                 if(int(S(i, j, k) > 0 && !flag_ext_face_data(i, j, k))) {
-                    flag_info_face_data(i, j, k) = 1;
+                    flag_info_face_data(i, j, k) = FaceInfo::available;
                 }
             });
         }

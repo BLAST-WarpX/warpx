@@ -26,7 +26,7 @@ add_warpx_test(
     2  # dims
     1  # nprocs
     "inputs_test_2d_runtime_components_picmi.py amr.restart='../test_2d_runtime_components_picmi/diags/chk000005'"  # inputs
-    "analysis_default_restart.py diags/diag1000010"  # analysis
+    "analysis_default_restart.py --path diags/diag1000010"  # analysis
     "analysis_default_regression.py --path diags/diag1000010"  # checksum
     test_2d_runtime_components_picmi  # dependency
 )
@@ -46,9 +46,89 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_acceleration_restart  # inputs
-    "analysis_default_restart.py diags/diag1000010"  # analysis
+    "analysis_default_restart.py --path diags/diag1000010"  # analysis
     "analysis_default_regression.py --path diags/diag1000010"  # checksum
     test_3d_acceleration  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_cell_boundary  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_cell_boundary  # inputs
+    OFF  # analysis
+    OFF  # checksum: compared directly with the restarted run
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_cell_boundary_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_cell_boundary_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000310"  # analysis
+    OFF  # checksum: analysis compares fields, particles, and domain bounds
+    test_3d_acceleration_mw_cell_boundary  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_start_stop  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_stop  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_start_stop_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_stop_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    test_3d_acceleration_mw_start_stop  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_not_started  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_not_started  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_not_started_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_not_started_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    test_3d_acceleration_mw_not_started  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_start_boundary  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_boundary  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_start_boundary_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_boundary_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    test_3d_acceleration_mw_start_boundary  # dependency
 )
 
 if(WarpX_FFT)
@@ -69,7 +149,7 @@ if(WarpX_FFT)
         3  # dims
         2  # nprocs
         inputs_test_3d_acceleration_psatd_restart  # inputs
-        "analysis_default_restart.py diags/diag1000010"  # analysis
+        "analysis_default_restart.py --path diags/diag1000010"  # analysis
         "analysis_default_regression.py --path diags/diag1000010"  # checksum
         test_3d_acceleration_psatd  # dependency
     )
@@ -93,7 +173,7 @@ if(WarpX_FFT)
         3  # dims
         2  # nprocs
         inputs_test_3d_acceleration_psatd_time_avg_restart  # inputs
-        "analysis_default_restart.py diags/diag1000010"  # analysis
+        "analysis_default_restart.py --path diags/diag1000010"  # analysis
         "analysis_default_regression.py --path diags/diag1000010"  # checksum
         test_3d_acceleration_psatd_time_avg  # dependency
     )

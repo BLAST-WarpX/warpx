@@ -33,6 +33,13 @@ namespace {
 
         if (u_th == 0._rt) {
             u = u_m; // Trivial case ; avoids division by 0 in the rest of the code below
+        } else if (u_m == 0._rt) {
+            // For zero drift, the flux distribution reduces to a half-normal distribution.
+            // Sampling it directly avoids the `abs(u_m)` denominators in the generic formulas,
+            // which compilers can speculatively evaluate in optimized builds leading to the
+            // invalid flag being triggered.
+            amrex::Real const xrand = amrex::RandomPositive(engine); // ensures xrand > 0
+            u = u_th * std::sqrt(2._rt*std::log(1._rt/xrand));
         } else if (abs_u_m < 0.6*u_th) {
             // Mean velocity magnitude is less than thermal velocity
             // Use the distribution u*exp(-u**2*(1-abs(u_m)/u_th)/(2*u_th**2)) as an approximation
@@ -46,7 +53,7 @@ namespace {
             while (reject) {
                 // Generates u according to u*exp(-u**2/(2*approx_u_th**2)),
                 // using the method of the inverse cumulative function
-                amrex::Real xrand = 1._rt - amrex::Random(engine); // ensures urand > 0
+                amrex::Real xrand = amrex::RandomPositive(engine); // ensures urand > 0
                 u = approx_u_th * std::sqrt(2._rt*std::log(1._rt/xrand));
                 // Rejection method
                 xrand = amrex::Random(engine);

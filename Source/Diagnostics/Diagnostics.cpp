@@ -50,6 +50,11 @@ Diagnostics::BaseReadParameters ()
 {
     auto & warpx = WarpX::GetInstance();
 
+    // Diagnostics are constructed before the checkpoint geometry is restored.
+    if (WarpX::do_moving_window) {
+        m_moving_window_initial_lo = warpx.Geom(0).ProbLo(WarpX::moving_window_dir);
+    }
+
     const amrex::ParmParse pp_diag_name(m_diag_name);
     m_file_prefix = "diags/" + m_diag_name;
     pp_diag_name.query("file_prefix", m_file_prefix);
@@ -323,6 +328,29 @@ Diagnostics::BaseReadParameters ()
                 + ".fields_to_plot does not match any species"
             );
         }
+        if (var.starts_with("part_per_cell_")) {
+            // Extract species name from the string part_per_cell_<species_name>
+            const std::string species = var.substr(std::string_view("part_per_cell_").size());
+            // Boolean used to check if species name was misspelled
+            bool species_name_is_wrong = true;
+            // Loop over all species
+            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                // Check if species name extracted from the string part_per_cell_<species_name>
+                // matches any of the species in the simulation
+                if (species == m_all_species_names[i]) {
+                    // Store species index: will be used in PartPerCellFunctor to dump
+                    // part_per_cell for this species
+                    m_part_per_cell_per_species_index.push_back(i);
+                    species_name_is_wrong = false;
+                }
+            }
+            // If species name was misspelled, abort with error message
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species_name_is_wrong,
+                "Input error: string " + var + " in " + m_diag_name
+                + ".fields_to_plot does not match any species"
+            );
+        }
 
         // Check if m_varnames contains a string of the form T_<species_name>
         if (var.starts_with("Tx_") || var.starts_with("Ty_") || var.starts_with("Tz_")) {
@@ -521,16 +549,15 @@ Diagnostics::InitBaseData ()
     nmax_lev = warpx.maxLevel() + 1;
     m_all_field_functors.resize( nmax_lev );
 
-    // For restart, move the m_lo and m_hi of the diag consistent with the
-    // current moving_window location
-    if (WarpX::do_moving_window) {
+    // The checkpoint geometry contains the shifts actually applied to the grid.
+    // Reconstructing them from the step count and dt can round differently at cell
+    // boundaries. Preserve each diagnostic's offset from the original simulation domain.
+    if (WarpX::do_moving_window && warpx.getistep(0) > 0) {
         const int moving_dir = WarpX::moving_window_dir;
         const amrex::Real displacement =
-            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
-        const int shift_num_base = static_cast<int>
-            (displacement / warpx.Geom(0).CellSize(moving_dir));
-        m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-        m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
+            warpx.Geom(0).ProbLo(moving_dir) - m_moving_window_initial_lo;
+        m_lo[moving_dir] += displacement;
+        m_hi[moving_dir] += displacement;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){

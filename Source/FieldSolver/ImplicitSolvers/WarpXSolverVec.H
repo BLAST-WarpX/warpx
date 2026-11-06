@@ -76,7 +76,7 @@ public:
     {
         assertIsDefined( a_solver_vec );
         m_num_amr_levels = a_solver_vec.m_num_amr_levels;
-        Define( WarpXSolverVec::m_WarpX,
+        Define( a_solver_vec.m_WarpX,
                 a_solver_vec.getVectorType(),
                 a_solver_vec.getScalarType() );
     }
@@ -122,6 +122,10 @@ public:
             m_scalar_vec = std::move(a_solver_vec.m_scalar_vec);
             m_array_type = a_solver_vec.m_array_type;
             m_scalar_type = a_solver_vec.m_scalar_type;
+            m_vector_type_name = a_solver_vec.m_vector_type_name;
+            m_scalar_type_name = a_solver_vec.m_scalar_type_name;
+            m_num_amr_levels = a_solver_vec.m_num_amr_levels;
+            m_WarpX = a_solver_vec.m_WarpX;
             m_is_defined = true;
         }
         return *this;
@@ -302,6 +306,14 @@ public:
             "WarpXSolverVec::nDOF_global() DOF object is a nullptr");
         return m_dofs->m_nDoFs_g;
     }
+    // first global DOF of each process, plus the total (size nprocs+1)
+    [[nodiscard]] const amrex::Vector<amrex::Long>& dofRowOffsets () const
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_dofs != nullptr),
+            "WarpXSolverVec::dofRowOffsets() DOF object is a nullptr");
+        return m_dofs->m_row_offsets;
+    }
 
     // copy to/from Real-type arrays
     void copyFrom (const amrex::Real*);
@@ -314,7 +326,7 @@ public:
     [[nodiscard]] auto numAMRLevels () const { return m_num_amr_levels; }
 
     // return DOFs object pointer
-    [[nodiscard]] inline const auto& getDOFsObject () const { return m_dofs; }
+    [[nodiscard]] inline static const auto& getDOFsObject () { return m_dofs; }
 
 private:
 
@@ -332,8 +344,12 @@ private:
     static constexpr int m_ncomp = 1;
     int m_num_amr_levels = 1;
 
-    inline static bool m_warpx_ptr_defined = false;
-    inline static WarpX* m_WarpX = nullptr;
+    /** The WarpX instance whose fields this vector mirrors.
+     *
+     * Set by Define() and scoped to a single vector, so that a process running
+     * several simulations one after another gets the instance it is solving for.
+     */
+    WarpX* m_WarpX = nullptr;
 
     static std::unique_ptr<WarpXSolverDOF> m_dofs;
 };

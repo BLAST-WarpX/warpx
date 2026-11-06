@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_test_3d_linear_breit_wheeler_angular
+
+photonA.density = 1.e45
+photonA.ux = 1.e6
+photonB.density = 1.e45
+photonB.ux = -1.e6

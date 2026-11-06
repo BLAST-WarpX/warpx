@@ -58,7 +58,7 @@ class LinearFunction
         virtual void precond ( T& a_U, const T& a_X ) = 0;
 
         //! update preconditioner
-        virtual void updatePreCondMat ( const T&  a_X ) = 0;
+        virtual void updatePreCondMat () = 0;
 
         //! get sparse matrix representation of preconditioner
         virtual void getPCMatrix( amrex::Gpu::DeviceVector<int>&,

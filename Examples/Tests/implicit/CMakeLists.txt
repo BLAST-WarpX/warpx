@@ -12,6 +12,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_theta_implicit_planar_pinch_substeps  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_theta_implicit_planar_pinch_substeps  # inputs
+    "analysis_pinch.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_semi_implicit_picard  # name
     1  # dims
     2  # nprocs
@@ -28,6 +38,16 @@ add_warpx_test(
     inputs_test_1d_theta_implicit_picard  # inputs
     "analysis_1d.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_theta_implicit_planar_pinch_algmg  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_theta_implicit_planar_pinch_algmg  # inputs
+    "analysis_pinch.py diags/diag1000020"  # analysis
+    "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
 
@@ -72,6 +92,28 @@ if(AMReX_PETSC)
         OFF  # dependency
     )
 
+    # petsc_snes and the native Newton solver follow the same algorithm: the checksum file
+    # of this test is a symbolic link to that of test_2d_theta_implicit_planar_pinch
+    add_warpx_test(
+        test_2d_theta_implicit_planar_pinch_petsc_snes  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_theta_implicit_planar_pinch_petsc_snes  # inputs
+        "analysis_pinch.py diags/diag1000020"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_2d_semi_implicit_planar_pinch_petsc_snes  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_semi_implicit_planar_pinch_petsc_snes  # inputs
+        "analysis_pinch.py diags/diag1000020 --gmres-iters-tol 4 --newton-iters-tol 4"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+
     add_warpx_test(
         test_rcylinder_theta_implicit_dynamic_pinch  # name
         RCYLINDER  # dims
@@ -94,11 +136,21 @@ if(AMReX_PETSC)
 endif()
 
 add_warpx_test(
+    test_2d_semi_implicit_pc_jacobi  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_semi_implicit_pc_jacobi  # inputs
+    "analysis_planar_pinch_solvers.py diags/diag1000002 5 5"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_theta_implicit_jfnk_vandb  # name
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
@@ -118,7 +170,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_filtered  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
@@ -128,10 +180,32 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_picmi.py  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_3d_theta_implicit_jfnk_direct  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_theta_implicit_jfnk_direct  # inputs
+    "analysis_implicit_jfnk.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+if(AMReX_PETSC)
+    add_warpx_test(
+        test_3d_theta_implicit_jfnk_pcwidth  # name
+        3  # dims
+        2  # nprocs
+        inputs_test_3d_theta_implicit_jfnk_pcwidth  # inputs
+        "analysis_implicit_jfnk.py diags/diag1000020 --gmres-iters-tol 5 --newton-iters-tol 3"  # analysis
+        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        OFF  # dependency
+    )
+endif()
 
 add_warpx_test(
     test_2d_theta_implicit_symmetry  # name

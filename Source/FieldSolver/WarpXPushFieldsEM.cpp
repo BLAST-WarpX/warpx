@@ -51,6 +51,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <string>
 
 using namespace amrex::literals;
 using warpx::fields::FieldType;
@@ -435,7 +436,7 @@ WarpX::PSATDForwardTransformG ()
         if (spectral_solver_cp[lev])
         {
             if (m_fields.has(FieldType::G_cp, lev)) {
-                spectral_solver_fp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_cp, lev), Idx.G);
+                spectral_solver_cp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_cp, lev), Idx.G);
             }
         }
     }
@@ -464,9 +465,9 @@ WarpX::PSATDBackwardTransformG ()
             if (m_fields.has(FieldType::G_cp, lev)) {
                 amrex::MultiFab* G_cp = m_fields.get(FieldType::G_cp, lev);
 #ifdef WARPX_DIM_RZ
-                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
+                spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
 #else
-                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G, m_fill_guards_fields);
+                spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp, Idx.G, m_fill_guards_fields);
 #endif
             }
         }
@@ -824,6 +825,7 @@ WarpX::PushPSATD (amrex::Real start_time)
                 cell_size_at_all_levels.push_back(CellSize(lev));
             }
             ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
+            FinalizeJ();
 
             // FFT of J after subtraction of cumulative sums
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
@@ -889,6 +891,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             // TODO This works only without mesh refinement
             const int lev = 0;
             SumBoundaryJ(current_fp, lev, Geom(lev).periodicity());
+            FinalizeJ();
             SyncRho();
         }
 
@@ -1028,14 +1031,14 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                                         lev,
                                         patch_type,
                                         m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_eb_update_E[lev],
+                                        m_eb_update_E_fp[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_eb_update_E[lev],
+                                        m_eb_update_E_cp[lev],
                                         a_dt );
     }
 
@@ -1046,7 +1049,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                 m_fields,
                 patch_type,
                 lev,
-                pml[lev]->GetEBUpdateEFlag(),
+                pml[lev]->GetEBUpdateEFlag_fp(),
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
@@ -1054,7 +1057,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                 m_fields,
                 patch_type,
                 lev,
-                pml[lev]->GetEBUpdateEFlag(),
+                pml[lev]->GetEBUpdateEFlag_cp(),
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }
@@ -1225,7 +1228,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
         m_fields.get_alldirs(FieldType::Efield_fp, lev),
         m_fields.get_alldirs(FieldType::Bfield_fp, lev),
         m_fields.get_alldirs(FieldType::current_fp, lev),
-        m_eb_update_E[lev],
+        m_eb_update_E_fp[lev],
         a_dt, m_macroscopic_properties);
 
     if (do_pml && pml[lev]->ok()) {
@@ -1234,7 +1237,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
                 m_fields,
                 patch_type,
                 lev,
-                pml[lev]->GetEBUpdateEFlag(),
+                pml[lev]->GetEBUpdateEFlag_fp(),
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
@@ -1242,7 +1245,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
                 m_fields,
                 patch_type,
                 lev,
-                pml[lev]->GetEBUpdateEFlag(),
+                pml[lev]->GetEBUpdateEFlag_cp(),
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }
@@ -1269,7 +1272,8 @@ WarpX::DampFieldsInGuards(const int lev,
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*Efield[0]); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& Ex_arr = Efield[0]->array(mfi);
                 amrex::Array4<amrex::Real> const& Ey_arr = Efield[1]->array(mfi);
@@ -1363,7 +1367,8 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*mf); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& mf_arr = mf->array(mfi);
 
@@ -1763,8 +1768,11 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) const
+WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev,
+                                                int scomp, int ncomp) const
 {
+    if (ncomp < 0) { ncomp = Rho->nComp() - scomp; }
+    AMREX_ALWAYS_ASSERT(scomp >= 0 && ncomp > 0 && scomp + ncomp <= Rho->nComp());
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<amrex::Real,3>& dx = WarpX::CellSize(lev);
     const amrex::Real dr = dx[0];
@@ -1810,46 +1818,62 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
 
         // Rescale charge in r-z mode since the inverse volume factor was not
         // included in the charge deposition.
-        // Note that the loop is also over ncomps, which takes care of the RZ modes,
-        // as well as the old and new rho.
-        int const ncomp = Rho->nComp();
-        amrex::ParallelFor(tb, ncomp,
-        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        // The MultiFab may hold several copies of the charge density side by
+        // side (e.g. rho_old and rho_new for PSATD, or a single copy for the
+        // electrostatic and hybrid solvers and for diagnostics). Each copy
+        // uses the same component layout as J: component 0 is the mode 0,
+        // and components 2*m-1 and 2*m are the real and imaginary parts of
+        // the mode m.
+        int const rho_ncomp = Rho->nComp();
+        int const ncomps_per_copy = WarpX::ncomps;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho_ncomp % ncomps_per_copy == 0,
+            "ApplyInverseVolumeScalingToChargeDensity: the number of components of rho ("
+            + std::to_string(rho_ncomp) + ") must be a multiple of the number of mode components ("
+            + std::to_string(ncomps_per_copy) + ")");
+        amrex::ParallelFor(tb,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
-            // Wrap the charge density deposited in the guard cells around
-            // to the cells above the axis.
-            // Rho is located on the boundary
+            // Fold only the requested components. Components are grouped by
+            // copy, with the azimuthal-mode layout repeated in each copy.
             if (rmin == 0. && 1-ishift <= i && i <= ngRho[0]-ishift) {
-                int imode;
-                if (icomp == 0 || icomp == ncomp/2) {
-                    imode = 0;
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
+                    int const comp_in_copy = icomp % ncomps_per_copy;
+                    if (comp_in_copy == 0) {
+                        // Mode 0 is symmetric across the axis.
+                        Rho_arr(i,j,0,icomp) += Rho_arr(-ishift-i,j,0,icomp);
+                    }
+#if defined(WARPX_DIM_RZ)
+                    else {
+                        int const imode = (comp_in_copy + 1) / 2;
+                        // Mode m has parity (-1)^m across the axis.
+                        Rho_arr(i,j,0,icomp) += static_cast<amrex::Real>(
+                            std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,icomp));
+                    }
+#endif
                 }
-                else if (icomp < ncomp/2) {
-                    imode = (icomp+1)/2;
-                }
-                else {
-                    imode = (icomp - ncomp/2 + 1)/2;
-                }
-                Rho_arr(i,j,0,icomp) -= static_cast<amrex::Real>(std::pow(-1, imode+1)*Rho_arr(-ishift-i,j,0,icomp));
             }
 
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
             if (r == 0.) {
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
+                    Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
 #elif defined(WARPX_DIM_RSPHERE)
-                Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
+                    Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
 #endif
+                }
             } else {
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
-                Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
+                    // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
+                    Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
-                // leaving out the highest order term
-                Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+                    // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                    // leaving out the highest order term
+                    Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
 #endif
+                }
             }
         });
     }

@@ -27,7 +27,7 @@ jobs:
       CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -36,8 +36,8 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
-    - uses: actions/setup-python@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       name: Install Python
       with:
         python-version: '3.x'
@@ -45,7 +45,7 @@ jobs:
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -88,7 +88,7 @@ jobs:
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
           -DWarpX_PYTHON=ON            \
-          -DAMReX_CUDA_ARCH=6.0        \
+          -DCMAKE_CUDA_ARCHITECTURES=60 \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE     \
@@ -102,7 +102,9 @@ jobs:
         export WARPX_MPI=ON
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
-        python3 -m pip install *.whl
+        # install pywarpx with the dependency wheels built above (also works if a dependency
+        # is given by URL, e.g., an in-development PICMI version)
+        python3 -m pip install --find-links . pywarpx-*.whl
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -116,7 +118,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -125,12 +127,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -161,12 +163,18 @@ jobs:
     runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-    #env:
-    #  # For NVHPC, Ninja is slower than the default:
-    #  CMAKE_GENERATOR: Ninja
+    env:
+      # nvc++ defaults to -tp=host, but GH runners mix Intel and AMD CPUs
+      # of different generations: pin the x86-64-v3 (AVX2) baseline they
+      # all support, for reproducible builds and ccache hits
+      CXXFLAGS: "-tp=x86-64-v3"
+      # host side of sources compiled as CUDA (-ccbin=nvc++)
+      CUDAFLAGS: "-Xcompiler=-tp=x86-64-v3"
+      # For NVHPC, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -175,12 +183,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Dependencies
       run: |
-        .github/workflows/dependencies/nvhpc.sh 25.1
+        .github/workflows/dependencies/nvhpc.sh 26.5
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -194,7 +202,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.1
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/26.5
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
@@ -213,7 +221,7 @@ jobs:
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
           -DWarpX_PYTHON=OFF           \
-          -DAMReX_CUDA_ARCH=8.0        \
+          -DCMAKE_CUDA_ARCHITECTURES=80 \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \

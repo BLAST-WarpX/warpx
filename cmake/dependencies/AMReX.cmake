@@ -21,24 +21,29 @@ macro(find_amrex)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
         # see https://amrex-codes.github.io/amrex/docs_html/BuildingAMReX.html#customization-options
-        if(WarpX_ASCENT)
-            set(AMReX_ASCENT ON CACHE INTERNAL "")
+        set(AMReX_ASCENT "${WarpX_ASCENT}" CACHE INTERNAL "")
+        set(AMReX_CATALYST "${WarpX_CATALYST}" CACHE INTERNAL "")
+        if(WarpX_ASCENT OR WarpX_CATALYST)
             set(AMReX_CONDUIT ON CACHE INTERNAL "")
-        endif()
-
-        if(WarpX_CATALYST)
-            set(AMReX_CATALYST ON CACHE INTERNAL "")
-            set(AMReX_CONDUIT ON CACHE INTERNAL "")
-        endif()
-
-        if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
-            set(AMReX_ASSERTIONS ON CACHE BOOL "")
-            # note: floating-point exceptions can slow down debug runs a lot
-            set(AMReX_FPE ON CACHE BOOL "")
         else()
-            set(AMReX_ASSERTIONS OFF CACHE BOOL "")
-            set(AMReX_FPE OFF CACHE BOOL "")
+            set(AMReX_CONDUIT OFF CACHE INTERNAL "")
         endif()
+
+        # Set re-evaluated defaults without caching them. With CMP0077 NEW, AMReX's
+        # option() honors these normal variables, while explicit caller values win.
+        if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+            set(_WarpX_AMReX_DEBUG_DEFAULT ON)
+        else()
+            set(_WarpX_AMReX_DEBUG_DEFAULT OFF)
+        endif()
+        if(NOT DEFINED AMReX_ASSERTIONS)
+            set(AMReX_ASSERTIONS "${_WarpX_AMReX_DEBUG_DEFAULT}")
+        endif()
+        if(NOT DEFINED AMReX_FPE)
+            # note: floating-point exceptions can slow down debug runs a lot
+            set(AMReX_FPE "${_WarpX_AMReX_DEBUG_DEFAULT}")
+        endif()
+        unset(_WarpX_AMReX_DEBUG_DEFAULT)
 
         if(WarpX_COMPUTE STREQUAL OMP)
             set(AMReX_GPU_BACKEND  "NONE" CACHE INTERNAL "")
@@ -105,9 +110,7 @@ macro(find_amrex)
             set(AMReX_PARTICLES_PRECISION "SINGLE" CACHE INTERNAL "")
         endif()
 
-        if(WarpX_SENSEI)
-            set(AMReX_SENSEI ON CACHE INTERNAL "")
-        endif()
+        set(AMReX_SENSEI "${WarpX_SENSEI}" CACHE INTERNAL "")
 
         set(AMReX_AMRLEVEL OFF CACHE INTERNAL "")
         set(AMReX_ENABLE_TESTS OFF CACHE INTERNAL "")
@@ -120,35 +123,46 @@ macro(find_amrex)
         set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
         set(AMReX_LINEAR_SOLVERS_INCFLO ON CACHE INTERNAL "")
 
-        if(WarpX_ASCENT OR WarpX_SENSEI)
-            set(AMReX_GPU_RDC ON CACHE BOOL "")
+        # CUDA device LTO (AMReX_CUDA_LTO, set for WarpX_IPO below) only works
+        # with relocatable device code: without RDC every translation unit is
+        # already device linked on its own and AMReX errors out.
+        if(WarpX_ASCENT OR WarpX_SENSEI OR
+           (WarpX_IPO AND WarpX_COMPUTE STREQUAL CUDA))
+            set(AMReX_GPU_RDC ON CACHE BOOL "" FORCE)
         else()
             # we don't need RDC and disabling it simplifies the build
             # complexity and potentially improves code optimization
-            set(AMReX_GPU_RDC OFF CACHE BOOL "")
+            set(AMReX_GPU_RDC OFF CACHE BOOL "" FORCE)
         endif()
 
         # shared libs, i.e. for Python bindings, need relocatable code
+        # (the second condition below is a subset of this one)
         if(WarpX_PYTHON OR
            ABLASTR_POSITION_INDEPENDENT_CODE OR
            (WarpX_LIB AND BUILD_SHARED_LIBS))
-            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
+            # A normal variable applies the requirement without overwriting a
+            # caller-owned cache entry when the requirement later disappears.
+            set(AMReX_PIC ON)
         endif()
-        if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
-            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
 
-            # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
-            # BETWEEN MULTIPLE PYTHON MODULES
-            # TODO this is likely an export/symbol hiding issue that we could
-            #      alleviate later on
-            set(AMReX_BUILD_SHARED_LIBS ON CACHE BOOL "Build AMReX shared library" FORCE)
+        # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
+        # BETWEEN MULTIPLE PYTHON MODULES
+        # TODO this is likely an export/symbol hiding issue that we could
+        #      alleviate later on
+        if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
+            # Do not cache this requirement. AMReX's option() honors the normal
+            # variable for this configure, and a caller-owned cache entry becomes
+            # visible again if the requirement later disappears.
+            set(AMReX_BUILD_SHARED_LIBS ON)
         endif()
 
         # IPO/LTO
-        if(WarpX_IPO)
-            set(AMReX_IPO ON CACHE INTERNAL "")
-            if(WarpX_COMPUTE STREQUAL CUDA)
-                set(AMReX_CUDA_LTO ON CACHE BOOL "")
+        set(AMReX_IPO "${WarpX_IPO}" CACHE INTERNAL "")
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            if(WarpX_IPO)
+                set(AMReX_CUDA_LTO ON CACHE BOOL "" FORCE)
+            else()
+                set(AMReX_CUDA_LTO OFF CACHE BOOL "" FORCE)
             endif()
         endif()
 
@@ -170,13 +184,11 @@ macro(find_amrex)
             list(APPEND CMAKE_MODULE_PATH "${WarpX_amrex_src}/Tools/CMake")
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             add_subdirectory(${WarpX_amrex_src} _deps/localamrex-build/)
         else()
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             FetchContent_Declare(fetchedamrex
                 GIT_REPOSITORY ${WarpX_amrex_repo}
