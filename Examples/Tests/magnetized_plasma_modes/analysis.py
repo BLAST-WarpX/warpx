@@ -84,12 +84,165 @@ print(f"Data file contains {num_steps} time snapshots.")
 print(f"Spatial resolution is {resolution}")
 
 
+# Mass ratio m_e / m_i = w_ci / w_ce used in the parallel dispersion relations.
+# The Ohm solver treats the electrons as a massless fluid (ratio 0). The Darwin
+# solver pushes kinetic electrons with the input mass ratio, which can bring
+# the electron cyclotron resonance into the plotted frequency range.
+INV_MASS_RATIO = sim.w_ci / sim.w_ce if is_darwin else 0.0
+
+
 def get_analytic_R_mode(w):
-    return w / np.sqrt(1.0 + abs(w))
+    """Signed wavenumber k l_i of the R (right-hand) mode at frequency w / w_ci.
+
+    With x = |w| / w_ci and r = w_ci / w_ce, the cold-plasma R mode obeys
+
+        (k l_i)^2 = x / (1 - x r) - x / (1 + x)
+                  = (1 + r) x^2 / [(1 - x r) (1 + x)] .
+
+    The second form is evaluated because it avoids cancellation at small x.
+    For massless electrons (r = 0), it reduces to x^2 / (1 + x).
+    Returns nan where the mode does not propagate.
+    """
+    x = np.abs(w)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        k2 = (1.0 + INV_MASS_RATIO) * x**2 / ((1.0 - x * INV_MASS_RATIO) * (1.0 + x))
+    return np.sign(w) * np.sqrt(np.where(k2 >= 0.0, k2, np.nan))
 
 
 def get_analytic_L_mode(w):
-    return w / np.sqrt(1.0 - abs(w))
+    """Signed wavenumber k l_i of the L (left-hand) mode at frequency w / w_ci.
+
+    Same as get_analytic_R_mode, with the two cyclotron resonances swapped:
+
+        (k l_i)^2 = (1 + r) x^2 / [(1 - x) (1 + x r)] .
+
+    For massless electrons (r = 0), it reduces to x^2 / (1 - x).
+    Returns nan where the mode does not propagate, i.e., above w_ci.
+    """
+    x = np.abs(w)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        k2 = (1.0 + INV_MASS_RATIO) * x**2 / ((1.0 - x) * (1.0 + x * INV_MASS_RATIO))
+    return np.sign(w) * np.sqrt(np.where(k2 >= 0.0, k2, np.nan))
+
+
+# Settings of the parallel dispersion check.
+# Only frequencies above w_ci are tested, where the R mode is the only
+# propagating mode.
+W_MIN = 1.0
+# Bands whose analytic k exceeds this fraction of the largest grid k are
+# skipped, because the discrete curl operator distorts the dispersion there.
+# This also skips the bands near the electron cyclotron resonance of the Darwin
+# runs, where the analytic k diverges.
+MAX_K_FRACTION = 0.6
+# Bins with power above this fraction of the band's peak power belong to the
+# mode and enter the power-weighted centroid of k.
+PEAK_FRACTION = 0.25
+# Pass/fail tolerances
+MAX_MEDIAN_ERROR = 0.10  # maximum median relative error in k
+BAND_ERROR = 0.15  # relative error below which a band counts as on the curve
+MIN_FRAC_ON_CURVE = 0.75  # minimum fraction of bands on the curve
+MIN_SNR = 30.0  # minimum median ratio of peak power to median power in a band
+
+
+def check_parallel_dispersion(field_kw, k_vals, w):
+    """Check that the parallel (B_dir = "z") spectrum follows the R mode.
+
+    For each resolved frequency band above w_ci, measure the wavenumber where
+    the spectral power peaks and compare it with get_analytic_R_mode.
+
+    field_kw is the fftshifted spectrum of Bl = (Bx + i By) / sqrt(2), while
+    k_vals and w are the plotted axes, in units of 1 / l_i and w_ci.
+
+    Bl keeps only the circular polarization that rotates with the electrons, so
+    the R mode appears only at positive raw FFT frequency, for both directions
+    of propagation. The figure displays each row of field_kw at minus its raw
+    FFT frequency, so the tested R mode appears at negative w on the figure.
+    """
+    power = np.abs(field_kw) ** 2
+
+    # Recover the raw FFT frequency of each row of field_kw from the plotted w.
+    freq = -np.flipud(w)
+    k_cut = MAX_K_FRACTION * k_vals.max()
+
+    # Search all positive k except the bins near k = 0, so that the mode must
+    # stand out against the whole thermal spectrum, not just a narrow window
+    # around the expected k.
+    cand = np.where(k_vals > 0.05)[0]
+    # The R mode appears at both +k and -k (propagation along and against B).
+    # Add the power at -k to the power at +k to double the statistics.
+    # On the fftshifted axis, the bin j mirrors the bin 2 * i0 - j, where i0 is
+    # the index of k = 0, for both even and odd numbers of grid points.
+    power[:, cand] += power[:, 2 * np.argmin(np.abs(k_vals)) - cand]
+
+    rel_errors = []
+    peak_snr = []
+    print("Parallel R-mode dispersion check:")
+    print("     w/w_ci    k l_i (measured)    k l_i (analytic)    rel. err    SNR")
+    for i, w in enumerate(freq):
+        if w < W_MIN:
+            continue
+        k_analytic = get_analytic_R_mode(w)
+        if not np.isfinite(k_analytic) or k_analytic > k_cut:
+            continue
+        band_power = power[i][cand]
+        peak = band_power.max()
+        # Measure k as the power-weighted centroid of the contiguous bins
+        # around the peak with power above PEAK_FRACTION of the peak power.
+        # The single strongest bin is unreliable: runs with few time snapshots
+        # have broad bands with several comparable local maxima. Stopping at
+        # the first bin below the threshold on each side keeps separate peaks
+        # elsewhere in k out of the centroid.
+        above = band_power > PEAK_FRACTION * peak
+        lo = hi = np.argmax(band_power)
+        while lo > 0 and above[lo - 1]:
+            lo -= 1
+        while hi < len(above) - 1 and above[hi + 1]:
+            hi += 1
+        sel = cand[lo : hi + 1]
+        k_measured = np.sum(k_vals[sel] * power[i][sel]) / np.sum(power[i][sel])
+        rel_errors.append(abs(k_measured - k_analytic) / k_analytic)
+        peak_snr.append(peak / np.median(band_power))
+        print(
+            f"    {w:7.2f}    {k_measured:16.3f}    {k_analytic:16.3f}"
+            f"    {rel_errors[-1]:8.3f}    {peak_snr[-1]:7.1f}"
+        )
+
+    rel_errors = np.array(rel_errors)
+    peak_snr = np.array(peak_snr)
+    n_bands = len(rel_errors)
+    # Darwin runs with few time snapshots and a low electron cyclotron
+    # frequency resolve only a few bands below that resonance.
+    assert n_bands >= 2, (
+        f"too few resolved frequency bands ({n_bands}) to test dispersion"
+    )
+    median_error = float(np.median(rel_errors))
+    frac_on_curve = float(np.mean(rel_errors < BAND_ERROR))
+    median_snr = float(np.median(peak_snr))
+
+    print(f"    resolved frequency bands     : {n_bands}")
+    print(
+        f"    median relative error in k   : {median_error:.3f} "
+        f"(tol {MAX_MEDIAN_ERROR:.2f})"
+    )
+    print(
+        f"    fraction of bands within {BAND_ERROR:.0%} : {frac_on_curve:.2f} "
+        f"(tol {MIN_FRAC_ON_CURVE:.2f})"
+    )
+    print(f"    median peak signal-to-noise  : {median_snr:.1f} (tol {MIN_SNR:g})")
+
+    assert median_error < MAX_MEDIAN_ERROR, (
+        f"measured spectrum departs from the analytic R-mode dispersion "
+        f"(median relative error {median_error:.3f} >= {MAX_MEDIAN_ERROR:.2f})"
+    )
+    assert frac_on_curve >= MIN_FRAC_ON_CURVE, (
+        f"too many frequency bands off the analytic dispersion "
+        f"(only {frac_on_curve:.2f} within {BAND_ERROR:.0%})"
+    )
+    assert median_snr > MIN_SNR, (
+        f"spectral peaks are not prominent enough "
+        f"(median SNR {median_snr:.1f} <= {MIN_SNR:g}); "
+        f"no clear wave mode was excited"
+    )
 
 
 if sim.B_dir == "z":
@@ -160,23 +313,39 @@ else:
 cbar_ax.set_ylabel(cbar_lab, rotation=270, labelpad=30)
 
 if sim.B_dir == "z":
+    if is_darwin:
+        # finite electron mass: include the electron cyclotron resonance
+        L_mode_label = (
+            r"$(kl_i)^2=\frac{(1+\Omega_i/\Omega_e)(\omega/\Omega_i)^2}"
+            r"{(1-\omega/\Omega_i)(1+\omega/\Omega_e)}$"
+        )
+        R_mode_label = (
+            r"$(kl_i)^2=\frac{(1+\Omega_i/\Omega_e)(\omega/\Omega_i)^2}"
+            r"{(1-\omega/\Omega_e)(1+\omega/\Omega_i)}$"
+        )
+    else:
+        L_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1-\omega/\Omega_i}$"
+        R_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1+\omega/\Omega_i}$"
+    # Evaluate the analytic curves on a fine frequency grid, so that they are
+    # smooth even when the run has few time snapshots.
+    w_fine = np.linspace(w.min(), w.max(), 2001)
     # plot the L mode
     ax1.plot(
-        get_analytic_L_mode(w),
-        np.abs(w),
+        get_analytic_L_mode(w_fine),
+        np.abs(w_fine),
         c="limegreen",
         ls="--",
         lw=1.25,
-        label="L mode:\n" + r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1-\omega/\Omega_i}$",
+        label="L mode:\n" + L_mode_label,
     )
     # plot the R mode
     ax1.plot(
-        get_analytic_R_mode(w),
-        -np.abs(w),
+        get_analytic_R_mode(w_fine),
+        -np.abs(w_fine),
         c="limegreen",
         ls="-.",
         lw=1.25,
-        label="R mode:\n" + r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1+\omega/\Omega_i}$",
+        label="R mode:\n" + R_mode_label,
     )
 
     ax1.plot(
@@ -205,7 +374,7 @@ if sim.B_dir == "z":
             c="pink",
             ls="-.",
             lw=1.25,
-            label="$\omega = \Omega_{e} + 3v_{th,e} k$",
+            label=r"$\omega = \Omega_{e} + 3v_{th,e} k$",
         )
         ax1.plot(
             k,
@@ -228,12 +397,12 @@ else:
             c="limegreen",
             ls="-.",
             lw=1.5,
-            label="$\omega = v_Ak$",
+            label=r"$\omega = v_Ak$",
         )
 
         w_pi_SI = sim.w_pi * sim.w_pe_SI / sim.w_pe
         w_LH = 1.0 / np.sqrt(1.0 / (sim.w_ci * sim.w_ce) + 1.0 / w_pi_SI**2)
-        ax1.axhline(w_LH / w_norm, ls="--", c="pink", label="$\omega_{LH}$")
+        ax1.axhline(w_LH / w_norm, ls="--", c="pink", label=r"$\omega_{LH}$")
 
     else:
         # digitized values from Munoz et al. (2018)
@@ -404,11 +573,12 @@ else:
     ax1.plot(x, y, c="limegreen", ls=":", lw=2)
 
 # ax1.legend(loc='upper left')
-fig.legend(loc=7, fontsize=18)
+# The longer Darwin R/L labels overlap the colorbar label at the default size.
+fig.legend(loc=7, fontsize=14 if (is_darwin and sim.B_dir == "z") else 18)
 
 if sim.B_dir == "z":
     ax1.set_xlabel(r"$k l_i$")
-    ax1.set_title("$B_{R/L} = B_x \pm iB_y$")
+    ax1.set_title(r"$B_{R/L} = B_x \pm iB_y$")
     fig.suptitle("Parallel EM modes")
     if is_darwin:
         ax1.set_xlim(-4.5, 4.5)
@@ -419,7 +589,7 @@ if sim.B_dir == "z":
     dir_str = "par"
 else:
     ax1.set_xlabel(r"$k \rho_i$")
-    ax1.set_title("$E_z(k, \omega)$")
+    ax1.set_title(r"$E_z(k, \omega)$")
     fig.suptitle(f"Perpendicular EM modes (ion Bernstein) - {sim.dim}D")
     ax1.set_xlim(-3, 3)
     ax1.set_ylim(0, 8)
@@ -439,3 +609,8 @@ else:
     )
 if not sim.test:
     plt.show()
+
+# Automated check of the parallel modes. The perpendicular (Bernstein) modes
+# are only compared visually with the digitized reference data above.
+if sim.B_dir == "z":
+    check_parallel_dispersion(field_kw, k, w)
