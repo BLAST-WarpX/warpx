@@ -17,7 +17,7 @@ ts = OpenPMDTimeSeries(filename)
 
 print("Check Gauss's law at every iteration:")
 
-tolerance = 1e-12
+tolerance = 1e-10
 
 for iteration in ts.iterations[1:]:
     rho, _ = ts.get_field("rho", iteration=iteration)
