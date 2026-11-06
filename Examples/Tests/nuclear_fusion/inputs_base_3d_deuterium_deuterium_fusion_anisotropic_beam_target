@@ -1,4 +1,7 @@
 # ===== Numerics / grid =====
+algo.maxwell_solver = none      # collision-only test: no field solve
+# Preserve the former Yee timestep (default CFL 0.999, 1-micron cell spacing).
+warpx.const_dt = 0.999*(1.e-6/(clight*sqrt(3.)))
 algo.particle_shape = 1          # linear (1st-order) particle shape factor
 amr.blocking_factor = 1          # min grid dimension (allows tiny grids)
 amr.max_grid_size = 16           # max cells per grid block
