@@ -76,7 +76,7 @@ WarpX::ComputeDt ()
         // Computation of dt for spectral algorithm
         // (determined by the minimum cell size in all directions)
         deltat = cfl * minDim(dx) / PhysConst::c;
-    } else {
+    } else 
         // Computation of dt for FDTD algorithm
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // - In RZ geometry
