@@ -163,7 +163,7 @@ MultiParticleContainer::Restart (const std::string& dir)
             if (n_rc < WarpXParticleContainer::NArrayReal) { continue; }
             n_rc++;
 
-            auto search = std::find(real_comp_names.begin(), real_comp_names.end(), comp);
+            auto search = std::ranges::find(real_comp_names, comp);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != real_comp_names.end(),
                 "Species " + species_names[i]
@@ -200,7 +200,7 @@ MultiParticleContainer::Restart (const std::string& dir)
             if (n_ic < WarpXParticleContainer::NArrayInt) { continue; }
             n_ic++;
 
-            auto search = std::find(int_comp_names.begin(), int_comp_names.end(), comp);
+            auto search = std::ranges::find(int_comp_names, comp);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 search != int_comp_names.end(),
                 "Species " + species_names[i] + " needs runtime int component " + comp

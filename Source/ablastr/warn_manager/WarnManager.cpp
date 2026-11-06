@@ -209,8 +209,7 @@ void WarnManager::debug_read_warnings_from_input(const amrex::ParmParse& params)
         else{
             std::vector<int> who_involved;
             pp_warn.queryarr("who_involved", who_involved);
-            if(std::find (who_involved.begin(), who_involved.end(), m_rank)
-                != who_involved.end()){
+            if(std::ranges::find(who_involved, m_rank) != who_involved.end()){
                 this->RecordWarning(topic, msg, wpriority);
             }
         }

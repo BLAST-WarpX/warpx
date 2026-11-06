@@ -31,7 +31,7 @@ namespace utils::algorithms
                const TE& elem)
     requires std::convertible_to<TE,TV>
     {
-        return (std::find(vect.begin(), vect.end(), elem) != vect.end());
+        return (std::ranges::find(vect, elem) != vect.end());
     }
 
 
