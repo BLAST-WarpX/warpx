@@ -150,6 +150,13 @@ MAX_K_FRACTION = 0.6
 # Bins within this factor of the peak are taken to belong to the mode and enter
 # the power-weighted centroid that measures its wavenumber.
 PEAK_FRACTION = 0.25
+# Pass/fail tolerances of the dispersion check: the median relative error in k,
+# the relative error under which a band counts as on the curve, the minimum
+# fraction of bands on the curve, and the minimum median peak signal-to-noise.
+MAX_MEDIAN_ERROR = 0.10
+BAND_ERROR = 0.15
+MIN_FRAC_ON_CURVE = 0.75
+MIN_SNR = 30.0
 
 
 def check_parallel_dispersion(field_kw, k_vals, w):
@@ -239,24 +246,31 @@ def check_parallel_dispersion(field_kw, k_vals, w):
         f"too few resolved frequency bands ({n_bands}) to test dispersion"
     )
     median_error = float(np.median(rel_errors))
-    frac_on_curve = float(np.mean(rel_errors < 0.15))
+    frac_on_curve = float(np.mean(rel_errors < BAND_ERROR))
     median_snr = float(np.median(peak_snr))
 
     print(f"    resolved frequency bands     : {n_bands}")
-    print(f"    median relative error in k   : {median_error:.3f} (tol 0.10)")
-    print(f"    fraction of bands within 15% : {frac_on_curve:.2f} (tol 0.75)")
-    print(f"    median peak signal-to-noise  : {median_snr:.1f} (tol 30)")
+    print(
+        f"    median relative error in k   : {median_error:.3f} "
+        f"(tol {MAX_MEDIAN_ERROR:.2f})"
+    )
+    print(
+        f"    fraction of bands within {BAND_ERROR:.0%} : {frac_on_curve:.2f} "
+        f"(tol {MIN_FRAC_ON_CURVE:.2f})"
+    )
+    print(f"    median peak signal-to-noise  : {median_snr:.1f} (tol {MIN_SNR:g})")
 
-    assert median_error < 0.10, (
+    assert median_error < MAX_MEDIAN_ERROR, (
         f"measured spectrum departs from the analytic R-mode dispersion "
-        f"(median relative error {median_error:.3f} >= 0.10)"
+        f"(median relative error {median_error:.3f} >= {MAX_MEDIAN_ERROR:.2f})"
     )
-    assert frac_on_curve >= 0.75, (
+    assert frac_on_curve >= MIN_FRAC_ON_CURVE, (
         f"too many frequency bands off the analytic dispersion "
-        f"(only {frac_on_curve:.2f} within 15%)"
+        f"(only {frac_on_curve:.2f} within {BAND_ERROR:.0%})"
     )
-    assert median_snr > 30.0, (
-        f"spectral peaks are not prominent enough (median SNR {median_snr:.1f} <= 30); "
+    assert median_snr > MIN_SNR, (
+        f"spectral peaks are not prominent enough "
+        f"(median SNR {median_snr:.1f} <= {MIN_SNR:g}); "
         f"no clear wave mode was excited"
     )
 
