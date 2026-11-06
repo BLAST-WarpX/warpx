@@ -76,7 +76,7 @@ WarpX::ComputeDt ()
         // Computation of dt for spectral algorithm
         // (determined by the minimum cell size in all directions)
         deltat = cfl * minDim(dx) / PhysConst::c;
-    } else
+    } else {
         // Computation of dt for FDTD algorithm
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // - In RZ geometry
@@ -96,7 +96,11 @@ WarpX::ComputeDt ()
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
             deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
 #endif
-        } else {
+        } else if (m_const_dt.has_value()) {
+            // No algorithm is selected, but a constant timestep is provided
+            deltat = m_const_dt.value();
+        }
+        else {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");
         }
     }
