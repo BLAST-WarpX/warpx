@@ -67,8 +67,8 @@ WarpX::ComputeDt ()
 
     if (m_const_dt.has_value()) {
         deltat = m_const_dt.value();
-    } 
-    
+    }
+
     if (electrostatic_solver_id  != ElectrostaticSolverAlgo::None) {
         // Set dt for electrostatic algorithm
         if (m_max_dt.has_value()) {
