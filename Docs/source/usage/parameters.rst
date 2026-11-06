@@ -1121,9 +1121,10 @@ Domain Boundary Conditions
       The standard deviation for these distributions should be provided for each species using
       ``boundary.<species_name>.u_th``. The same standard deviation is used to sample all components.
 
-    * ``None``: No boundary conditions are applied to the particles.
-      When using RZ, RCYLINDER, and RSPHERE, this option must be used for the lower radial boundary, the first value of :pp:param:`boundary.particle_lo`.
-      This should not be used in any other cases.
+    * ``None``: This option is only for the ``r=0`` boundary in cylindrical and spherical geometries (RZ, RCYLINDER, and RSPHERE),
+      i.e., the first value of :pp:param:`boundary.particle_lo`.
+      It is not allowed for any other boundary.
+      No boundary conditions are applied to the particles there: particles crossing the axis simply re-enter the domain.
 
 .. pp:param:: boundary.reflect_all_velocities
     :type: ``bool``
