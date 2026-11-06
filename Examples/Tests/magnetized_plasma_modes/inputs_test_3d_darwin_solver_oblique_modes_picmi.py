@@ -90,7 +90,8 @@ class ObliqueModes(object):
     N = 16  # cells per side (dx = 0.5 l_i, matching the full-resolution deck)
     L_over_li = 8.0  # box side, in ion skin depths
     NPPC = 4  # seed macroparticles/cell/species before symmetrization (x3 after)
-    SHAPE = 1
+    SHAPE = 3  # particle shape for the electrostatic part of the solve
+    MS_SHAPE = 1  # particle shape for the magnetostatic part of the solve
     GMRES_TOL = 1e-5
     DT_WCI = 0.04  # dt * Omega_ci
     TOTAL_STEPS = 130
@@ -123,7 +124,7 @@ class ObliqueModes(object):
                 f"\tN={self.N}^3, L={self.L_over_li} l_i, dx={self.dx / self.l_i:.3f} l_i, "
                 f"k0 l_i = {2 * np.pi / self.L_over_li:.3f}\n"
                 f"\tdt W_ci = {self.dt * self.w_ci:.4f}, steps={self.total_steps}, "
-                f"NPPC={self.NPPC}, shape={self.SHAPE}"
+                f"NPPC={self.NPPC}, ES/MS shape={self.SHAPE}/{self.MS_SHAPE}"
             )
 
         self.setup_run()
@@ -172,6 +173,7 @@ class ObliqueModes(object):
         simulation.verbose = self.test
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
+            magnetostatic_particle_shape=self.MS_SHAPE,
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=self.GMRES_TOL,
                 max_iterations=2048,

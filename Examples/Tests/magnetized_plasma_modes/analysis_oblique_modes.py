@@ -274,7 +274,10 @@ for key, members in sorted(groups.items()):
 def tot(path):
     header = open(path).readline().split()
     data = np.loadtxt(path)
-    idx = [i for i, x in enumerate(header) if "total" in x.split("]")[-1]]
+    # FieldEnergy totals are "total_lev0(J)"; ParticleEnergy has "total(J)" (and a
+    # per-particle "total_mean(J)" that must not be added)
+    labels = [x.split("]")[-1] for x in header]
+    idx = [i for i, x in enumerate(labels) if x in ("total_lev0(J)", "total(J)")]
     return data[:, idx].sum(axis=1)
 
 
