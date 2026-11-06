@@ -507,7 +507,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
         openPMD::Iteration it = series.iterations.begin()->second;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_external_file_species_name.empty() or it.particles.size() == 1u,
-            "External file should contain only 1 species when the species in the file is not specified\n");
+            "External file should contain only 1 species when `external_file_species_name` is not specified\n");
 
         std::string const ps_name = m_external_file_species_name.empty() ?
                                         it.particles.begin()->first :
