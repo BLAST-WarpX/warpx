@@ -67,7 +67,9 @@ WarpX::ComputeDt ()
 
     if (m_const_dt.has_value()) {
         deltat = m_const_dt.value();
-    } else if (electrostatic_solver_id  != ElectrostaticSolverAlgo::None) {
+    }
+
+    if (electrostatic_solver_id  != ElectrostaticSolverAlgo::None) {
         // Set dt for electrostatic algorithm
         if (m_max_dt.has_value()) {
             deltat = m_max_dt.value();
@@ -98,10 +100,24 @@ WarpX::ComputeDt ()
         } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
             deltat = cfl * CartesianCKCAlgorithm::ComputeMaxDt(dx);
 #endif
-        } else {
+        } else if (!m_const_dt.has_value()) {
             WARPX_ABORT_WITH_MESSAGE("ComputeDt: Unknown algorithm");
         }
     }
+
+    if (m_const_dt.has_value()) {
+            if (m_const_dt.value() > deltat) {
+                std::string const warnMsg = "Specified const_dt (" + std::format("{:.2e}", m_const_dt.value())
+                + ") is too large to respect the CFL condition (" + std::format("{:.2e}", deltat) + ")."
+                "This may lead to severe numerical instabilities and potentially even crash WarpX.";
+                ablastr::warn_manager::WMRecordWarning(
+                    "Input",
+                    warnMsg,
+                    ablastr::warn_manager::WarnPriority::high
+                );
+            }
+            deltat = m_const_dt.value();
+        }
 
     dt.resize(0);
     dt.resize(max_level+1,deltat);
