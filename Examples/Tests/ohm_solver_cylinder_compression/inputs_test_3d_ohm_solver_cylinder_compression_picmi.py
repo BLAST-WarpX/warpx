@@ -15,7 +15,7 @@ import numpy as np
 import openpmd_api as io
 from mpi4py import MPI as mpi
 
-from pywarpx import picmi
+from pywarpx import callbacks, picmi
 
 constants = picmi.constants
 
@@ -355,7 +355,16 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=[
+                    "B",
+                    "E",
+                    "rho",
+                    "Tx_ions",
+                    "Ty_ions",
+                    "Tz_ions",
+                    # User-registered field, see the allocdata callback below
+                    "magnetic_pressure_Bz",
+                ],
                 write_dir="diags",
                 warpx_format="plotfile",
             )
@@ -364,7 +373,16 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=[
+                    "B",
+                    "E",
+                    "rho",
+                    "Tx_ions",
+                    "Ty_ions",
+                    "Tz_ions",
+                    # User-registered field, see the allocdata callback below
+                    "magnetic_pressure_Bz",
+                ],
                 write_dir="diags",
                 warpx_format="openpmd",
                 warpx_file_prefix="field_diags",
@@ -380,6 +398,52 @@ class PlasmaCylinderCompression(object):
             if Path.exists(Path("diags")):
                 shutil.rmtree("diags")
             Path("diags").mkdir(parents=True, exist_ok=True)
+
+        # Magnetic pressure Bz^2 / (2 mu0), registered from Python and written to
+        # the diagnostic by its registered name.
+        #
+        # The field here is essentially purely axial (|B_perp|/|Bz| < 1% in this
+        # run), but the compression it drives is RADIAL: the applied Bz doubles
+        # over the run and squeezes the diamagnetic plasma column inwards. Bz is
+        # excluded from the core and piles up outside it, so Bz^2/(2 mu0) is the
+        # radially confining pressure that balances the plasma pressure the hybrid
+        # solver already tracks. Hence the name refers to the field component the
+        # pressure is built from, not to the direction of the compression.
+        #
+        # Registered on the Bz BoxArray, so it inherits that staggering and is
+        # exact where computed -- no interpolation. The diagnostic's
+        # CellCenterFunctor does the face->centre averaging on output, exactly as
+        # it does for Bz itself.
+        @callbacks.installallocdata
+        def allocate_magnetic_pressure_Bz():
+            Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)
+            simulation.fields.alloc_init(
+                name="magnetic_pressure_Bz",
+                level=0,
+                ba=Bz.box_array(),
+                dm=Bz.dm(),
+                ncomp=1,
+                ngrow=Bz.n_grow_vect,
+                initial_value=0.0,
+                redistribute=True,
+                redistribute_on_remake=True,
+            )
+
+        def update_magnetic_pressure_Bz():
+            Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)
+            p_B = simulation.fields.get("magnetic_pressure_Bz", level=0)
+            p_B.set_val(0.0)
+            # p_B += Bz * Bz, then scale by 1 / (2 mu0)
+            p_B.add_product(Bz, 0, Bz, 0, 0, 1, 0)
+            p_B.mult(1.0 / (2.0 * constants.mu0), 0)
+
+        # Filled after every E-solve, so every diagnostic dump from step 1 on
+        # carries the current value. The step-0 dump necessarily shows the
+        # allocation value (zeros): "afterInitEsolve" fires before
+        # AddExternalFields(), so Bfield_fp does not yet hold the applied
+        # compression field at that point, and there is no callback between
+        # AddExternalFields() and the initial diagnostic write.
+        callbacks.installafterEsolve(update_magnetic_pressure_Bz)
 
         # Initialize inputs and WarpX instance
         simulation.initialize_inputs()
