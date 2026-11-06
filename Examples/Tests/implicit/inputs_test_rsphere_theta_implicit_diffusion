@@ -1,0 +1,151 @@
+#####################################################
+#
+#   free diffusion of an electron ion plasma sphere
+#
+#   mi = 25me, T0 = 5.11e3 eV, n0 = 1.0e22/m^3
+#   Vte = 0.1cvac
+#   lambdaDe = 5.3141e-6 m
+#   1/wpe = 1.7726e-13 s
+#   1/wpi = 8.8630e-13 s
+#   deltai = cvac/wpi = 2.6570e-4 m
+#
+#####################################################
+
+# Parameters for the plasma wave
+my_constants.T0 = 5.11e3    # temperature [eV]
+my_constants.n0 = 1.0e22    # plasma density [#/m^3]
+my_constants.Mi = 25.0*m_e  # ion_mass
+my_constants.wpi = q_e*sqrt(n0/(epsilon0*Mi))  # ion plasma frequency
+my_constants.kpi = wpi/clight  # ion plasma wavenumber
+my_constants.R0 = 1.0/kpi      # plasma radius [m]
+
+my_constants.Nppc_r = 400  # particles per cell in r
+my_constants.Nppc_t = 4   # particles per cell in theta
+my_constants.Nppc_p = 4   # particles per cell in phi
+
+# Grid configuration
+amr.n_cell = 25
+warpx.numprocs = 2
+amr.max_level = 0
+
+# Geometry
+geometry.dims = RSPHERE
+geometry.prob_lo = 0.0
+geometry.prob_hi = 5.0/kpi
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+# Time steping
+max_step = 100
+stop_time = 40.0/wpi
+warpx.max_dt = 0.4/wpi
+warpx.cfl = 1.2
+warpx.dt_update_interval = 1
+warpx.dt_update_write_interval = 10
+warpx.dt_update_diagnostic_file = "diags/reduced_files/dt_updates.txt"
+warpx.max_omegap_dt = 10.0
+
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.use_filter = 0
+
+# Field Solver
+algo.maxwell_solver = Yee
+algo.evolve_scheme = "theta_implicit_em"
+
+implicit_evolve.theta = 0.5
+implicit_evolve.max_particle_iterations = 21
+implicit_evolve.particle_tolerance = 1.0e-12
+implicit_evolve.particle_suborbits = true
+implicit_evolve.suborbit_warning_threshold = 2
+implicit_evolve.suborbit_statistics_interval = 10
+
+implicit_evolve.nonlinear_solver = newton
+newton.linear_solver = petsc_ksp
+newton.verbose = true
+newton.max_iterations = 20
+newton.relative_tolerance = 1.0e-14
+newton.absolute_tolerance = 0.0
+newton.require_convergence = true
+newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
+newton.diagnostic_interval = 10
+
+gmres.verbose_int = 2
+gmres.max_iterations = 100
+gmres.relative_tolerance = 1.0e-6
+gmres.absolute_tolerance = 0.0
+
+implicit_evolve.use_mass_matrices_jacobian = true
+implicit_evolve.skip_particle_picard_init = true
+implicit_evolve.use_mass_matrices_pc = true
+implicit_evolve.mass_matrices_pc_width = 1
+jacobian.pc_type = pc_petsc
+pc_petsc.verbose = false
+pc_petsc.type = lu
+
+# Algorithms
+particles.crop_on_PEC_boundary = true
+particles.max_grid_crossings = 2
+algo.current_deposition = villasenor
+algo.particle_shape = 2
+
+# Species
+particles.species_names = electrons ions
+
+electrons.charge = -q_e
+electrons.mass = m_e
+
+ions.charge = q_e
+ions.mass = Mi
+
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = Nppc_r Nppc_t Nppc_p
+electrons.xmin = 0.0
+electrons.xmax = R0
+electrons.profile = constant
+electrons.density = n0
+electrons.radial_numpercell_power = 2.
+electrons.random_theta = true
+electrons.momentum_distribution_type = "gaussian"
+electrons.ux_th = sqrt(T0*q_e/m_e)/clight
+electrons.uy_th = sqrt(T0*q_e/m_e)/clight
+electrons.uz_th = sqrt(T0*q_e/m_e)/clight
+
+ions.injection_style = "NUniformPerCell"
+ions.num_particles_per_cell_each_dim = Nppc_r Nppc_t Nppc_p
+ions.xmin = 0.0
+ions.xmax = 1.0/kpi
+ions.profile = constant
+ions.density = n0
+ions.radial_numpercell_power = 2.
+ions.random_theta = true
+ions.momentum_distribution_type = "gaussian"
+ions.ux_th = sqrt(T0*q_e/Mi)/clight
+ions.uy_th = sqrt(T0*q_e/Mi)/clight
+ions.uz_th = sqrt(T0*q_e/Mi)/clight
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 100
+diag1.diag_type = Full
+diag1.fields_to_plot = jr Er divE rho_ions rho_electrons
+
+# Reduced diagnostics
+warpx.reduced_diags_names = particle_number particle_energy field_energy
+
+particle_number.type = ParticleNumber
+particle_number.intervals = 10
+particle_number.precision = 18
+particle_number.path = diags/reduced_files/
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 10
+particle_energy.precision = 18
+particle_energy.path = diags/reduced_files/
+
+field_energy.type = FieldEnergy
+field_energy.intervals = 10
+field_energy.precision = 18
+field_energy.path = diags/reduced_files/
