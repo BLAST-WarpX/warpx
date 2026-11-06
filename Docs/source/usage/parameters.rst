@@ -1761,6 +1761,8 @@ Particle initialization
 
       * ``<species_name>.injection_file`` (``string``) openPMD file name
 
+      * ``<species_name>.external_file_species_name`` (``string``, optional) the name of the species in the data file from which the data is read. If this is not specified, the file can contain only one species, and the data is read from that species.
+
       * :pp:param:`<species_name>.charge` (``float``, optional) (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
 
       * :pp:param:`<species_name>.mass` (``float``, optional) (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
