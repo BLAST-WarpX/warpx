@@ -106,7 +106,7 @@ def get_analytic_R_mode(w):
     x = np.abs(w)
     with np.errstate(divide="ignore", invalid="ignore"):
         k2 = (1.0 + INV_MASS_RATIO) * x**2 / ((1.0 - x * INV_MASS_RATIO) * (1.0 + x))
-    return np.sign(w) * np.sqrt(np.where(k2 > 0.0, k2, np.nan))
+    return np.sign(w) * np.sqrt(np.where(k2 >= 0.0, k2, np.nan))
 
 
 def get_analytic_L_mode(w):
@@ -122,7 +122,7 @@ def get_analytic_L_mode(w):
     x = np.abs(w)
     with np.errstate(divide="ignore", invalid="ignore"):
         k2 = (1.0 + INV_MASS_RATIO) * x**2 / ((1.0 - x) * (1.0 + x * INV_MASS_RATIO))
-    return np.sign(w) * np.sqrt(np.where(k2 > 0.0, k2, np.nan))
+    return np.sign(w) * np.sqrt(np.where(k2 >= 0.0, k2, np.nan))
 
 
 # Settings of the parallel dispersion check.
@@ -326,10 +326,13 @@ if sim.B_dir == "z":
     else:
         L_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1-\omega/\Omega_i}$"
         R_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1+\omega/\Omega_i}$"
+    # Evaluate the analytic curves on a fine frequency grid, so that they are
+    # smooth even when the run has few time snapshots.
+    w_fine = np.linspace(w.min(), w.max(), 2001)
     # plot the L mode
     ax1.plot(
-        get_analytic_L_mode(w),
-        np.abs(w),
+        get_analytic_L_mode(w_fine),
+        np.abs(w_fine),
         c="limegreen",
         ls="--",
         lw=1.25,
@@ -337,8 +340,8 @@ if sim.B_dir == "z":
     )
     # plot the R mode
     ax1.plot(
-        get_analytic_R_mode(w),
-        -np.abs(w),
+        get_analytic_R_mode(w_fine),
+        -np.abs(w_fine),
         c="limegreen",
         ls="-.",
         lw=1.25,
