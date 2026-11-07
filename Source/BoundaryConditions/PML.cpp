@@ -768,6 +768,9 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     auto nge = IntVect(AMREX_D_DECL(2, 2, 2));
     auto ngb = IntVect(AMREX_D_DECL(2, 2, 2));
     int ngf_int = 0;
+    // G is cell-centered with staggered Yee fields. Its gradient updates
+    // boundary magnetic nodes and therefore needs one guard cell.
+    if (m_divb_cleaning) { ngf_int = 1; }
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC) {
         ngf_int = std::max( ngf_int, 1 );
     }

@@ -64,17 +64,23 @@ void FiniteDifferenceSolver::EvolveBPML (
     const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
         fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
 
+    amrex::MultiFab const* Gfield = nullptr;
+    if (fields.has(FieldType::pml_G_fp, level)) {
+        Gfield = patch_type == PatchType::fine ? fields.get(FieldType::pml_G_fp, level)
+                                              : fields.get(FieldType::pml_G_cp, level);
+    }
+
     if (m_grid_type == ablastr::utils::enums::GridType::Collocated) {
 
-        EvolveBPMLCartesian <CartesianNodalAlgorithm> (Bfield, Efield, dt, dive_cleaning);
+        EvolveBPMLCartesian <CartesianNodalAlgorithm> (Bfield, Efield, Gfield, dt, dive_cleaning);
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee || m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
-        EvolveBPMLCartesian <CartesianYeeAlgorithm> (Bfield, Efield, dt, dive_cleaning);
+        EvolveBPMLCartesian <CartesianYeeAlgorithm> (Bfield, Efield, Gfield, dt, dive_cleaning);
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
-        EvolveBPMLCartesian <CartesianCKCAlgorithm> (Bfield, Efield, dt, dive_cleaning);
+        EvolveBPMLCartesian <CartesianCKCAlgorithm> (Bfield, Efield, Gfield, dt, dive_cleaning);
 
     } else {
         WARPX_ABORT_WITH_MESSAGE(
@@ -91,6 +97,7 @@ template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveBPMLCartesian (
     std::array< amrex::MultiFab*, 3 > Bfield,
     ablastr::fields::VectorField const Efield,
+    amrex::MultiFab const* Gfield,
     amrex::Real const dt,
     const bool dive_cleaning) {
 
@@ -188,6 +195,29 @@ void FiniteDifferenceSolver::EvolveBPMLCartesian (
             }
 
         );
+
+        if (Gfield) {
+            amrex::Array4<amrex::Real const> const G = Gfield->const_array(mfi);
+            amrex::ParallelFor(tbx, tby, tbz,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Bx(i,j,k,PMLComp::xx) += dt * (
+                          T_Algo::DownwardDx(G, coefs_x, n_coefs_x, i, j, k, PMLComp::x)
+                        + T_Algo::DownwardDx(G, coefs_x, n_coefs_x, i, j, k, PMLComp::y)
+                        + T_Algo::DownwardDx(G, coefs_x, n_coefs_x, i, j, k, PMLComp::z));
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    By(i,j,k,PMLComp::yy) += dt * (
+                          T_Algo::DownwardDy(G, coefs_y, n_coefs_y, i, j, k, PMLComp::x)
+                        + T_Algo::DownwardDy(G, coefs_y, n_coefs_y, i, j, k, PMLComp::y)
+                        + T_Algo::DownwardDy(G, coefs_y, n_coefs_y, i, j, k, PMLComp::z));
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Bz(i,j,k,PMLComp::zz) += dt * (
+                          T_Algo::DownwardDz(G, coefs_z, n_coefs_z, i, j, k, PMLComp::x)
+                        + T_Algo::DownwardDz(G, coefs_z, n_coefs_z, i, j, k, PMLComp::y)
+                        + T_Algo::DownwardDz(G, coefs_z, n_coefs_z, i, j, k, PMLComp::z));
+                });
+        }
 
     }
 
