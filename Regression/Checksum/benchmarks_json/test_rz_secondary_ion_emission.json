@@ -1,0 +1,20 @@
+{
+  "electrons": {
+    "particle_momentum_x": 9.78325831888615e-26,
+    "particle_momentum_y": 9.201597535520317e-26,
+    "particle_momentum_z": 8.005060478063377e-26,
+    "particle_position_x": 0.13782079777295614,
+    "particle_position_y": 0.014486829392459018,
+    "particle_position_z": 0.38693322203884306,
+    "particle_weight": 2.0
+  },
+  "ions": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
+    "particle_weight": 0.0
+  }
+}

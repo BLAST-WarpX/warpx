@@ -390,6 +390,7 @@ WarpX::WarpX ()
 
     // Particle Boundary Buffer (i.e., scraped particles on boundary)
     m_particle_boundary_buffer = std::make_unique<ParticleBoundaryBuffer>();
+    mypc->InitSecondaryEmissionBoundaryBuffer(*m_particle_boundary_buffer);
 
     // Fluid Container
     if (do_fluid_species) {
