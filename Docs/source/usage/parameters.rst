@@ -185,6 +185,42 @@ Overall simulation parameters
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
     If this parameter is set to the string ``/dev/null``, used inputs are not written to any file. Note that this works on any OS if the provided string matches exactly ``/dev/null``, regardless of the existence of a null device file.
 
+.. pp:param:: warpx.epsilon_r
+    :type: `float`
+    :default: ``1.0``
+
+    Relative permittivity applied uniformly to Ampere's law in the FDTD solver.
+    Setting this to a value greater than ``1.0`` scales the ``curl(B)`` and ``J`` terms in the E-field update by ``1/epsilon_r``, effectively reducing the EM wave propagation speed to ``c/sqrt(epsilon_r)`` and relaxing the CFL condition.
+    Faraday's law and the particle pusher are not modified.
+    Must be finite and ``>= 1.0``.
+    Only supported with the explicit FDTD solver (``algo.evolve_scheme = explicit``).
+    For the macroscopic solver, this multiplies the configured absolute permittivity
+    by ``epsilon_r`` in both the conductive damping and field/current response.
+    The configured conductivity and permeability are unchanged.
+    Specify either this parameter or :pp:param:`warpx.c_light_factor`, not both.
+
+    .. warning::
+        Increasing the effective permittivity changes plasma frequencies and
+        charge-screening lengths as well as electromagnetic wave propagation.
+        Particle kinematics retain physical ``c``. The larger field-solver CFL
+        timestep does not remove particle-motion or plasma-timescale constraints.
+        Check the approximation against physical-light-speed simulations for the
+        application of interest.
+
+.. pp:param:: warpx.c_light_factor
+    :type: `float`
+    :default: ``1.0``
+
+    Alternative input for :pp:param:`warpx.epsilon_r`: a factor ``F`` sets
+    ``epsilon_r = F*F``, reducing the vacuum electromagnetic wave speed to ``c/F``.
+    For example, ``warpx.c_light_factor = 10`` is equivalent to
+    ``warpx.epsilon_r = 100``. The physical speed-of-light constant and the
+    particle pusher are unchanged. In macroscopic media, the material wave speed
+    is reduced by the same factor, with conductivity and permeability preserved.
+    The factor must be finite, at least one, and have a representable square.
+    Specify only one of the two parameters. The solver restrictions and physical
+    approximation described for :pp:param:`warpx.epsilon_r` apply to both.
+
 .. pp:param:: warpx.gamma_boost
     :type: ``float``
 
