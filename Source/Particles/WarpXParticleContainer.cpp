@@ -477,19 +477,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // are not trivial, this check might be too relaxed and we might include a particle that should
     // deposit part of its current in a neighboring box. However, this should catch particles
     // traveling many cells away, for example with algorithms that allow for large time steps.
-
-#if   defined(WARPX_DIM_1D_Z)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_3D)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#endif
+    const amrex::IntVect shape_extent(static_cast<int>(particle_shape/2));
 
     // On CPU: particles deposit on tile arrays, which have a small number of guard cells ng_J
     // On GPU: particles deposit directly on the J arrays, which usually have a larger number of guard cells
