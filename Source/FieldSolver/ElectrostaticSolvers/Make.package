@@ -1,3 +1,4 @@
+CEXE_sources += DielectricMaterials.cpp
 CEXE_sources += PoissonBoundaryHandler.cpp
 CEXE_sources += LabFrameExplicitES.cpp
 CEXE_sources += RelativisticExplicitES.cpp
