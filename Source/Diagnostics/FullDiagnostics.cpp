@@ -249,11 +249,13 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
 
     // Get the time step on coarsest level.
     const int step = warpx.getistep(0);
-    // For time-averaged diagnostics, we still write out an instantaneous diagnostic on step 0
-    // to accommodate a user workflow that only uses that type of diagnostic.
-    // This allows for quicker turnaround in setup by avoiding having to set an additional instantaneous diagnostic.
-    if (m_diag_type == DiagTypes::TimeAveraged && step > 0) {
-        if (m_time_average_mode == TimeAverageType::Static || m_time_average_mode == TimeAverageType::Dynamic) {
+    if (m_diag_type == DiagTypes::TimeAveraged && m_time_average_mode != TimeAverageType::None) {
+        const bool is_dynamic = (m_time_average_mode == TimeAverageType::Dynamic);
+        const int num_summed_steps = m_num_summed_steps.at(i_buffer);
+        // An incomplete averaging period (e.g., at the last step of the simulation or after a
+        // restart) would be divided by the full period and is therefore not written
+        const bool write_average = !is_dynamic || (num_summed_steps == m_average_period_steps);
+        if (write_average) {
             // Loop over the output levels and divide by the number of steps in the averaging period
             for (int lev = 0; lev < nlev_output; ++lev) {
                 m_sum_mf_output.at(i_buffer).at(lev).mult(1._rt/static_cast<amrex::Real>(m_average_period_steps));
@@ -265,21 +267,26 @@ FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
                     m_output_species.at(i_buffer), nlev_output, m_file_prefix,
                     m_file_min_digits, m_plot_raw_fields, m_plot_raw_fields_guards,
                     m_verbose);
+        } else {
+            ablastr::warn_manager::WMRecordWarning(
+                    "Diagnostics",
+                    "Time-averaged diagnostic " + m_diag_name + " was not written at step "
+                    + std::to_string(step) + " because only " + std::to_string(num_summed_steps)
+                    + " of the " + std::to_string(m_average_period_steps)
+                    + " steps of its averaging period were summed (e.g., because the simulation"
+                    " ended or was restarted within the averaging period).",
+                    ablastr::warn_manager::WarnPriority::medium
+            );
+        }
 
-            // Reset the values in the dynamic start time-averaged diagnostics after flush
-            if (m_time_average_mode == TimeAverageType::Dynamic) {
-                for (int lev = 0; lev < nlev_output; ++lev) {
-                    m_sum_mf_output.at(i_buffer).at(lev).setVal(0.);
-                }
+        // Reset the values in the dynamic start time-averaged diagnostics after flush
+        if (is_dynamic) {
+            for (int lev = 0; lev < nlev_output; ++lev) {
+                m_sum_mf_output.at(i_buffer).at(lev).setVal(0.);
             }
+            m_num_summed_steps.at(i_buffer) = 0;
         }
     } else {
-        if (m_diag_type == DiagTypes::TimeAveraged && step == 0) {
-            // For both dynamic_start and fixed_start at step 0 we prepare an instantaneous output
-            amrex::Print() << Utils::TextMsg::Info("Time-averaged diagnostic " + m_diag_name
-                                                   + " is preparing an instantaneous output during step " + std::to_string(step));
-        }
-
         m_flush_format->WriteToFile(
             m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
             warpx.gett_new(0),
@@ -299,6 +306,11 @@ bool
 FullDiagnostics::DoDump (int step, int /*i_buffer*/, bool force_flush)
 {
     if (m_already_done) { return false; }
+    // Time averages require at least one step, so there is no output before the first step
+    if (m_diag_type == DiagTypes::TimeAveraged && m_time_average_mode != TimeAverageType::None
+        && step < 0) {
+        return false;
+    }
     if ( force_flush || (m_intervals.contains(step+1)) ){
         m_already_done = true;
         return true;
@@ -313,12 +325,14 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
     bool in_averaging_period = false;
     if (m_diag_type == DiagTypes::TimeAveraged) {
 
-        if (step > 0) {
+        // In the time loop, step 0 computes the data after the first time step,
+        // which belong to the first averaging period
+        if (step >= 0) {
 
             if (m_time_average_mode == TimeAverageType::Dynamic) {
                 m_average_start_step = m_intervals.nextContains(step) - m_average_period_steps;
                 // check that the periods do not overlap and that the start step is not negative
-                if (m_average_start_step > 0) {
+                if (m_average_start_step >= 0) {
                     // The start step cannot be on an interval step because then we would begin a new period and also output the old one
                     if (m_average_start_step < m_intervals.previousContains(step)) {
                         WARPX_ABORT_WITH_MESSAGE(
@@ -331,7 +345,8 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
                     WARPX_ABORT_WITH_MESSAGE(
                             "The step to begin time averaging ("
                             + std::to_string(m_average_start_step)
-                            + ") for diagnostic " + m_diag_name + " must be a positive number."
+                            + ") for diagnostic " + m_diag_name + " must not be negative. "
+                            "The averaging period must not be longer than the first output step."
                     );
                 }
 
@@ -358,6 +373,11 @@ FullDiagnostics::DoComputeAndPack (int step, bool force_flush)
                 }
             }
         }
+    }
+    // Dynamic-start time averages sum exactly the steps of an averaging period:
+    // the forced flush at the last step re-evaluates the step that was already summed
+    if (m_diag_type == DiagTypes::TimeAveraged && m_time_average_mode == TimeAverageType::Dynamic) {
+        return in_averaging_period && !force_flush;
     }
     // Data must be computed and packed for full diagnostics
     // whenever the data needs to be flushed.
