@@ -1,0 +1,2 @@
+FILE = inputs_test_rz_pml_yee
+amr.restart = "../test_rz_pml_yee/diags/chk000200"
