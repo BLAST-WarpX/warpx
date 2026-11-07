@@ -976,6 +976,12 @@ WarpX::AddExternalFields (int const lev)
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
+    // Keep fine-patch initialization consistent with the coarse and auxiliary
+    // patches: excluded levels receive the parent field through SMR substitution.
+    if (lev > maxlevel_extEMfield_init) {
+        return;
+    }
+
     // FIXME: RZ multimode has more than one component for all these
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero) {
         ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
