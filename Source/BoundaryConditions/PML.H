@@ -158,6 +158,15 @@ public:
 
     void ComputePMLFactors (amrex::Real dt);
 
+    /** Apply the conductivity term of the theta-implicit update (fine patch).
+     * With inverse=true, dst = src/(1 + dt*sigma), for the magnetic stage.
+     * Otherwise dst -= dt*sigma*src, for the electric RHS. Only the two
+     * transverse split components are supported; src and dst may alias.
+     */
+    void ApplyImplicitSigma (ablastr::fields::VectorField dst,
+                             ablastr::fields::VectorField src,
+                             amrex::Real dt, bool inverse) const;
+
     [[nodiscard]] const MultiSigmaBox& GetMultiSigmaBox_fp () const
     {
         return *sigba_fp;
