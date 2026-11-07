@@ -32,6 +32,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_deuterium_deuterium_proton_tritium_fusion  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_deuterium_deuterium_proton_tritium_fusion  # inputs
+    "analysis_two_product_fusion.py diags/diag1000001"  # analysis
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_deuterium_helium3_fusion  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_deuterium_helium3_fusion  # inputs
+    "analysis_two_product_fusion.py diags/diag1000001"  # analysis
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_deuterium_deuterium_fusion_anisotropic_beam_target_uz_10pct  # name
     3  # dims
     2  # nprocs
