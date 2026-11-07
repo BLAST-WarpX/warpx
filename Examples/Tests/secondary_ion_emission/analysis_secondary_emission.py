@@ -12,10 +12,9 @@ import sys
 sys.path.append("../../../Tools/Parser/")
 
 import numpy as np
+from input_file_parser import parse_input_file
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import c as clight
-
-from input_file_parser import parse_input_file
 
 filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
