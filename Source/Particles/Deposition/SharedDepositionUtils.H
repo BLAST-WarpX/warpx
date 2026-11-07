@@ -16,6 +16,9 @@
 #endif
 
 #include <AMReX.H>
+#include <AMReX_Algorithm.H>
+#include <AMReX_Box.H>
+#include <AMReX_IntVect.H>
 
 /*
  * \brief gets the maximum width, height, or length of a tilebox. In number of cells.
@@ -24,11 +27,43 @@
  */
 AMREX_FORCE_INLINE
 int getMaxTboxAlongDim (int nCells, int tilesize){
-    int maxTilesize = 0;
-    const int nTiles = nCells / tilesize;
-    const int remainder = nCells % tilesize;
-    maxTilesize = tilesize + int(std::ceil((amrex::Real) remainder / nTiles));
-    return maxTilesize;
+    // Must be consistent with amrex::getTileIndex: a box smaller than a tile is a single tile
+    const int nTiles = amrex::max(nCells / tilesize, 1);
+    return (nCells + nTiles - 1) / nTiles;
+}
+
+/*
+ * \brief gets the box of a tile from its index, as returned by amrex::getTileIndex.
+ * \param tile_index : Index of the tile
+ * \param box : Box that is split into tiles
+ * \param tile_size : The tile size
+ */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Box getTileBoxFromIndex (int tile_index, const amrex::Box& box,
+                                const amrex::IntVect& tile_size) noexcept
+{
+    amrex::IntVect tile_lo, tile_hi;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        // Must be consistent with the tiling_1d function in amrex::getTileIndex
+        const int lo = box.smallEnd(idim);
+        const int ncells = box.length(idim);
+        const int ntile = amrex::max(ncells/tile_size[idim], 1);
+        const int itile = tile_index % ntile;
+        tile_index /= ntile;
+        const int ts_right = ncells/ntile;
+        const int ts_left = ts_right+1;
+        const int nleft = ncells - ntile*ts_right;
+        if (itile < nleft) {
+            // tiles on the left have size of ts_left
+            tile_lo[idim] = lo + itile*ts_left;
+            tile_hi[idim] = tile_lo[idim] + ts_left - 1;
+        } else {
+            // tiles on the right have size of ts_right
+            tile_lo[idim] = lo + itile*ts_right + nleft;
+            tile_hi[idim] = tile_lo[idim] + ts_right - 1;
+        }
+    }
+    return amrex::Box(tile_lo, tile_hi);
 }
 
 /*
