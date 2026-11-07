@@ -539,6 +539,27 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
         }
 #endif
 
+        if (direct_faces.size() > 1)
+        {
+            // A PML box can span multiple regular boxes on the same boundary plane.
+            // These faces define the same one-dimensional damping profile. Keep
+            // rejecting distinct boundary planes and opposing faces.
+            auto const boundary_plane = [&] (int const gid)
+            {
+                amrex::Box const& grid_box = grids[gid];
+                bool const is_low = box.bigEnd(idim) < grid_box.smallEnd(idim);
+                return std::make_pair(is_low, is_low ? grid_box.smallEnd(idim)
+                                                    : grid_box.bigEnd(idim) + 1);
+            };
+            auto const plane = boundary_plane(direct_faces.front());
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::all_of(direct_faces.begin(), direct_faces.end(),
+                            [&] (int const gid) { return boundary_plane(gid) == plane; }),
+                "SigmaBox::SigmaBox(): incompatible direct-face damping profiles. "
+                "Box gaps not wide enough?");
+            direct_faces.resize(1);
+        }
+
         for (auto gid : direct_faces)
         {
             const Box& grid_box = grids[gid];

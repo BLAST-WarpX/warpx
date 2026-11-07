@@ -67,6 +67,34 @@ add_warpx_test(
     test_2d_pml_x_yee  # dependency
 )
 
+foreach(size IN ITEMS 24 96)
+    add_warpx_test(
+        test_3d_pml_coincident_faces_${size}
+        3
+        1
+        "inputs_base_3d_pml_coincident_faces.py --max-grid-size ${size}"
+        OFF  # analysis (analytic damping profile assertions in the script)
+        OFF  # checksum
+        OFF  # dependency
+    )
+endforeach()
+
+if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
+    add_warpx_test(
+        test_3d_pml_conflicting_faces_rejected
+        3
+        1
+        inputs_test_3d_pml_conflicting_faces_rejected
+        OFF
+        OFF
+        OFF
+    )
+    set_tests_properties(
+        test_3d_pml_conflicting_faces_rejected.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "incompatible direct-face damping profiles"
+    )
+endif()
+
 if(WarpX_FFT)
     add_warpx_test(
         test_3d_pml_psatd_dive_divb_cleaning  # name
