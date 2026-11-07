@@ -423,8 +423,6 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     } // end loop over boxes
 #endif
 
-    m_WarpX->ApplyPECInsulatorToPCMasks(lev);
-
 #if AMREX_SPACEDIM > 1
     // Set the BC masks for the in-plane components of the curl curl E operator
     for (amrex::MFIter mfi(*curl2_BC_mask[0], false); mfi.isValid(); ++mfi) {
@@ -531,4 +529,5 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     } // end loop over boxes
 #endif
 
+    m_WarpX->ApplyPECInsulatorToPCMasks(lev);
 }
