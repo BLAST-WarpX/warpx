@@ -11,6 +11,8 @@
 #include "PreconditionerLibrary.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
+#include <AMReX_ParmParse.H>
+#include <AMReX_Print.H>
 #include <string>
 
 /**
@@ -134,6 +136,7 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     bool m_is_linear = false;
     bool m_usePreCond = false;
     RT m_epsJFNK = RT(1.0e-6);
+    RT m_linear_eps{};
     RT m_normY0;
     RT m_cur_time, m_dt;
 
@@ -156,6 +159,19 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
     m_R.Define(a_U);
 
     m_ops = a_ops;
+
+    const amrex::ParmParse pp_jac("jacobian");
+    pp_jac.query("is_linear", m_is_linear);
+    if (m_is_linear) {
+        amrex::Print() << "WARNING: Linear Jacobian mode enabled; use only when the residual "
+                         "is affine in the solver unknowns.\n";
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            pp_jac.contains("linear_eps"),
+            "jacobian.linear_eps is required when jacobian.is_linear = true. "
+            "A useful starting point is the characteristic amplitude of the solver unknown "
+            "(e.g. the electric field E, in V/m, for the implicit field solve). ");
+        pp_jac.get("linear_eps", m_linear_eps);
+    }
 
     m_usePreCond = (a_pc_type != PreconditionerType::none);
     if (m_usePreCond) {
@@ -214,7 +230,7 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
 
         RT eps;
         if (m_is_linear) {
-            eps = 1.0_rt;
+            eps = m_linear_eps;
         } else {
             /* eps = error_rel * sqrt(1 + ||Y0||) / ||dU||
              * M. Pernice and H. F. Walker, "NITSOL: A Newton Iterative Solver for
