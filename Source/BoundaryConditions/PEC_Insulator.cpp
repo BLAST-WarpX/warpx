@@ -715,7 +715,9 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fx ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        // Conductor zeroing passes dummy field parsers; do not evaluate them.
+                        amrex::Real const field_value = (set_Fx && !only_zero_parallel_field)
+                            ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fx, E_like, Fx_nodal, is_insulator, is_normal_to_boundary[0],
@@ -730,7 +732,8 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        amrex::Real const field_value = (set_Fy && !only_zero_parallel_field)
+                            ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fy, E_like, Fy_nodal, is_insulator, is_normal_to_boundary[1],
@@ -745,7 +748,8 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fz ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        amrex::Real const field_value = (set_Fz && !only_zero_parallel_field)
+                            ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fz, E_like, Fz_nodal, is_insulator, is_normal_to_boundary[2],
