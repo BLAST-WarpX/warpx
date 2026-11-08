@@ -80,8 +80,7 @@ gmres.relative_tolerance = 1.0e-6
 gmres.absolute_tolerance = 0.0
 
 jacobian.pc_type = pc_petsc
-jacobian.is_linear = true
-jacobian.linear_eps = 1e5
+jacobian.epsJFNK = 1.0  # Use an order-one perturbation factor for linear systems.
 precon_mat.verbose = true
 pc_petsc.type = lu
 
