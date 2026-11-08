@@ -341,9 +341,8 @@ int SparseJacobianMatrix::Assemble (
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
                                     // r_{i} / r_{i-1/2} + r_{i} / r_{i+1/2}
-                                    geom_factor =
-                                        r_over_dr / (r_over_dr - 0.5_rt)
-                                        + r_over_dr / (r_over_dr + 0.5_rt);
+                                    geom_factor = r_over_dr / (r_over_dr - 0.5_rt)
+                                                + r_over_dr / (r_over_dr + 0.5_rt);
                                 }
                                 else if (dir == 2) {
                                     geom_factor = 2.0_rt; // (r_{i+1/2} + r_{i-1/2}) / r_{i}
@@ -415,9 +414,8 @@ int SparseJacobianMatrix::Assemble (
                                 val = 2.0_rt * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 1) {
 #if defined(WARPX_DIM_RZ)
-                                const amrex::Real geom_factor =
-                                    r_over_dr / (r_over_dr - 0.5_rt)
-                                    + r_over_dr / (r_over_dr + 0.5_rt);
+                                const amrex::Real geom_factor = r_over_dr / (r_over_dr - 0.5_rt)
+                                                              + r_over_dr / (r_over_dr + 0.5_rt);
 #else
                                 const amrex::Real geom_factor = 2.0_rt;
 #endif

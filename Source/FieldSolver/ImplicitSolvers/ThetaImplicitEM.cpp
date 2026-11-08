@@ -377,12 +377,10 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     // Use the physical boundary radius, including a nonzero radial origin.
                     const amrex::Real r = (bdry_side == 0 ? geom.ProbLo(0) : geom.ProbHi(0));
                     const amrex::Real half_dr_over_r = 0.5_rt * geom.CellSize(0) / r;
-                    val0_Et =
-                        0.5_rt * (1.0_rt + (bdry_side == 0 ? -half_dr_over_r : half_dr_over_r));
+                    val0_Et = 0.5_rt * (1.0_rt + (bdry_side == 0 ? -half_dr_over_r : half_dr_over_r));
                     val1_Et = 1.0_rt;
 #if defined(WARPX_DIM_RCYLINDER)
-                    val0_Ez =
-                        0.5_rt * (1.0_rt + (bdry_side == 0 ? half_dr_over_r : -half_dr_over_r));
+                    val0_Ez = 0.5_rt * (1.0_rt + (bdry_side == 0 ? half_dr_over_r : -half_dr_over_r));
                     val1_Ez = 1.0_rt;
 #endif
                 }
@@ -497,11 +495,9 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         if (bc_type == FieldBoundaryType::PEC_Insulator &&
                            !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                             // Use the physical boundary radius, including a nonzero radial origin.
-                            const amrex::Real r =
-                                (bdry_side == 0 ? geom.ProbLo(0) : geom.ProbHi(0));
+                            const amrex::Real r = (bdry_side == 0 ? geom.ProbLo(0) : geom.ProbHi(0));
                             const amrex::Real half_dr_over_r = 0.5_rt * geom.CellSize(0) / r;
-                            val0 =
-                                0.5_rt * (1.0_rt + (bdry_side == 0 ? half_dr_over_r : -half_dr_over_r));
+                            val0 = 0.5_rt * (1.0_rt + (bdry_side == 0 ? half_dr_over_r : -half_dr_over_r));
                             val1 = 1.0_rt;
                             val2 = 1.0_rt;
                         }
