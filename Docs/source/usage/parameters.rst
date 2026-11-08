@@ -358,23 +358,12 @@ Overall simulation parameters
           For these preconditioners, a width of 1 is sufficient for good GMRES performance in most cases.
           The ``pc_curl_curl_mlmg`` preconditioner forces the width to 0.
 
-        - ``jacobian.is_linear`` (``bool``, default: false).
-          This option is intended primarily for testing the solver and preconditioner on known linear problems.
-          Enable linear mode for the matrix-free Jacobian, using the fixed perturbation factor ``jacobian.linear_eps`` instead of the nonlinear finite-difference perturbation rule.
-          Use this only when the residual is affine in the solver unknowns, as in a vacuum field solve with linear boundary conditions.
-
-          .. warning::
-
-             Do not enable this option for nonlinear problems: the resulting finite difference generally does not represent the Jacobian and can impair or prevent convergence.
-             WarpX prints a warning when this option is enabled, but does not check that the residual is affine.
-             Leave it at its default of ``false`` unless the residual is known to be affine in the solver unknowns.
-
-        - ``jacobian.linear_eps`` (``float``, required when ``jacobian.is_linear = true``; no default).
-          Sets :math:`\epsilon` in the perturbed state :math:`U + \epsilon v` used to evaluate the Jacobian action along the direction :math:`v`.
-          This parameter is read only in linear mode, and omitting it in that mode aborts initialization.
-          A useful starting point is the characteristic amplitude of the solver unknown, for example the electric field in V/m for the implicit field solve.
-          A perturbation that is too small can cause cancellation when subtracting the two right-hand-side evaluations.
-          For an affine residual, increasing the perturbation introduces no finite-difference truncation error in exact arithmetic, although floating-point error still depends on its size.
+        - ``jacobian.epsJFNK`` (``float``, default: 1.0e-6).
+          Relative perturbation factor for the matrix-free finite-difference Jacobian; must be finite and nonzero.
+          The perturbation magnitude scales with the base solution norm, using the right-hand-side norm when the base solution is zero.
+          This accommodates poorly scaled solution vectors whose norms are not of order unity.
+          For known linear systems (affine residuals), a value of ``1.0`` can reduce cancellation error and is useful for testing the solver and preconditioner.
+          For nonlinear problems, retain a small value such as the default: an order-one perturbation can produce an inaccurate Jacobian and impair convergence.
 
         - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
