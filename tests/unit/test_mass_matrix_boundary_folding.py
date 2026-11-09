@@ -243,6 +243,15 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
         picmi.Species(particle_type="electron", name="electrons"), layout=None
     )
     sim.initialize_inputs()
+    # This test sums the PC matrices before applying them to E. Contributions
+    # from neighboring boxes extend the cubic stencil to three cells beyond a
+    # box edge. Applying box-local matrices first and then summing J only needs
+    # the local particle-gather support (see the discussion in PR #7254):
+    # https://github.com/BLAST-WarpX/warpx/pull/7254#discussion_r4030996489
+    # E already has enough allocated guards, but the normal PEC fill covers
+    # only two cells. Fill all allocated guards so J0 also reads valid E values
+    # where physical X guards intersect transverse Z box/periodic boundaries.
+    pywarpx.warpx.safe_guard_cells = 1
     sim.initialize_warpx()
 
     warpx = sim.extension.warpx
