@@ -106,8 +106,8 @@ WarpX::ComputeDt ()
     }
 
     if (m_const_dt.has_value()) {
-            if (m_const_dt.value() > deltat && 
-            (evolve_scheme == EvolveScheme::Explicit 
+            if (m_const_dt.value() > deltat &&
+            (evolve_scheme == EvolveScheme::Explicit
                 && (
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
                 || electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC
