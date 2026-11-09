@@ -3,12 +3,11 @@
 # This file is part of WarpX.
 # License: BSD-3-Clause-LBNL
 
-"""Prepare the reference current for a PC mass-matrix boundary-folding test.
+"""Compare current folding with PC mass-matrix folding for cubic shapes.
 
-For now this exercises only the unfolded path: sum synthetic per-box
-coefficients, extend random E through its BCs, compute J0 = sigma_pc E,
-and apply the current BCs. Folding sigma_pc and comparing J1 with J0
-will be added separately.
+Sum synthetic per-box coefficients, extend random E through its BCs, compute
+J0 = sigma_pc E, and apply the current BCs. Fold the same matrix and compute
+J1 using valid E columns only. These currents must agree on every valid row.
 """
 
 import numpy as np
@@ -22,6 +21,8 @@ from pywarpx import picmi
 pytestmark = pytest.mark.skipif(
     pywarpx.libwarpx.geometry_dim != "2d", reason="this setup uses Cartesian XZ"
 )
+
+SHAPE_ORDER = 3
 
 
 def _array_module():
@@ -42,16 +43,16 @@ def _nonzero_random(rng, shape):
     return rng.choice([-1.0, 1.0], size=shape) * rng.uniform(0.5, 1.5, size=shape)
 
 
-def _fill_quadratic_pc(mf, direction, xp):
+def _fill_cubic_pc(mf, direction, xp):
     """Randomize every coefficient supported by particles inside each box.
 
-    A quadratic shape covers three consecutive indices. For a particle
-    inside a box's cells, its leftmost shape index ranges from cell_lo - 1
-    to cell_hi (nodal) or cell_hi - 1 (centered). A row and its E column
-    are supported precisely when some such shape window contains both.
+    A cubic shape covers four consecutive indices. For a particle inside
+    a box's cells, the leftmost index ranges from cell_lo - 1 to cell_hi - 1
+    for nodal data, or cell_lo - 2 to cell_hi - 1 for centered data. A row
+    and its E column are supported when some such window contains both.
     This leaves unsupported ghost coefficients zero without depositing particles.
     """
-    order = 2
+    order = SHAPE_ORDER
     n_stencil = 2 * order + 1
     assert mf.n_comp == n_stencil**2
     for mfi in mf:
@@ -63,9 +64,10 @@ def _fill_quadratic_pc(mf, direction, xp):
             np.arange(fab.small_end[axis], fab.big_end[axis] + 1)
             for axis in (0, 1)
         ]
-        left_lo = [valid.small_end[axis] - 1 for axis in (0, 1)]
+        nodal = [int(mf.box_array().ix_type().node_centered(axis)) for axis in (0, 1)]
+        left_lo = [valid.small_end[axis] - 2 + nodal[axis] for axis in (0, 1)]
         # valid_hi is cell_hi + 1 for nodal data, and cell_hi for centered data.
-        left_hi = [valid.big_end[axis] - 1 for axis in (0, 1)]
+        left_hi = [valid.big_end[axis] - nodal[axis] - 1 for axis in (0, 1)]
         rng = np.random.default_rng(
             [42, direction, valid.small_end[0], valid.small_end[1]]
         )
@@ -100,7 +102,7 @@ def _apply_unfolded_pc(sigma, efield, current, xp):
     J guards need not have a complete stencil. Check that no nonzero term is
     clipped on valid rows or physical X-ghost rows needed for the reference.
     """
-    order = 2
+    order = SHAPE_ORDER
     n_stencil = 2 * order + 1
     current.set_val(0.0)
     domain = current.box_array().minimal_box()
@@ -159,13 +161,72 @@ def _pec_reference(mf, raw_current, n_cell_x, sign):
     return expected
 
 
-def test_unfolded_pc_current_pec_x_periodic_z():
-    """Construct J0 with PEC on both X faces and periodic Z, without folding PC."""
+def _valid_view(mf, mfi):
+    """View a FAB's valid rows, retaining its component axis."""
+    valid = mfi.validbox()
+    rows = tuple(
+        slice(
+            mf.n_grow_vect[axis],
+            mf.n_grow_vect[axis] + valid.big_end[axis] - valid.small_end[axis] + 1,
+        )
+        for axis in (0, 1)
+    )
+    return mf.array(mfi).to_xp()[rows[0], rows[1], 0, :]
+
+
+def _apply_folded_pc(sigma, efield, current, n_cell, direction, xp):
+    """Apply folded coefficients using global valid E, never physical E guards.
+
+    Z columns wrap periodically, including the duplicate upper nodal plane.
+    Coefficients pointing outside the physical X domain must be exactly zero.
+    Check PEC row/column zeros independently of the matrix-vector product:
+    E is already zero on constrained nodes and could otherwise hide an error.
+    """
+    order = SHAPE_ORDER
+    n_stencil = 2 * order + 1
+    assert sigma.n_comp == n_stencil**2
+    e = xp.asarray(efield[...])
+    current.set_val(0.0)
+    for mfi in current:
+        valid = mfi.validbox()
+        rows = [
+            np.arange(valid.small_end[axis], valid.big_end[axis] + 1)
+            for axis in (0, 1)
+        ]
+        s = _valid_view(sigma, mfi)
+        j = _valid_view(current, mfi)[:, :, 0]
+        if direction != "x":
+            constrained = xp.asarray((rows[0] == 0) | (rows[0] == n_cell[0]))
+            assert not bool(xp.any(s[constrained, :, :] != 0.0)), (
+                f"S{direction}{direction}: nonzero constrained PEC row"
+            )
+        for dz in range(-order, order + 1):
+            column_z = xp.asarray((rows[1] + dz) % n_cell[1])
+            for dx in range(-order, order + 1):
+                column_x = rows[0] + dx
+                inside = (column_x >= 0) & (column_x < e.shape[0])
+                coefficient = dx + order + n_stencil * (dz + order)
+                values = s[:, :, coefficient]
+                assert not bool(xp.any(values[xp.asarray(~inside), :] != 0.0)), (
+                    f"S{direction}{direction}: offset {(dx, dz)} retains physical E ghosts"
+                )
+                if direction != "x":
+                    constrained = xp.asarray((column_x == 0) | (column_x == n_cell[0]))
+                    assert not bool(xp.any(values[constrained, :] != 0.0)), (
+                        f"S{direction}{direction}: offset {(dx, dz)} retains a PEC column"
+                    )
+                keep = xp.asarray(inside)
+                ex = xp.asarray(column_x[inside])
+                j[keep, :] += values[keep, :] * e[ex[:, None], column_z[None, :]]
+
+
+def test_mass_matrix_boundary_folding_pec_x_periodic_z():
+    """Folding the full cubic PC stencil must reproduce PEC folding of sigma E."""
     n_cell = [16, 16]
     sim = make_sim(
         n_cell=n_cell,
         max_grid_size=8,
-        particle_shape="quadratic",
+        particle_shape="cubic",
         current_deposition_algo="direct",
     )
     grid = sim.solver.grid
@@ -179,7 +240,7 @@ def test_unfolded_pc_current_pec_x_periodic_z():
             pc_type=picmi.JacobiPreconditioner(),
             use_mass_matrices_jacobian=True,
             use_mass_matrices_pc=True,
-            mass_matrices_pc_width=2,
+            mass_matrices_pc_width=SHAPE_ORDER,
         ),
         theta=0.5,
     )
@@ -193,20 +254,21 @@ def test_unfolded_pc_current_pec_x_periodic_z():
     xp = _array_module()
     for idir, direction in enumerate(("x", "y", "z")):
         sigma = fields.get("MassMatrices_PC", direction, 0)
-        _fill_quadratic_pc(sigma, idir, xp)
+        _fill_cubic_pc(sigma, idir, xp)
         template = fields.get("current_fp", direction, 0)
-        fields.alloc_init(
-            "J0",
-            direction,
-            0,
-            template.box_array(),
-            template.dm(),
-            template.n_comp,
-            template.n_grow_vect,
-            0.0,
-            redistribute=False,
-            redistribute_on_remake=False,
-        )
+        for name in ("J0", "J1"):
+            fields.alloc_init(
+                name,
+                direction,
+                0,
+                template.box_array(),
+                template.dm(),
+                template.n_comp,
+                template.n_grow_vect,
+                0.0,
+                redistribute=False,
+                redistribute_on_remake=False,
+            )
 
     # Sum box-local deposition contributions once, leaving physical BCs unfolded.
     warpx.sync_mass_matrices_pc()
@@ -245,3 +307,27 @@ def test_unfolded_pc_current_pec_x_periodic_z():
             atol=rtol() * scale,
             err_msg=f"J0{direction}: PEC current reflection",
         )
+
+    # Fold the same already-summed coefficients in place. Cartesian geometry
+    # needs no radial volume scaling. Do not sum or apply current BCs to J1.
+    warpx.apply_mass_matrices_pc_boundary()
+    for direction in ("x", "y", "z"):
+        j0 = fields.get("J0", direction, 0)
+        j1 = fields.get("J1", direction, 0)
+        _apply_folded_pc(
+            fields.get("MassMatrices_PC", direction, 0),
+            fields.get("Efield_fp", direction, 0),
+            j1,
+            n_cell,
+            direction,
+            xp,
+        )
+        scale = np.max(np.abs(j0[...]))
+        # Check every FAB's valid rows, including all copies of shared nodes.
+        for mfi in j1:
+            reference = _valid_view(j0, mfi)
+            actual = _valid_view(j1, mfi)
+            assert bool(xp.all(xp.isfinite(actual))), f"J1{direction}: non-finite current"
+            assert bool(
+                xp.all(xp.abs(actual - reference) <= rtol() * (scale + xp.abs(reference)))
+            ), f"J1{direction} != J0{direction} on valid box {mfi.validbox()}"
