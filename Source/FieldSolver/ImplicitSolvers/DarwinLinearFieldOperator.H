@@ -15,6 +15,8 @@
 
 #include <AMReX_MultiFab.H>
 
+#include <memory>
+
 class SemiImplicitDarwin;
 
 /**
@@ -35,8 +37,8 @@ class SemiImplicitDarwin;
  *  and it holds a pointer back to the solver for the fields, geometry and
  *  mass matrices that the evaluation reads.
  *
- *  No preconditioner is currently implemented, so precond() applies the
- *  identity and define() rejects any preconditioner type other than `none`.
+ *  The only preconditioner supported is `pc_darwin_mlmg` (see DarwinMLMGPC.H);
+ *  with `none`, precond() applies the identity.
  */
 class DarwinLinearFieldOperator final : public LinearFunction<WarpXSolverVec,SemiImplicitDarwin>
 {
@@ -60,18 +62,28 @@ public:
      */
     void apply ( WarpXSolverVec& a_Ax, const WarpXSolverVec& a_x ) override;
 
-    /** \brief Apply the preconditioner. No preconditioner is implemented for
-     *  the Darwin solver, so this applies the identity. */
+    /** \brief Apply the preconditioner, i.e. approximately solve `P a_U = a_X`.
+     *  With no preconditioner selected this applies the identity. */
     inline
     void precond ( WarpXSolverVec& a_U, const WarpXSolverVec& a_X ) override
     {
-        a_U.Copy(a_X);
+        if (m_preCond) { m_preCond->Apply(a_U, a_X); }
+        else           { a_U.Copy(a_X); }
     }
 
+    /** \brief Refresh the preconditioner from the current state of the solver
+     *  (the freshly deposited mass matrices). A no-op without a preconditioner. */
     inline
-    void updatePreCondMat ( const WarpXSolverVec& a_X ) override
+    void updatePreCondMat () override
     {
-        amrex::ignore_unused(a_X);
+        if (m_preCond) { m_preCond->Update(); }
+    }
+
+    /** \brief Print the preconditioner's parameters, if there is one. */
+    inline
+    void printParameters () const
+    {
+        if (m_preCond) { m_preCond->printParameters(); }
     }
 
     inline
@@ -96,14 +108,14 @@ public:
      * \param[in] a_U a defined solver vector with the layout of Z, used both
      *            to make new vectors and to size the scratch space
      * \param[in] a_ops pointer back to the Darwin solver
-     * \param[in] a_pc_type preconditioner type; must be `none`
+     * \param[in] a_pc_type preconditioner type; `none` or `pc_darwin_mlmg`
      */
     void define ( const WarpXSolverVec& a_U,
                   SemiImplicitDarwin* a_ops,
                   const PreconditionerType& a_pc_type ) override;
 
     [[nodiscard]] inline
-    PreconditionerType pcType () const override { return PreconditionerType::none; }
+    PreconditionerType pcType () const override { return m_pc_type; }
 
 private:
 
@@ -115,13 +127,32 @@ private:
     /** \brief Pointer back to the Darwin solver */
     SemiImplicitDarwin* m_ops = nullptr;
 
+    /** \brief Selected preconditioner type, and the preconditioner itself
+     *  (null when no preconditioner is used). */
+    PreconditionerType m_pc_type = PreconditionerType::none;
+    std::unique_ptr<Preconditioner<WarpXSolverVec,SemiImplicitDarwin>> m_preCond;
+
     /**
      * \brief Scratch space used by apply(), allocated once in define() rather
      *  than on every GMRES iteration since every iterate of Z shares the same
      *  layout.
+     *
+     *  apply() evaluates the whole operator from a single guard-cell exchange
+     *  on m_Zscratch_*, by computing each intermediate over enough of its own
+     *  guard region to feed the next stage. Hence the staggered ghost widths,
+     *  set in define():
+     *   - m_Zscratch_* (B-staggered) is the widest, and is the only field that
+     *     is communicated;
+     *   - m_dA_* (E-staggered) holds curl(Z) out to the reach of the mass
+     *     matrix gather;
+     *   - m_chidA_* (E-staggered) holds chi curl(Z) one cell out, which is
+     *     what the final curl reads;
+     *   - m_lapZ_* (B-staggered) holds the result, valid region only.
      */
     amrex::MultiFab m_lapZ_x, m_lapZ_y, m_lapZ_z;
     amrex::MultiFab m_Zscratch_x, m_Zscratch_y, m_Zscratch_z;
+    amrex::MultiFab m_dA_x, m_dA_y, m_dA_z;
+    amrex::MultiFab m_chidA_x, m_chidA_y, m_chidA_z;
 };
 
 #endif // WARPX_DARWIN_LINEAR_FIELD_OPERATOR_H_

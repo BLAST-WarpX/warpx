@@ -46,6 +46,7 @@ guardCellManager::Init (
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
     const ElectromagneticSolverAlgo electromagnetic_solver_id,
+    const CurrentDepositionAlgo current_deposition_algo,
     const EvolveScheme evolve_scheme,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
@@ -174,9 +175,19 @@ guardCellManager::Init (
                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // When using these implicit schemes, the speed of light Courant limit may be significantly
         // violated, but the number of guard cells only need to be adjusted based on the particle motion.
+        // Each increase in shape order extends the particle shape support by dx/2
+        // on each side, so every two additional orders require one more guard cell.
+        // Integer division below: nox / 2 = 0, 0, 1, 1, 2 for nox = 0, 1, 2, 3, 4.
+        // For direct deposition, the current is deposited using the time-centered particle position,
+        // limiting the additional stencil extent due to particle motion.
+        // Villasenor deposition obtains the same guard-cell requirement by using a shape factor of
+        // order `nox-1` for cell-centered quantities in the normal direction.
+        // Esirkepov uses the full order `nox` independent of grid staggering and therefore
+        // requires one additional guard cell.
+        const int extra = (current_deposition_algo == CurrentDepositionAlgo::Esirkepov) ? 1 : 0;
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
-            ng_alloc_Rho[i] = nox + particle_max_grid_crossings - 1;
-            ng_alloc_J[i]   = nox + particle_max_grid_crossings - 1;
+            ng_alloc_Rho[i] = nox / 2 + particle_max_grid_crossings + extra;
+            ng_alloc_J[i]   = nox / 2 + particle_max_grid_crossings + extra;
         }
     }
 
@@ -388,6 +399,15 @@ guardCellManager::Init (
         // for EB gather must be consistent with those for J.
         ng_alloc_EB.max( ng_alloc_J );
         ng_FieldGather.max( ng_alloc_J );
+    }
+
+    if (evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
+        // The semi-implicit Darwin scheme sums the guard cells of the mass
+        // matrices into the valid cells before applying them to the E-field
+        // (and dA) in the linear solve. The stencil of a valid cell then
+        // reaches one cell beyond the guard cells of J, and would otherwise be
+        // silently clipped by ApplyMassMatrices.
+        ng_alloc_EB.max( ng_alloc_J + 1 );
     }
 
 }

@@ -57,7 +57,7 @@ python3 -m pip install --user --upgrade matplotlib
 #python3 -m pip install --user --upgrade yt
 
 # install or update WarpX dependencies
-python3 -m pip install --user --upgrade picmistandard==0.34.0
+python3 -m pip install --user --upgrade picmistandard==0.35.0
 python3 -m pip install --user --upgrade lasy
 
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)

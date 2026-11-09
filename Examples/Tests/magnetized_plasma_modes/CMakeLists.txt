@@ -35,7 +35,7 @@ add_warpx_test(
     test_2d_darwin_solver_em_modes_es_picmi  # name
     2  # dims
     2  # nprocs
-    "inputs_test_em_modes_picmi.py --test --dim 2 --bdir z --darwin --include_es_solver"  # inputs
+    "inputs_test_em_modes_picmi.py --test --dim 2 --bdir z --darwin --include_es_solver --use_preconditioner"  # inputs
     "analysis.py --analyze_darwin_sim"  # analysis
     "analysis_default_regression.py --path diags/field_diag000050"  # checksum
     OFF  # dependency

@@ -8,6 +8,7 @@
 #ifndef WARPX_BREMSSTRAHLUNG_FUNC_H_
 #define WARPX_BREMSSTRAHLUNG_FUNC_H_
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -31,6 +32,7 @@
  *  effectively created in the particle creation functor.
  */
 class BremsstrahlungFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -92,7 +94,8 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const m1, amrex::ParticleReal const m2,
             amrex::Real const dt, amrex::Real const /*dV*/, index_type coll_idx,
-            index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
+            index_type const cell_start_pair, amrex::IntVect const /*global_index*/,
+            index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* AMREX_RESTRICT p_product_data,
@@ -351,8 +354,8 @@ public:
                 amrex::Print() << "        n2 = " << n2 << "\n";
                 amrex::Print() << "        sigma_total = " << sigma_total << "\n";
 #endif
-                arg = 1.0_prt;
                 fmulti = std::max(fmulti/arg, 1.0_prt);
+                arg = 1.0_prt;
             }
             //q12 = 1.0 - exp(-arg)
             amrex::ParticleReal const q12 = arg;
@@ -406,7 +409,7 @@ public:
 
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 

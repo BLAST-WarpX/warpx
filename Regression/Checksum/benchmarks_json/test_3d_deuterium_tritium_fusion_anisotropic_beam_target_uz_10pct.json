@@ -1,0 +1,14 @@
+{
+  "lev=0": {
+    "rho": 0.0
+  },
+  "neutron_1": {
+    "particle_momentum_x": 1.9588128001889522e-14,
+    "particle_momentum_y": 1.967077680049657e-14,
+    "particle_momentum_z": 2.7072769872735517e-14,
+    "particle_position_x": 1.2990111482707087,
+    "particle_position_y": 1.9463287219678675,
+    "particle_position_z": 0.21605790547250064,
+    "particle_weight": 472709224947.671
+  }
+}

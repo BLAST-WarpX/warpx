@@ -9,6 +9,7 @@
 #include "Fields.H"
 #include "SemiImplicitDarwin.H"
 #include "Python/callbacks.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
@@ -58,10 +59,28 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_source.Define(m_Z);
     m_source.zero();
 
+    // Particle shape used for the magnetostatic part of the solve (current and
+    // mass matrices deposition, inductive E-field gather, and B-field gather).
+    // Defaults to the electrostatic particle shape, algo.particle_shape.
+    m_magnetostatic_particle_shape = WarpX::nox;
+    const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
+    utils::parser::queryWithParser(
+        pp_implicit_evolve, "magnetostatic_particle_shape", m_magnetostatic_particle_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_magnetostatic_particle_shape >= 1 && m_magnetostatic_particle_shape <= WarpX::nox,
+        "implicit_evolve.magnetostatic_particle_shape must be between 1 and algo.particle_shape");
+
     // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
+
+    // Initialize the mass matrices for plasma response (their stencil width
+    // is set by the magnetostatic particle shape). This has to come before the
+    // linear operator is defined below, since the operator sizes its scratch
+    // space from the mass matrix stencil.
+    InitializeMassMatrices(m_magnetostatic_particle_shape);
+    InitializeImplicitOptions();
 
     // Get the linear solver input parameters
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
@@ -70,11 +89,17 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("absolute_tolerance",  m_linsol_atol);
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
+    pp_l.query("pc_type",             m_pc_type);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_type == PreconditionerType::none ||
+        m_pc_type == PreconditionerType::pc_darwin_mlmg,
+        "The semi-implicit Darwin solver only supports pc_darwin_mlmg as "
+        "the GMRES preconditioner (amrex_gmres.pc_type).");
 
     // Define the linear operator (this also allocates the scratch space it
     // uses to evaluate the operator on each GMRES iteration)
     m_linear_function = std::make_unique<DarwinLinearFieldOperator>();
-    m_linear_function->define(m_Z, this, PreconditionerType::none);
+    m_linear_function->define(m_Z, this, m_pc_type);
 
     // Define the linear solver
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
@@ -88,14 +113,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
-    // Initialize the mass matrices for plasma response
-    InitializeMassMatrices();
-
-    // The predictor velocity push in OneStep() temporarily overrides the
-    // global galerkin_interpolation flag to true, to gather with the same
-    // shape-factor order used for deposition. Skip that override, and warn,
-    // if the user has explicitly selected momentum-conserving gathering,
-    // since forcing Galerkin gathering there would silently negate that choice.
+    // The predictor velocity push gathers the electrostatic E-field with the
+    // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
+    // momentum-conserving gathering.
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
     if (!m_predictor_use_galerkin) {
         ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
@@ -121,12 +141,16 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+    amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
+    amrex::Print()     << "Magnetostatic particle shape:                  " << m_magnetostatic_particle_shape << "\n";
+    if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
 int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
                                                    amrex::Real  a_dt,
-                                                   int          a_step )
+                                                   int          a_step,
+                                                   bool verbose_step)
 {
     BL_PROFILE("SemiImplicitDarwin::OneStep()");
 
@@ -140,17 +164,20 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Fields have E^{n} (from phi^n only), B^{n-1/2}
     // Particles have u^{n-1/2} and x^{n}.
 
+    // The electrostatic solve at the end of the previous step only sets E in the
+    // valid cells, so exchange guard cells now (this happens in
+    // WarpX::ExplicitFillBoundaryEBUpdateAux for explicit solvers).
+    m_WarpX->FillBoundaryE(m_WarpX->getngEB());
+
     // Save u and x at the start of the time step
     // TODO: only save u since we don't need to keep x
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
-    // the E-field was cleared during the last Poisson solve). Temporarily force
-    // Galerkin gathering for this predictor push (skipped if the user explicitly
-    // requested momentum-conserving gathering - see the warning issued in Define()).
-    const bool save_galerkin_interpolation = WarpX::galerkin_interpolation;
-    if (m_predictor_use_galerkin) { WarpX::galerkin_interpolation = true; }
-
+    // the E-field was cleared during the last Poisson solve). E is gathered with the
+    // Galerkin scheme (unless the user explicitly requested momentum-conserving
+    // gathering), with the electrostatic particle shape. B is gathered exactly as in
+    // the corrector push and the mass matrices, i.e., with the magnetostatic particle shape.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(
@@ -162,18 +189,18 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
-
-    WarpX::galerkin_interpolation = save_galerkin_interpolation;
 
     // Prepare current deposition: the velocities are time centered with
     // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
     // for the advanced velocity), and the advanced velocity is saved to u_n
     PrepareVelocitiesForCurrentDeposition();
 
-    // Accumulate current* and the mass matrices
+    // Accumulate current* and the mass matrices (with the magnetostatic shape)
     AccumulateCurrentAndMassMatrices();
 
     // Python callback insertion
@@ -183,17 +210,22 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // i.e. fill m_source with `2 * laplacian(B) + 2 * mu_0 curl(J)`
     CalculateSourceVector();
 
+    // Refresh the preconditioner from the freshly deposited mass matrices
+    // (no-op unless a preconditioner is enabled).
+    m_linear_function->updatePreCondMat();
+
     // Solve the magnetoinductive equation:
     // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
     // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
     // ApplyScaledMassMatrices), i.e. the linear response of the deposited
     // current to the inductive E-field that this solve produces.
+    int const verbosity = verbose_step ? m_linsol_verbose_int : 0;
+    m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
-    // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
-    // value (e.g. 1 if the iteration count was exceeded) otherwise. Map
-    // that onto the negative-means-failure convention used by the caller.
-    const int exit_status = (m_linear_solver->getStatus() == 0) ? 0 : -1;
+    // Map a failed linear solve onto the negative-means-failure convention
+    // used by the caller.
+    const int exit_status = m_linear_solver->converged() ? 0 : -1;
     if (exit_status < 0) {
         return exit_status;
     }
@@ -205,7 +237,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // the acceleration due to the inductive E-field
     ClearParticleVelocities();
 
-    // Push particle velocities (E-field now only includes the inductive component)
+    // Push particle velocities (E-field now only includes the inductive component).
+    // E and B are gathered with the magnetostatic particle shape and without order
+    // reduction, as the mass matrices assume: the E gather is then the transpose of the
+    // (direct) current deposition, and B is the same as in the predictor push and the
+    // mass matrices.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(
@@ -217,7 +253,10 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/m_magnetostatic_particle_shape,
+                              /*e_galerkin=*/false,
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
 
@@ -321,28 +360,31 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     const int lev = 0;
 
     // Deposit the current density from all species, using the time-centered
-    // particle velocities as appropriate for the implicit push. This also
-    // resets the current MultiFabs before depositing.
+    // particle velocities as appropriate for the implicit push and the
+    // magnetostatic particle shape. This also resets the current MultiFabs
+    // before depositing.
     m_WarpX->GetPartContainer().DepositCurrent(
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
-        m_dt, 0.0_rt, PushType::Implicit);
+        m_dt, 0.0_rt, PushType::Implicit, m_magnetostatic_particle_shape);
 
     // Zero and accumulate the mass matrices from all species. This shares the
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
-    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices();
+    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
+    // here with the magnetostatic particle shape (set in m_implicit_options).
+    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+
+    // The deposit routine only fills half of each diagonal mass matrix's
+    // band (exploiting symmetry); mirror the other half to complete
+    // deposition before boundary summation.
+    FinishMassMatricesDeposition();
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
+    m_WarpX->FinalizeJ();
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
-
-    // The deposit routine only fills half of each diagonal mass matrix's
-    // band (exploiting symmetry); mirror the other half back in now that
-    // deposition and boundary summation are complete.
-    FinishMassMatrices();
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()
@@ -390,12 +432,12 @@ void SemiImplicitDarwin::CalculateSourceVector ()
 
     // Calculate the vector Laplacian of B and write result into first temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorLaplacian(
-        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate the curl of J and write result into second temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate 2 * laplacian(B) + 2 * mu_0 curl(J) and write result in m_source
@@ -456,7 +498,7 @@ void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
 
     // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
+        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag_fp()[lev], lev
     );
     for (int ii = 0; ii < 3; ii++)
     {
@@ -564,6 +606,17 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
 
     const amrex::Real scale = 2._prt * PhysConst::mu0 / m_dt;
 
+    // The mass matrices were summed over their guard cells (SyncMassMatrices),
+    // so that the stencil of a valid cell reaches one cell beyond the guard
+    // cells of J (see guardCellManager::Init). Check that dA has enough guard
+    // cells for the valid cells of rhs not to be clipped.
+    AssertMassMatricesStencilNotClipped(rhs, dA);
+
+    // No guard-cell exchange is needed on the result: ApplyMassMatrices()
+    // already fills as many guard cells of `rhs` as `rhs` and the mass matrices
+    // have in common, computing them from the same wide-stencil read of `dA`
+    // that the valid region uses. The caller sizes `rhs` so that this covers
+    // whatever it goes on to read.
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
@@ -571,11 +624,54 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
         /* a_baseline      = */ nullptr,
         /* a_scale         = */ scale,
         /* a_zero_out_first = */ false);
+}
 
-    for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
-        // Fill and sync guard cells & edges
-        rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
+                                                     amrex::MultiFab& a_chi_yy_cc,
+                                                     amrex::MultiFab& a_chi_zz_cc ) const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeScaledMassMatrixCC()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    amrex::MultiFab* chi_cc[3] = {&a_chi_xx_cc, &a_chi_yy_cc, &a_chi_zz_cc};
+
+    // Scale by the same 2 mu0/dt prefactor the operator applies to the
+    // mass-matrix product.
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
+
+    for (int d = 0; d < 3; ++d) {
+        const int nc = Sdiag[d]->nComp();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*chi_cc[d], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& tbx = mfi.tilebox();
+            amrex::Array4<amrex::Real> const& chi = chi_cc[d]->array(mfi);
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                // Row-sum this block's stencil-band components at (i,j,k),
+                // then collocate onto the cell center by index identification
+                // (same convention DarwinMLMGPC uses for Z): a plain (i,j,k)
+                // fetch already reads the point at S's own native staggering
+                // that shares (i,j,k) with the target cell-centered array.
+                // This keeps chi_dd collocated with where curl(Z)_d itself
+                // would land under the same convention, and avoids zeroing the
+                // nodal-dimension Nyquist mode the way pair-averaging would.
+                amrex::Real s = 0.0;
+                for (int c = 0; c < nc; ++c) {
+                    s += S(i,j,k,c);
+                }
+                chi(i,j,k) = fac*s;
+            });
+        }
     }
 }

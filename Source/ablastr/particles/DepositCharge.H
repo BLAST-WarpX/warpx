@@ -30,7 +30,8 @@ namespace ablastr::particles
  * \param ion_lev pointer to array of particle ionization level. This is
                   required to have the charge of each macroparticle
                   since q is a scalar. For non-ionizable species,
-                  ion_lev is a null pointer.
+                  ion_lev is a null pointer. Like wp, it covers all the particles
+                  of the tile, starting at index 0 (not at offset).
  * \param rho MultiFab of the charge density
  * \param local_rho temporary FArrayBox for deposition with OpenMP
  * \param particle_shape shape factor in each direction
@@ -171,6 +172,9 @@ deposit_charge (typename T_PC::ParIterType& pti,
 #endif
 
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
+    // Like the other particle attributes, ion_lev points to the start of the tile:
+    // offset it so that the kernels deposit particles [offset, offset+np_to_deposit)
+    int const * const ion_lev_offset = (ion_lev != nullptr) ? ion_lev + offset : nullptr;
 
     // Indices of the lower bound
     const amrex::Dim3 lo = lbound(tilebox);
@@ -178,19 +182,19 @@ deposit_charge (typename T_PC::ParIterType& pti,
     ABLASTR_PROFILE_VAR_START(blp_ppc_chd);
 
     if        (nox == 1){
-        doChargeDepositionShapeN<1>(GetPosition, wp.dataPtr()+offset, ion_lev,
+        doChargeDepositionShapeN<1>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                     rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 2){
-        doChargeDepositionShapeN<2>(GetPosition, wp.dataPtr()+offset, ion_lev,
+        doChargeDepositionShapeN<2>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                     rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 3){
-        doChargeDepositionShapeN<3>(GetPosition, wp.dataPtr()+offset, ion_lev,
+        doChargeDepositionShapeN<3>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                     rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     } else if (nox == 4){
-        doChargeDepositionShapeN<4>(GetPosition, wp.dataPtr()+offset, ion_lev,
+        doChargeDepositionShapeN<4>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                     rho_fab, np_to_deposit.value(), dinv, xyzmin, lo, charge,
                                     n_rz_azimuthal_modes);
     }

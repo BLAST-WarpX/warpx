@@ -81,7 +81,7 @@ gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
 jacobian.pc_type = pc_petsc
-pc_petsc.verbose = true
+precon_mat.verbose = true
 pc_petsc.type = lu
 
 ###   Diagnostics

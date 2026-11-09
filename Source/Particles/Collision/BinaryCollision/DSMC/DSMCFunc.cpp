@@ -37,7 +37,7 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::TWOPRODUCT_REACTION) {
+        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::TWO_PRODUCT_REACTION) {
             // Only one ionization process is currently supported as part of a given
             // collision set.
             if (reaction_produces_new_species) {

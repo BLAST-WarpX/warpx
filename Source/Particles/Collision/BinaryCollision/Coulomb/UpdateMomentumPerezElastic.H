@@ -7,6 +7,7 @@
 #ifndef WARPX_PARTICLES_COLLISION_UPDATE_MOMENTUM_PEREZ_ELASTIC_H_
 #define WARPX_PARTICLES_COLLISION_UPDATE_MOMENTUM_PEREZ_ELASTIC_H_
 
+#include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Math.H>
@@ -218,51 +219,17 @@ void UpdateMomentumPerezElastic (
             // Obtain scattering angle from Bobylev's delta function distribution
             cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
         }
-        T_PR const sinXs = std::sqrt(T_PR(1.0) - cosXs*cosXs);
 
         // Get random azimuthal angle
         T_PR const phis = amrex::Random(engine) * T_PR(2.0) * MathConst::pi;
-        T_PR const cosphis = std::cos(phis);
-        T_PR const sinphis = std::sin(phis);
 
-        // Compute post-collision momenta pfs in COM
-        T_PR p1fsx;
-        T_PR p1fsy;
-        T_PR p1fsz;
-        // p1sp is the p1s perpendicular
-        T_PR p1sp = std::sqrt( p1sx*p1sx + p1sy*p1sy );
-        // Make sure p1sp is not almost zero
-        if ( p1sp > std::numeric_limits<T_PR>::min() )
-        {
-            p1fsx = ( p1sx*p1sz/p1sp ) * sinXs*cosphis +
-                    ( p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sx           ) * cosXs;
-            p1fsy = ( p1sy*p1sz/p1sp ) * sinXs*cosphis +
-                    (-p1sx*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sy           ) * cosXs;
-            p1fsz = (-p1sp           ) * sinXs*cosphis +
-                    ( T_PR(0.0)      ) * sinXs*sinphis +
-                    ( p1sz           ) * cosXs;
-            // Note a negative sign is different from
-            // Eq. (12) in Perez's paper,
-            // but they are the same due to the random nature of phis.
-        }
-        else
-        {
-            // If the previous p1sp is almost zero
-            // x->y  y->z  z->x
-            // This set is equivalent to the one in Nanbu's paper
-            p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
-            p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
-                    ( p1sz*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sy           ) * cosXs;
-            p1fsz = ( p1sz*p1sx/p1sp ) * sinXs*cosphis +
-                    (-p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sz           ) * cosXs;
-            p1fsx = (-p1sp           ) * sinXs*cosphis +
-                    ( T_PR(0.0)      ) * sinXs*sinphis +
-                    ( p1sx           ) * cosXs;
-        }
+        // Compute post-collision momenta pfs in COM: rotate the pre-collision
+        // momentum of particle 1 by the scattering angle Xs and azimuthal angle phis
+        // (Eq. (12) in Perez's paper). The magnitude is preserved in the COM frame.
+        T_PR p1fsx = p1sx;
+        T_PR p1fsy = p1sy;
+        T_PR p1fsz = p1sz;
+        ParticleUtils::rotateVector(p1fsx, p1fsy, p1fsz, phis, cosXs);
 
         T_PR const p2fsx = -p1fsx;
         T_PR const p2fsy = -p1fsy;

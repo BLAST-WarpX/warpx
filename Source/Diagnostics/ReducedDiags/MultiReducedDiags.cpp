@@ -129,14 +129,14 @@ void MultiReducedDiags::ComputeDiags (int step)
 // end void MultiReducedDiags::ComputeDiags
 
 // call functions to compute diags at the mid step time level
-void MultiReducedDiags::ComputeDiagsMidStep (int step)
+void MultiReducedDiags::ComputeDiagsMidStep (int step, amrex::Real dt)
 {
     ABLASTR_PROFILE("MultiReducedDiags::ComputeDiagsMidStep()");
 
     // loop over all reduced diags
     for (int i_rd = 0; i_rd < static_cast<int>(m_rd_names.size()); ++i_rd)
     {
-        m_multi_rd[i_rd] -> ComputeDiagsMidStep(step);
+        m_multi_rd[i_rd] -> ComputeDiagsMidStep(step, dt);
     }
     // end loop over all reduced diags
 }

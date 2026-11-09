@@ -23,7 +23,7 @@
 enum class ScatteringProcessType {
     INVALID,
     ELASTIC,
-    TWOPRODUCT_REACTION,
+    TWO_PRODUCT_REACTION,
     CHARGE_EXCHANGE,
     EXCITATION,
     IONIZATION,

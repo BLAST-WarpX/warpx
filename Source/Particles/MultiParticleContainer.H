@@ -48,6 +48,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -122,9 +123,17 @@ public:
 
     /**
      * \brief Deposit mass matrices.
+     *
+     * \param[in,out] fields the field register holding the mass matrices, which are
+     *                reset before the deposition
+     * \param[in] lev mesh refinement level for the deposition
+     * \param[in] dt time step for the particle level
+     * \param[in] implicit_options implicit solver options, including the mass matrices
+     *            stencil and the order of the particle shape factors used for the deposition
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                              int lev, amrex::Real dt);
+                              int lev, amrex::Real dt,
+                              ImplicitOptions const& implicit_options);
 
     /**
     * \brief This pushes the particle positions by one time step for all the species in the
@@ -141,7 +150,8 @@ public:
     void PushP (int lev, amrex::Real dt,
                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                 const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
-                MomentumPushType momentum_push_type);
+                MomentumPushType momentum_push_type,
+                std::optional<FieldGatherOrders> gather_orders = std::nullopt);
 
     /**
     * \brief This returns a MultiFAB filled with zeros. It is used to return the charge density
@@ -152,9 +162,11 @@ public:
     std::unique_ptr<amrex::MultiFab> GetZeroChargeDensity(int lev);
 
     /**
-     * \brief Deposit charge density.
+     * \brief Deposit charge from all species without synchronization (i.e. summing guard
+     * cells and transferring charge across mesh-refinement levels) and without finalization
+     * (i.e. applying physical boundary conditions and radial volume scaling).
      *
-     * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
+     * \param[in,out] rho Charge deposits, one MultiFab per mesh refinement level.
      * \param[in] relative_time Time at which to deposit rho, relative to the time of the
      *                          current positions of the particles. When different than 0,
      *                          the particle position will be temporarily modified to match
@@ -176,11 +188,14 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time,
-                    PushType push_type = PushType::Explicit);
+                    PushType push_type = PushType::Explicit,
+                    std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit temperature to species MFs. This is done for each
@@ -199,7 +214,16 @@ public:
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr
     /// to it. The charge density is accumulated over all the particles in the MultiParticleContainer
 
-    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
+    /**
+     * \brief Deposit charge from all species on one level with optional summation and finalization.
+     *
+     * \param[in] lev Mesh refinement level for deposition.
+     * \param[in] local If false, sum overlapping valid- and guard-cell deposits.
+     * \param[in] finalize If true, apply physical boundary conditions and radial volume
+     *                     scaling to return physical charge density; requires local=false.
+     *                     If false, leave boundary handling and radial scaling to the caller.
+     */
+    std::unique_ptr<amrex::MultiFab> GetChargeDensityOnLevel (int lev, bool local, bool finalize);
 
     std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();

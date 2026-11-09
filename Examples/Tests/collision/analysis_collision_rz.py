@@ -27,11 +27,13 @@ tolerance = 1.0e-15
 last_fn = sys.argv[1]
 if last_fn[-1] == "/":
     last_fn = last_fn[:-1]
-fn_list = glob(last_fn[:-5] + "?????")
+# Collect all output files in fn_list (names match pattern prefix + 6-digit step number;
+# assumes the default diagnostics file_min_digits = 6 and fewer than 10^6 steps)
+fn_list = glob(last_fn[:-6] + 6 * "[0-9]")
 
 for fn in fn_list:
     # get time index j
-    j = int(fn[-5:])
+    j = int(fn[-6:])
     if j == 0:
         # load file
         ds = yt.load(fn)

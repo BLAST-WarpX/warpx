@@ -80,7 +80,8 @@ public:
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
-                        MomentumPushType momentum_push_type = MomentumPushType::Full) final;
+                        MomentumPushType momentum_push_type = MomentumPushType::Full,
+                        std::optional<FieldGatherOrders> gather_orders = std::nullopt) final;
 
     void PostRestart () final;
 

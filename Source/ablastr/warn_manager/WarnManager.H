@@ -74,6 +74,9 @@ namespace ablastr::warn_manager
         */
         ~WarnManager() = default;
 
+        /**
+         * \brief Return the static WarnManager singleton
+         */
         static WarnManager& GetInstance();
 
         /**
@@ -144,6 +147,11 @@ namespace ablastr::warn_manager
         * @param[in, out] params the inputfile parser
         */
         void debug_read_warnings_from_input(const amrex::ParmParse& params);
+
+        /**
+         * \brief Clear all warning messages
+         */
+        void Clear();
 
         static const int warn_line_size = 80 /*! Maximum line length to be used in formatting warning list*/;
         static const int warn_tab_size = 5 /*! Tabulation size to be used in formatting warning list*/;
@@ -228,6 +236,11 @@ namespace ablastr::warn_manager
         const std::string& topic,
         const std::string& text,
         const WarnPriority& priority = WarnPriority::medium);
+
+    /**
+     * \brief Clear all warning messages
+     */
+    void WMClear();
 }
 
 #endif //ABLASTR_WARN_MANAGER_H_

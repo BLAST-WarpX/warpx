@@ -84,9 +84,9 @@ RUN apt-get update           && \
         zlib1g-dev           && \
     rm -rf /var/lib/apt/lists/*
 
-# Install c-blosc from source
+# Install c-blosc2 from source
 RUN git clone                               \
-      -b v2.14.4                            \
+      -b v2.23.1                            \
       https://github.com/Blosc/c-blosc2.git \
       /tmp/c-blosc2                      && \
     cmake                                   \
@@ -108,7 +108,7 @@ RUN git clone                               \
 # Install ADIOS2 from source
 # TODO: -DADIOS2_USE_SST=ON
 RUN git clone                                   \
-        -b v2.10.2                              \
+        -b v2.12.1                              \
         https://github.com/ornladios/ADIOS2.git \
         /tmp/adios2                             \
                                              && \

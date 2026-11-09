@@ -66,7 +66,7 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_h.m_scattering_angle_model = scattering_angle_model;
     m_exe_h.m_produces_products = (
         m_exe_h.m_type == ScatteringProcessType::IONIZATION ||
-        m_exe_h.m_type == ScatteringProcessType::TWOPRODUCT_REACTION ||
+        m_exe_h.m_type == ScatteringProcessType::TWO_PRODUCT_REACTION ||
         m_exe_h.m_type == ScatteringProcessType::CHARGE_EXCHANGE);
 
     // sanity check cross-section energy grid
@@ -107,7 +107,7 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
     } else if (scattering_process == "charge_exchange") {
         return ScatteringProcessType::CHARGE_EXCHANGE;
     } else if (scattering_process == "two_product_reaction") {
-        return ScatteringProcessType::TWOPRODUCT_REACTION;
+        return ScatteringProcessType::TWO_PRODUCT_REACTION;
     } else if (scattering_process == "ionization") {
         return ScatteringProcessType::IONIZATION;
     } else if (scattering_process.find("excitation") != std::string::npos) {
