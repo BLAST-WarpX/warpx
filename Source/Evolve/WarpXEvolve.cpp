@@ -392,6 +392,15 @@ WarpX::Evolve (int numsteps)
         if (checkStopSimulation(cur_time)) {
             break;
         }
+
+#if defined(AMREX_TINY_PROFILING) && !defined(BL_PROFILING)
+        // Collective (MPI reductions/gathers): must be called on the same steps on all ranks.
+        if (m_tiny_profiler_flush_interval.contains(step+1)) {
+            amrex::Print() << "Tiny profiler flush at step " << step+1 << "\n";
+            BL_PROFILE("WarpX::TinyProfilerFlush");
+            BL_PROFILE_TINY_FLUSH();
+        }
+#endif
     } // End loop on time steps
 
     // This if statement is needed for PICMI, which allows the Evolve routine to be
@@ -428,6 +437,9 @@ void WarpX::OneStep (
                       << " using dt = " << a_dt << ".\n"
                       << "Nonlinear solver failed to converge: exit status = " << exit_status;
             WARPX_ABORT_WITH_MESSAGE(solverMsg.str());
+        }
+        if (a_step + 1 < max_step) { // not worth it on the last step
+            m_implicit_solver->ReinitializePETScIfDue(a_step, verbose_step);
         }
     }
     // explicit solver
@@ -589,9 +601,14 @@ WarpX::OneStep_nosub (
     SyncCurrentAndRho(); // Filter, exchange gurd cells, and interpolate across levels
     FinalizeRho(); // Apply boundary conditions and inverse volume scaling to rho
 
-    // At this point, J is up-to-date inside the domain, and E and B are
-    // up-to-date including enough guard cells for first step of the field
-    // solve.
+    // Vay constructs J from D in PushPSATD, which finalizes the resulting J.
+    if (current_deposition_algo != CurrentDepositionAlgo::Vay) {
+        FinalizeJ(); // Apply boundary conditions and inverse volume scaling to J
+    }
+
+    // At this point, J is up-to-date inside the domain except with Vay deposition,
+    // and E and B are up-to-date including enough guard cells for the first
+    // step of the field solve.
 
     // For extended PML: copy J from regular grid to PML, and damp J in PML
     if (do_pml && pml_has_particles) { CopyJPML(); }
@@ -839,7 +856,6 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
 void WarpX::SyncCurrentAndRho ()
 {
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
@@ -870,6 +886,10 @@ void WarpX::SyncCurrentAndRho ()
 
             if (current_deposition_algo == CurrentDepositionAlgo::Vay)
             {
+                // Nonperiodic physical-boundary support for Vay deposition is unestablished.
+                // With periodic domain boundaries, D needs filtering and periodic communication,
+                // but no physical-boundary finalization. Periodic domain boundaries do not
+                // require periodic_single_box_fft: local FFTs can also use a periodic domain.
                 // TODO This works only without mesh refinement
                 const int lev = 0;
                 if (use_filter) {
@@ -884,16 +904,24 @@ void WarpX::SyncCurrentAndRho ()
         SyncRho();
     }
 
-    // Reflect charge and current density over PEC boundaries, if needed.
+}
+
+void WarpX::FinalizeJ ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        ApplyJfieldBoundary(lev,
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            PatchType::fine);
-        if (lev > 0) {
-            ApplyJfieldBoundary(lev,
+        if (m_fields.has_vector(FieldType::current_fp, lev)) {
+            FinalizeJOnLevel(lev,
+                m_fields.get(FieldType::current_fp, Direction{0}, lev),
+                m_fields.get(FieldType::current_fp, Direction{1}, lev),
+                m_fields.get(FieldType::current_fp, Direction{2}, lev),
+                PatchType::fine);
+        }
+        if (lev > 0 && m_fields.has_vector(FieldType::current_cp, lev)) {
+            FinalizeJOnLevel(lev,
                 m_fields.get(FieldType::current_cp, Direction{0}, lev),
                 m_fields.get(FieldType::current_cp, Direction{1}, lev),
                 m_fields.get(FieldType::current_cp, Direction{2}, lev),
@@ -901,6 +929,16 @@ void WarpX::SyncCurrentAndRho ()
         }
     }
 
+}
+
+void WarpX::FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
+                              amrex::MultiFab* Jz, PatchType patch_type)
+{
+    ApplyJfieldBoundary(lev, Jx, Jy, Jz, patch_type);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const int glev = (patch_type == PatchType::fine) ? lev : lev - 1;
+    ApplyInverseVolumeScalingToCurrentDensity(Jx, Jy, Jz, glev);
+#endif
 }
 
 void WarpX::FinalizeRho ()
@@ -990,6 +1028,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        FinalizeJ();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
     }
@@ -1024,14 +1063,17 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        FinalizeJ();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
 
         if (time_dependency_J == TimeDependencyJ::Quadratic)
         {
             PSATDMoveJNewToJMid();
-            mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
+            mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(current_string, finest_level),
+                                 dt[0], t_deposit_current + 0.5_rt*sub_dt);
             SyncCurrent("current_fp");
+            FinalizeJ();
             PSATDForwardTransformJ("current_fp", "current_cp");
         }
 
@@ -1173,6 +1215,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         WARPX_ABORT_WITH_MESSAGE(msg.str());
     }
 
+    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     bool const skip_lev0_coarse_patch = true;
@@ -1192,6 +1235,11 @@ WarpX::OneStep_sub1 (Real cur_time)
     SumBoundaryJ(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         fine_lev, Geom(fine_lev).periodicity());
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, fine_lev),
+        PatchType::fine);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
@@ -1232,6 +1280,16 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch), coarse_lev);
+    FinalizeJOnLevel(coarse_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, coarse_lev),
+        PatchType::fine);
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_cp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{2}, fine_lev),
+        PatchType::coarse);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
@@ -1280,6 +1338,11 @@ WarpX::OneStep_sub1 (Real cur_time)
         ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, fine_lev),
+        PatchType::fine);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
@@ -1320,6 +1383,16 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch),
         coarse_lev);
+    FinalizeJOnLevel(coarse_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, coarse_lev),
+        PatchType::fine);
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_cp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{2}, fine_lev),
+        PatchType::coarse);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
@@ -1491,42 +1564,13 @@ WarpX::PushParticlesandDeposit (
         implicit_options
     );
 
-    if (!skip_deposition) {
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // This is called after all particles have deposited their current and charge.
-        if (!implicit_options) {
-            // Skip scaling J here for the implicit solvers: the total current is
-            // accumulated from multiple containers after this call (see CumulateJ()
-            // and ComputeJfromMassMatrices()), and is scaled in PreRHSOp().
-            ApplyInverseVolumeScalingToCurrentDensity(
-                m_fields.get(FieldType::current_fp, Direction{0}, lev),
-                m_fields.get(FieldType::current_fp, Direction{1}, lev),
-                m_fields.get(FieldType::current_fp, Direction{2}, lev),
-                lev);
-            if (m_fields.has_vector(FieldType::current_buf, lev)) {
-                ApplyInverseVolumeScalingToCurrentDensity(
-                    m_fields.get(FieldType::current_buf, Direction{0}, lev),
-                    m_fields.get(FieldType::current_buf, Direction{1}, lev),
-                    m_fields.get(FieldType::current_buf, Direction{2}, lev),
-                    lev-1);
-            }
-        }
-// #else
-        // I left this comment here as a reminder that currently the
-        // boundary handling for cartesian grids are not matching the RZ handling
-        // (done in the ApplyInverseScalingToChargeDensity function). The
-        // Cartesian grid code had to be moved from here to after the application
-        // of the filter to avoid incorrect results (moved to `SyncCurrentAndRho()`).
-        // Might this be related to issue #1943?
-#endif
-        if (do_fluid_species && !implicit_options) {
-            myfl->Evolve(m_fields,
-                         lev,
-                         current_fp_string,
-                         cur_time,
-                         skip_deposition
-            );
-        }
+    if (do_fluid_species && !implicit_options && !skip_deposition) {
+        myfl->Evolve(m_fields,
+                     lev,
+                     current_fp_string,
+                     cur_time,
+                     skip_deposition
+        );
     }
 }
 

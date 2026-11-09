@@ -74,6 +74,9 @@ class PETScSolver_impl
 
         //! Assemble the sparse matrix for preconditioner
         [[nodiscard]] int assemblePCMatrix(LinOpType* const);
+        //! Destroy the PETSc objects, e.g. before PETSc is finalized; they are created again
+        //! by createObjects
+        virtual void destroyObjects ();
 
         //! Work vector
         mutable VecType m_U;
@@ -145,6 +148,9 @@ class KSP_impl : public PETScSolver_impl
 
         //! Create PETSc objects
         void createObjects (const VecType&);
+        void destroyObjects () override;
+        //! Set the GMRES restart length, also for the objects created later
+        void setRestartLength (int);
 
         //! Set tolerances
         void setTolerances(amrex::Real, amrex::Real, int);
@@ -190,6 +196,8 @@ class KSP_impl : public PETScSolver_impl
         amrex::Real m_rtol = 1e-8;
         //! maximum iterations
         int m_maxits= 100;
+        //! GMRES restart length (negative: PETSc's default)
+        int m_restart_length = -1;
         //! verbosity
         int m_verbose = 1;
 
@@ -225,6 +233,9 @@ class SNES_impl : public PETScSolver_impl
 
         //! Destructor
         ~SNES_impl() override;
+        //! Create the PETSc objects (done by the constructor, and again after destroyObjects)
+        void createObjects ();
+        void destroyObjects () override;
 
         //! Check if object is defined
         [[nodiscard]] bool isDefined () const
