@@ -106,7 +106,7 @@ WarpX::ComputeDt ()
     }
 
     if (m_const_dt.has_value()) {
-            if (m_const_dt.value() > deltat) {
+            if (m_const_dt.value() > deltat && electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
                 std::ostringstream oss;
                 oss << "Specified const_dt (" << std::scientific << std::setprecision(6) << m_const_dt.value()
                     << ") is too large to respect the CFL condition (" << std::scientific << std::setprecision(6) << deltat
