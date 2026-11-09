@@ -115,8 +115,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
         );
 
 #elif defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(Bfield, lev);
         CalculateCurrentAmpereSpherical <SphericalYeeAlgorithm> (
-            Jfield, Bfield, lev
+            Jfield
         );
 
 #else
@@ -336,96 +337,11 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 #elif defined(WARPX_DIM_RSPHERE)
 template<typename T_Algo>
 void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
-    ablastr::fields::VectorField& Jfield,
-    ablastr::fields::VectorField const& Bfield,
-    int lev
-)
+    ablastr::fields::VectorField& Jfield)
 {
-    // for the profiler
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // Loop through the grids, and over the tiles within each grid
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for ( MFIter mfi(*Jfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        Real wt = static_cast<Real>(amrex::second());
-
-        // Extract field data for this grid/tile
-        Array4<Real> const& Jr = Jfield[0]->array(mfi);
-        Array4<Real> const& Jtheta = Jfield[1]->array(mfi);
-        Array4<Real> const& Jphi = Jfield[2]->array(mfi);
-        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
-        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
-
-        // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
-
-        // Extract cylindrical specific parameters
-        Real const dr = m_dr;
-        Real const rmin = m_rmin;
-
-        // Extract tileboxes for which to loop with 1 guard cell included
-        Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
-        Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
-        Box const& tjphi  = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
-
-        Real const one_over_mu0 = 1._rt / PhysConst::mu0;
-
-        // Calculate the total current, using Ampere's law, on the same grid
-        // as the E-field
-        amrex::ParallelFor(tjr, tjtheta, tjphi,
-
-            // Jr calculation
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Jr(i, 0, 0, 0) = 0._rt;
-            },
-
-            // Jtheta calculation
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                // r on a nodal point (Jtheta is nodal in r)
-                Real const r = rmin + i*dr;
-                // Off-axis, regular curl
-                if (r > 0.5_rt*dr) {
-                    // Mode m=0
-                    Jtheta(i, 0, 0, 0) = one_over_mu0 * (
-                        - T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
-                } else { // r==0: on-axis corrections
-                    // Ensure that Jtheta remains 0 on axis
-                    Jtheta(i, 0, 0, 0) = 0.;
-                }
-            },
-
-            // Jphi calculation
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                // r on a nodal point (Jphi is nodal in r)
-                Real const r = rmin + i*dr;
-                // Off-axis, regular curl
-                if (r > 0.5_rt*dr) {
-                    Jphi(i, 0, 0, 0) = one_over_mu0 * (
-                       T_Algo::DownwardDrr_over_r(Btheta, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
-                    );
-                // r==0: on-axis corrections
-                } else {
-                    // Btheta is linear in r, for small r
-                    // Therefore, the formula below regularizes the singularity
-                    Jphi(i, 0, 0, 0) = one_over_mu0 * 4 * Btheta(i, 0, 0, 0) / dr;
-                }
-            }
-        );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
-    }
+    Jfield[0]->setVal(0._rt);
+    Jfield[1]->setVal(0._rt);
+    Jfield[2]->setVal(0._rt);
 }
 
 #else
