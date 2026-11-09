@@ -71,9 +71,20 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     // default values of E_external_grid and B_external_grid
     // are used to set the E and B field when "constant" or
     // "parser" is not explicitly used in the input.
+#if defined(WARPX_DIM_RSPHERE)
+    std::string B_ext_grid_s = "none";
+    pp_warpx.query("B_ext_grid_init_style", B_ext_grid_s);
+    std::transform(B_ext_grid_s.begin(), B_ext_grid_s.end(), B_ext_grid_s.begin(), ::tolower);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        B_ext_grid_s == "none",
+        "RSPHERE does not support external magnetic fields: "
+        "warpx.B_ext_grid_init_style must be none.");
+    B_ext_grid_type = ExternalFieldType::default_zero;
+#else
     std::string B_ext_grid_s;
     pp_warpx.query("B_ext_grid_init_style", B_ext_grid_s);
     B_ext_grid_type = string_to_external_field_type<EMFieldType::B>(B_ext_grid_s);
+#endif
 
     std::string E_ext_grid_s;
     pp_warpx.query("E_ext_grid_init_style", E_ext_grid_s);
@@ -86,10 +97,22 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     // if the input string is "constant", the values for the
     // external grid must be provided in the input.
     auto v_B = std::vector<amrex::Real>(3);
+#if defined(WARPX_DIM_RSPHERE)
+    utils::parser::queryArrWithParser(pp_warpx, "B_external_grid", v_B);
+#else
     if (B_ext_grid_type == ExternalFieldType::constant) {
         utils::parser::getArrWithParser(pp_warpx, "B_external_grid", v_B);
     }
+#endif
     std::copy(v_B.begin(), v_B.end(), B_external_grid.begin());
+#if defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        B_external_grid[0] == 0. &&
+        B_external_grid[1] == 0. &&
+        B_external_grid[2] == 0.,
+        "RSPHERE does not support external magnetic fields: "
+        "warpx.B_external_grid must be 0 0 0.");
+#endif
 
     // if the input string is "constant", the values for the
     // external grid must be provided in the input.
