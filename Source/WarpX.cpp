@@ -704,6 +704,18 @@ WarpX::ReadParameters ()
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
             ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
+        std::vector<std::string> tiny_profiler_flush_interval_vec = {"-1"};
+        pp_warpx.queryarr("tiny_profiler_flush_interval", tiny_profiler_flush_interval_vec);
+        m_tiny_profiler_flush_interval =
+            ablastr::utils::text::IntervalsParser(tiny_profiler_flush_interval_vec);
+#if !defined(AMREX_TINY_PROFILING) || defined(BL_PROFILING)
+        if (m_tiny_profiler_flush_interval.isActivated()) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Profiling",
+                "warpx.tiny_profiler_flush_interval is ignored because WarpX was not built with the tiny profiler.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+#endif
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
@@ -1275,6 +1287,24 @@ WarpX::ReadParameters ()
 
         }
 #endif
+
+        // Ensure code aborts if "none" is used for particles anywhere else than at r=0
+        // for cylindrical and spherical geometries
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            const bool none_allowed_lo = (idim == 0) && (Geom(0).ProbLo(0) == 0);
+#else
+            const bool none_allowed_lo = false;
+#endif
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                none_allowed_lo || WarpX::particle_boundary_lo[idim] != ParticleBoundaryType::None,
+                "Error : Particle boundary ``none`` is only allowed at r=0 "
+                "in cylindrical and spherical geometries (boundary.particle_lo).");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::particle_boundary_hi[idim] != ParticleBoundaryType::None,
+                "Error : Particle boundary ``none`` is only allowed at r=0 "
+                "in cylindrical and spherical geometries (boundary.particle_hi).");
+        }
 
 #if defined(WARPX_DIM_RZ)
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -3706,8 +3736,8 @@ WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::
         case FieldType::Bfield_fp :
             ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
-        case FieldType::vector_potential_fp :
-            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
+        case FieldType::vector_potential_fp_nodal :
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp_nodal", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
             ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", lev), periodicity);
