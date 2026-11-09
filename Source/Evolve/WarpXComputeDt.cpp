@@ -65,10 +65,6 @@ WarpX::ComputeDt ()
     const amrex::Real* dx = geom[max_level].CellSize();
     amrex::Real deltat = 0.;
 
-    if (m_const_dt.has_value()) {
-        deltat = m_const_dt.value();
-    }
-
     if (electrostatic_solver_id  != ElectrostaticSolverAlgo::None) {
         // Set dt for electrostatic algorithm
         if (m_max_dt.has_value()) {
@@ -112,6 +108,7 @@ WarpX::ComputeDt ()
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
                 || electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC
                 || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD
+                || electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT
                 ))
         ) {
                 std::ostringstream oss;

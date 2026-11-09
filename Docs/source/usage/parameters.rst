@@ -3684,7 +3684,7 @@ Time step
     Allows direct specification of the time step size, in units of seconds.
     When the electrostatic solver is being used, this must be supplied if not using adaptive timestepping.
     This can be used with the electromagnetic solver, overriding :pp:param:`warpx.cfl`, but will raise a
-    warning if the specified time step is larger than the CFL limit.
+    warning if the specified time step is larger than the CFL limit with explicit solvers.
 
 .. pp:param:: warpx.dt_update_interval
     :type: ``string``
