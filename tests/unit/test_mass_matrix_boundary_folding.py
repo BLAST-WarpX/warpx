@@ -224,8 +224,8 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
         current_deposition_algo="direct",
     )
     grid = sim.solver.grid
-    grid.lower_boundary_conditions = ["pec", "periodic"]
-    grid.upper_boundary_conditions = ["pec", "periodic"]
+    grid.lower_boundary_conditions = ["dirichlet", "periodic"]
+    grid.upper_boundary_conditions = ["dirichlet", "periodic"]
     grid.lower_boundary_conditions_particles = ["absorbing", "periodic"]
     grid.upper_boundary_conditions_particles = ["absorbing", "periodic"]
     sim.evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(
@@ -326,8 +326,26 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
             assert bool(xp.all(xp.isfinite(actual))), (
                 f"J1{direction}: non-finite current"
             )
-            assert bool(
-                xp.all(
-                    xp.abs(actual - reference) <= rtol() * (scale + xp.abs(reference))
-                )
-            ), f"J1{direction} != J0{direction} on valid box {mfi.validbox()}"
+            error = xp.abs(actual - reference)
+            tolerance = rtol() * (scale + xp.abs(reference))
+            mismatches = xp.argwhere(~(error <= tolerance))
+            if len(mismatches):
+                valid = mfi.validbox()
+                lo = tuple(valid.small_end[axis] for axis in (0, 1))
+                hi = tuple(valid.big_end[axis] for axis in (0, 1))
+                lines = [
+                    f"J1{direction} != J0{direction}: valid box {lo} to {hi}",
+                    f"mismatches={len(mismatches)}/{actual.size}, "
+                    f"max_abs_error={float(xp.max(error)):.16e}",
+                    "Global grid indices; showing up to 20 mismatches:",
+                    "ix iz comp J0 J1 abs_error tolerance",
+                ]
+                for index in mismatches[:20]:
+                    ix, iz, comp = (int(value) for value in index)
+                    key = (ix, iz, comp)
+                    lines.append(
+                        f"{lo[0] + ix} {lo[1] + iz} {comp} "
+                        f"{float(reference[key]):.16e} {float(actual[key]):.16e} "
+                        f"{float(error[key]):.16e} {float(tolerance[key]):.16e}"
+                    )
+                pytest.fail("\n".join(lines), pytrace=False)
