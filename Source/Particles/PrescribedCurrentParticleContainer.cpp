@@ -609,7 +609,7 @@ PrescribedCurrentParticleContainer::Evolve (
             amrex::MultiFab* jz =
                 fields.get(current_fp_string, Direction{2}, lev);
             DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz, 0, np,
-                           thread_num, lev, lev, dt, relative_time, push_type);
+                           thread_num, lev, lev, dt, relative_time, push_type, WarpX::nox);
         }
 
         if (!skip_deposition && fields.has(FieldType::rho_fp, lev)) {
