@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2020 Andrew Myers, Axel Huebl, Burlen Loring
+# Copyright 2017-2026 Andrew Myers, Axel Huebl, Burlen Loring
 # Maxence Thevenet, Remi Lehe
 #
 # This file is part of WarpX.
@@ -25,6 +25,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import datetime
 import json
 import os
 import subprocess
@@ -45,15 +46,35 @@ sys.path.insert(0, _ext_path)
 
 
 def download_with_headers(url, filename):
-    """Download a file with proper User-Agent header to avoid 403 errors."""
+    """Download a Doxygen tag file, with a User-Agent header to avoid 403 errors.
+
+    Web servers sometimes answer with an error page instead of the file. Writing
+    that page to disk would make Doxygen abort with a cryptic XML parser error,
+    thus we keep complete tag files only, not merely XML: error pages come in
+    XML flavors, too (e.g., XHTML), and a transfer truncated mid-stream starts
+    out perfectly valid.
+    """
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "WarpX-docs-builder"})
-        with urllib.request.urlopen(req) as response:
-            with open(filename, "wb") as f:
-                f.write(response.read())
+        # a stalled connection would otherwise hang the whole docs build
+        with urllib.request.urlopen(req, timeout=60) as response:
+            payload = response.read()
+        head = payload[:200].lstrip()
+        if not head.startswith(b"<?xml") or b"<tagfile" not in head:
+            raise RuntimeError("downloaded file is not a Doxygen tag file")
+        if not payload[-20:].rstrip().endswith(b"</tagfile>"):
+            raise RuntimeError("downloaded tag file is incomplete")
+        with open(filename, "wb") as f:
+            f.write(payload)
     except Exception as e:
         print(f"Could not download {filename} from {url}: {e}")
         print("Continuing build without cross-reference file...")
+        # Doxyfile's TAGFILES lists the file either way, so a leftover from an
+        # earlier build would keep breaking Doxygen
+        try:
+            os.remove(filename)
+        except OSError:
+            pass  # nothing to clean up
 
 
 # -- General configuration ------------------------------------------------
@@ -161,7 +182,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "WarpX"
-copyright = "2017-2021, WarpX collaboration"
+copyright = f"2017-{datetime.date.today().year}, WarpX collaboration"
 author = "WarpX collaboration"
 
 # Parse WarpX version information
