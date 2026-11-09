@@ -11,6 +11,8 @@
 #include "PreconditionerLibrary.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
+#include <AMReX_ParmParse.H>
+#include <cmath>
 #include <string>
 
 /**
@@ -156,6 +158,12 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
     m_R.Define(a_U);
 
     m_ops = a_ops;
+
+    const amrex::ParmParse pp_jac("jacobian");
+    pp_jac.query("epsJFNK", m_epsJFNK);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::isfinite(m_epsJFNK) && m_epsJFNK != RT(0.0),
+        "jacobian.epsJFNK must be finite and nonzero.");
 
     m_usePreCond = (a_pc_type != PreconditionerType::none);
     if (m_usePreCond) {
