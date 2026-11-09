@@ -92,14 +92,14 @@ def _fill_random_e(mf, rng):
     mf[...] = _nonzero_random(rng, shape)
 
 
-def _apply_unfolded_pc(sigma, efield, current, xp):
+def _apply_unfolded_pc(sigma, efield, current, pec_axis, xp):
     """Direct diagonal-block stencil sum on valid and guard current rows.
 
     Array4 views retain the unused third spatial axis, so the XZ plane is
     [:, :, 0, component]. Component offsets flatten with X varying fastest.
     Reads are restricted to the E FAB, as in ApplyMassMatrices. Outer internal
     J guards need not have a complete stencil. Check that no nonzero term is
-    clipped on valid rows or physical X-ghost rows needed for the reference.
+    clipped on valid rows or physical ghost rows needed for the reference.
     """
     order = SHAPE_ORDER
     n_stencil = 2 * order + 1
@@ -113,11 +113,14 @@ def _apply_unfolded_pc(sigma, efield, current, xp):
         guard_shift = [
             efield.n_grow_vect[axis] - current.n_grow_vect[axis] for axis in (0, 1)
         ]
-        ng_x, ng_z = (current.n_grow_vect[axis] for axis in (0, 1))
-        xlo = 0 if valid.small_end[0] == domain.small_end[0] else ng_x
-        xhi = j.shape[0] if valid.big_end[0] == domain.big_end[0] else j.shape[0] - ng_x
+        ng = current.n_grow_vect
+        required_rows = [slice(ng[a], j.shape[a] - ng[a]) for a in (0, 1)]
+        a = pec_axis
+        lo = 0 if valid.small_end[a] == domain.small_end[a] else ng[a]
+        hi = j.shape[a] if valid.big_end[a] == domain.big_end[a] else j.shape[a] - ng[a]
+        required_rows[a] = slice(lo, hi)
         required = np.zeros(j.shape, dtype=bool)
-        required[xlo:xhi, ng_z : j.shape[1] - ng_z] = True
+        required[tuple(required_rows)] = True
         for dz in range(-order, order + 1):
             for dx in range(-order, order + 1):
                 shift = (dx + guard_shift[0], dz + guard_shift[1])
@@ -139,21 +142,24 @@ def _apply_unfolded_pc(sigma, efield, current, xp):
                 j[row] += s[:, :, 0, coefficient][row] * e[column]
 
 
-def _pec_reference(mf, raw_current, n_cell_x, sign):
-    """Expected valid current after adding signed physical X-guard contributions."""
-    ng_x, ng_z = (mf.n_grow_vect[axis] for axis in (0, 1))
-    nx, nz = (len(mf.imesh(axis)) for axis in (0, 1))
-    nodal_x = int(mf.box_array().ix_type().node_centered(0))
-    expected = raw_current[ng_x : ng_x + nx, ng_z : ng_z + nz].copy()
-    for ix in range(nx):
-        for boundary in (0, n_cell_x):
-            mirror = 2 * boundary - (1 - nodal_x) - ix
+def _pec_reference(mf, raw_current, n_cell, pec_axis, sign):
+    """Expected valid current after adding signed physical guard contributions."""
+    # Work with the PEC direction first, then restore the original XZ ordering.
+    raw_current = np.swapaxes(raw_current, 0, pec_axis)
+    axes = (pec_axis, 1 - pec_axis)
+    ng_n, ng_p = (mf.n_grow_vect[axis] for axis in axes)
+    n_n, n_p = (len(mf.imesh(axis)) for axis in axes)
+    nodal = int(mf.box_array().ix_type().node_centered(pec_axis))
+    expected = raw_current[ng_n : ng_n + n_n, ng_p : ng_p + n_p].copy()
+    for i in range(n_n):
+        for boundary in (0, n_cell[pec_axis]):
+            mirror = 2 * boundary - (1 - nodal) - i
             # Only physical guards and a nodal boundary row fold into this row.
-            if 0 <= mirror < nx and mirror != ix:
+            if 0 <= mirror < n_n and mirror != i:
                 continue
-            if -ng_x <= mirror < nx + ng_x:
-                expected[ix, :] += sign * raw_current[mirror + ng_x, ng_z : ng_z + nz]
-    return expected
+            if -ng_n <= mirror < n_n + ng_n:
+                expected[i, :] += sign * raw_current[mirror + ng_n, ng_p : ng_p + n_p]
+    return np.swapaxes(expected, 0, pec_axis)
 
 
 def _valid_view(mf, mfi):
@@ -169,52 +175,59 @@ def _valid_view(mf, mfi):
     return mf.array(mfi).to_xp()[rows[0], rows[1], 0, :]
 
 
-def _apply_folded_pc(sigma, efield, current, n_cell, direction, xp):
+def _apply_folded_pc(sigma, efield, current, n_cell, direction, pec_axis, xp):
     """Apply folded coefficients using global valid E, never physical E guards.
 
-    Z columns wrap periodically, including the duplicate upper nodal plane.
-    Coefficients pointing outside the physical X domain must be exactly zero.
+    Transverse columns wrap periodically, including the upper nodal plane.
+    Coefficients pointing outside the physical domain must be exactly zero.
     Check PEC row/column zeros independently of the matrix-vector product:
     E is already zero on constrained nodes and could otherwise hide an error.
     """
     order = SHAPE_ORDER
     n_stencil = 2 * order + 1
     assert sigma.n_comp == n_stencil**2
-    e = xp.asarray(efield[...])
+    # Orient array views as (PEC, periodic); stencil components remain in XZ order.
+    e = xp.swapaxes(xp.asarray(efield[...]), 0, pec_axis)
+    axes = (pec_axis, 1 - pec_axis)
+    tangent = direction != "xz"[pec_axis]
     current.set_val(0.0)
     for mfi in current:
         valid = mfi.validbox()
         rows = [
-            np.arange(valid.small_end[axis], valid.big_end[axis] + 1) for axis in (0, 1)
+            np.arange(valid.small_end[axis], valid.big_end[axis] + 1) for axis in axes
         ]
-        s = _valid_view(sigma, mfi)
-        j = _valid_view(current, mfi)[:, :, 0]
-        if direction != "x":
-            constrained = xp.asarray((rows[0] == 0) | (rows[0] == n_cell[0]))
+        s = xp.swapaxes(_valid_view(sigma, mfi), 0, pec_axis)
+        j = xp.swapaxes(_valid_view(current, mfi)[:, :, 0], 0, pec_axis)
+        if tangent:
+            constrained = xp.asarray((rows[0] == 0) | (rows[0] == n_cell[pec_axis]))
             assert not bool(xp.any(s[constrained, :, :] != 0.0)), (
                 f"S{direction}{direction}: nonzero constrained PEC row"
             )
         for dz in range(-order, order + 1):
-            column_z = xp.asarray((rows[1] + dz) % n_cell[1])
             for dx in range(-order, order + 1):
-                column_x = rows[0] + dx
-                inside = (column_x >= 0) & (column_x < e.shape[0])
+                dn, dp = (dx, dz) if pec_axis == 0 else (dz, dx)
+                column_p = xp.asarray((rows[1] + dp) % n_cell[1 - pec_axis])
+                column_n = rows[0] + dn
+                inside = (column_n >= 0) & (column_n < e.shape[0])
                 coefficient = dx + order + n_stencil * (dz + order)
                 values = s[:, :, coefficient]
                 assert not bool(xp.any(values[xp.asarray(~inside), :] != 0.0)), (
                     f"S{direction}{direction}: offset {(dx, dz)} retains physical E ghosts"
                 )
-                if direction != "x":
-                    constrained = xp.asarray((column_x == 0) | (column_x == n_cell[0]))
+                if tangent:
+                    constrained = xp.asarray(
+                        (column_n == 0) | (column_n == n_cell[pec_axis])
+                    )
                     assert not bool(xp.any(values[constrained, :] != 0.0)), (
                         f"S{direction}{direction}: offset {(dx, dz)} retains a PEC column"
                     )
                 keep = xp.asarray(inside)
-                ex = xp.asarray(column_x[inside])
-                j[keep, :] += values[keep, :] * e[ex[:, None], column_z[None, :]]
+                en = xp.asarray(column_n[inside])
+                j[keep, :] += values[keep, :] * e[en[:, None], column_p[None, :]]
 
 
-def test_mass_matrix_boundary_folding_pec_x_periodic_z():
+@pytest.mark.parametrize("pec_axis", [0, 1], ids=["pec_x_periodic_z", "periodic_x_pec_z"])
+def test_mass_matrix_boundary_folding(pec_axis):
     """Folding the full cubic PC stencil must reproduce PEC folding of sigma E."""
     n_cell = [16, 16]
     sim = make_sim(
@@ -224,10 +237,13 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
         current_deposition_algo="direct",
     )
     grid = sim.solver.grid
-    grid.lower_boundary_conditions = ["dirichlet", "periodic"]
-    grid.upper_boundary_conditions = ["dirichlet", "periodic"]
-    grid.lower_boundary_conditions_particles = ["absorbing", "periodic"]
-    grid.upper_boundary_conditions_particles = ["absorbing", "periodic"]
+    for bc in (grid.lower_boundary_conditions, grid.upper_boundary_conditions):
+        bc[pec_axis] = "dirichlet"
+    for bc in (
+        grid.lower_boundary_conditions_particles,
+        grid.upper_boundary_conditions_particles,
+    ):
+        bc[pec_axis] = "absorbing"
     sim.evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(
         nonlinear_solver=picmi.NewtonNonlinearSolver(
             linear_solver=picmi.GMRESLinearSolver(),
@@ -250,7 +266,7 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
     # https://github.com/BLAST-WarpX/warpx/pull/7254#discussion_r4030996489
     # E already has enough allocated guards, but the normal PEC fill covers
     # only two cells. Fill all allocated guards so J0 also reads valid E values
-    # where physical X guards intersect transverse Z box/periodic boundaries.
+    # where physical guards intersect transverse box/periodic boundaries.
     pywarpx.warpx.safe_guard_cells = 1
     sim.initialize_warpx()
 
@@ -281,9 +297,11 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
     for direction in ("x", "y", "z"):
         _fill_random_e(fields.get("Efield_fp", direction, 0), rng)
     warpx.fill_boundary_e()
-    for direction in ("y", "z"):
+    for direction in (d for d in ("x", "y", "z") if d != "xz"[pec_axis]):
         e = fields.get("Efield_fp", direction, 0)[...]
-        assert np.all(e[[0, -1], :] == 0.0), f"E{direction}: PEC Dirichlet nodes"
+        assert np.all(np.take(e, [0, -1], axis=pec_axis) == 0.0), (
+            f"E{direction}: PEC Dirichlet nodes"
+        )
 
     expected = {}
     for direction in ("x", "y", "z"):
@@ -292,10 +310,11 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
             fields.get("MassMatrices_PC", direction, 0),
             fields.get("Efield_fp", direction, 0),
             j0,
+            pec_axis,
             xp,
         )
         expected[direction] = _pec_reference(
-            j0, j0[()], n_cell[0], sign=1.0 if direction == "x" else -1.0
+            j0, j0[()], n_cell, pec_axis, sign=1.0 if direction == "xz"[pec_axis] else -1.0
         )
 
     # Sigma was already summed. Apply only physical current BCs to J0 here.
@@ -325,6 +344,7 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
             j1,
             n_cell,
             direction,
+            pec_axis,
             xp,
         )
         scale = np.max(np.abs(j0[...]))
