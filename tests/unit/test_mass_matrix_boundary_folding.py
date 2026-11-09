@@ -118,7 +118,9 @@ def _apply_unfolded_pc(sigma, efield, current, boundary_axes, xp):
         for a in boundary_axes:
             lo = 0 if valid.small_end[a] == domain.small_end[a] else ng[a]
             hi = (
-                j.shape[a] if valid.big_end[a] == domain.big_end[a] else j.shape[a] - ng[a]
+                j.shape[a]
+                if valid.big_end[a] == domain.big_end[a]
+                else j.shape[a] - ng[a]
             )
             required_rows[a] = slice(lo, hi)
         required = np.zeros(j.shape, dtype=bool)
@@ -221,7 +223,9 @@ def _apply_folded_pc(sigma, efield, current, n_cell, direction, pec_nodes, xp):
                         f"S{direction}{direction}: offset {(dx, dz)} retains physical E ghosts"
                     )
                     if direction != "xz"[axis]:
-                        constrained = xp.asarray(np.isin(column, pec_nodes.get(axis, [])))
+                        constrained = xp.asarray(
+                            np.isin(column, pec_nodes.get(axis, []))
+                        )
                         assert not bool(xp.any(v[constrained] != 0.0)), (
                             f"S{direction}{direction}: offset {(dx, dz)} retains a PEC column"
                         )
