@@ -61,8 +61,7 @@ def _fill_cubic_pc(mf, direction, xp):
         values = mf.array(mfi).to_xp()
         values[...] = 0.0
         rows = [
-            np.arange(fab.small_end[axis], fab.big_end[axis] + 1)
-            for axis in (0, 1)
+            np.arange(fab.small_end[axis], fab.big_end[axis] + 1) for axis in (0, 1)
         ]
         nodal = [int(mf.box_array().ix_type().node_centered(axis)) for axis in (0, 1)]
         left_lo = [valid.small_end[axis] - 2 + nodal[axis] for axis in (0, 1)]
@@ -116,11 +115,7 @@ def _apply_unfolded_pc(sigma, efield, current, xp):
         ]
         ng_x, ng_z = (current.n_grow_vect[axis] for axis in (0, 1))
         xlo = 0 if valid.small_end[0] == domain.small_end[0] else ng_x
-        xhi = (
-            j.shape[0]
-            if valid.big_end[0] == domain.big_end[0]
-            else j.shape[0] - ng_x
-        )
+        xhi = j.shape[0] if valid.big_end[0] == domain.big_end[0] else j.shape[0] - ng_x
         required = np.zeros(j.shape, dtype=bool)
         required[xlo:xhi, ng_z : j.shape[1] - ng_z] = True
         for dz in range(-order, order + 1):
@@ -190,8 +185,7 @@ def _apply_folded_pc(sigma, efield, current, n_cell, direction, xp):
     for mfi in current:
         valid = mfi.validbox()
         rows = [
-            np.arange(valid.small_end[axis], valid.big_end[axis] + 1)
-            for axis in (0, 1)
+            np.arange(valid.small_end[axis], valid.big_end[axis] + 1) for axis in (0, 1)
         ]
         s = _valid_view(sigma, mfi)
         j = _valid_view(current, mfi)[:, :, 0]
@@ -245,7 +239,9 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
         theta=0.5,
     )
     # An empty species enables particle gather/deposition guard-cell allocation.
-    sim.add_species(picmi.Species(particle_type="electron", name="electrons"), layout=None)
+    sim.add_species(
+        picmi.Species(particle_type="electron", name="electrons"), layout=None
+    )
     sim.initialize_inputs()
     sim.initialize_warpx()
 
@@ -327,7 +323,11 @@ def test_mass_matrix_boundary_folding_pec_x_periodic_z():
         for mfi in j1:
             reference = _valid_view(j0, mfi)
             actual = _valid_view(j1, mfi)
-            assert bool(xp.all(xp.isfinite(actual))), f"J1{direction}: non-finite current"
+            assert bool(xp.all(xp.isfinite(actual))), (
+                f"J1{direction}: non-finite current"
+            )
             assert bool(
-                xp.all(xp.abs(actual - reference) <= rtol() * (scale + xp.abs(reference)))
+                xp.all(
+                    xp.abs(actual - reference) <= rtol() * (scale + xp.abs(reference))
+                )
             ), f"J1{direction} != J0{direction} on valid box {mfi.validbox()}"
