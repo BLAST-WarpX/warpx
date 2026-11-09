@@ -7,7 +7,7 @@
 #ifndef WARPX_PRECONDITIONER_H_
 #define WARPX_PRECONDITIONER_H_
 
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 
 #include "Utils/TextMsg.H"
 #include <AMReX_Enum.H>

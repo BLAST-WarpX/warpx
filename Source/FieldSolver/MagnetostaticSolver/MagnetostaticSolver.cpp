@@ -107,17 +107,8 @@ WarpX::AddMagnetostaticFieldLabFrame()
         }
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int lev = 0; lev <= max_level; lev++) {
-        ApplyInverseVolumeScalingToCurrentDensity(
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            lev );
-    }
-#endif
-
     SyncCurrent("current_fp");
+    FinalizeJ();
 
     // set the boundary and current density potentials
     setVectorPotentialBC(m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level));
