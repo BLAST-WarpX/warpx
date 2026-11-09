@@ -251,8 +251,8 @@ namespace
                         ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
                         field(ijk_vec, n) = 2._rt*field(ijk_next, n) + field(ijk_nextp1, n);
                     } else {
-                        amrex::Real mirror_factor = 1._rt;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                        amrex::Real mirror_factor = 1._rt;
                         if (icomp == 1 && idim == 0) {
                             // Reflect r*Btheta evenly where the magnetic field is not prescribed.
                             amrex::Real const shift = is_nodal[0] ? 0._rt : 0.5_rt;
@@ -260,6 +260,8 @@ namespace
                             amrex::Real const r_mirror = rmin + (ijk_mirror[0] - dom_lo[0] + shift)*dr;
                             mirror_factor = r_mirror/r;
                         }
+#else
+                        const amrex::Real mirror_factor = 1._rt;
 #endif
                         field(ijk_vec, n) = mirror_factor * field(ijk_mirror, n);
                     }
