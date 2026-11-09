@@ -81,8 +81,7 @@ public:
                const WarpXSolverVec& a_E,
                      amrex::Real     start_time,
                      int             a_nl_iter,
-                     bool            a_from_jacobian,
-                     bool            update_pc = true) override;
+                     bool            a_from_jacobian) override;
 
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
@@ -98,6 +97,13 @@ public:
      * \brief Inititialize the BC masks for the curl curl operator
      */
     void InitializeCurlCurlBCMasks ();
+
+protected:
+
+    /**
+     * \brief Initialize the curl-curl BC masks needed by the preconditioner matrix assembly.
+     */
+    void InitializePCMatrixAssembly () override { InitializeCurlCurlBCMasks(); }
 
 private:
 
