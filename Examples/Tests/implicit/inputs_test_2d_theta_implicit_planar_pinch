@@ -11,3 +11,4 @@ precon_mat.verbose = true
 pc_petsc.type = asm
 pc_petsc.asm_overlap = 4
 pc_petsc.sub_type = lu
+implicit_evolve.petsc_reinit_interval = 7

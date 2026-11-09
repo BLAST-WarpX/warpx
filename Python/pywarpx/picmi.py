@@ -1862,7 +1862,7 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
 
 class JacobiPreconditioner(PreconditionerBase):
     """
-    Sets up the point Jacobi preconditioner used during the nonlinear solver
+    Sets up the weighted Jacobi preconditioner used during the nonlinear solver
     """
 
     name: ClassVar[str | None] = "pc_jacobi"
@@ -1878,6 +1878,14 @@ class JacobiPreconditioner(PreconditionerBase):
     )
     absolute_tolerance: float | None = Field(
         default=None, description="Absolute tolerance of the convergence"
+    )
+    omega: float | None = Field(
+        default=None,
+        description="Relaxation factor. Setting it turns off adaptive_omega.",
+    )
+    adaptive_omega: bool | None = Field(
+        default=None,
+        description="Whether to reduce the relaxation factor when the residual increases",
     )
 
 
@@ -2145,9 +2153,18 @@ class SemiImplicitDarwinEvolveScheme(EvolveSchemeBase):
     # There is no nonlinear solver for the linear solver to attach to, which
     # PETScKSPLinearSolver requires.
     linear_solver: GMRESLinearSolver = Field(description="The GMRES linear solver")
+    magnetostatic_particle_shape: int | None = Field(
+        default=None,
+        description="Order of the particle shape factors used for the magnetostatic part of "
+        "the solve (current and mass matrices deposition, inductive E-field gather and "
+        "B-field gather). Must be between 1 and the particle shape used for the "
+        "electrostatic part (the `particle_shape` of the Simulation), which is the default.",
+    )
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.magnetostatic_particle_shape = self.magnetostatic_particle_shape
         self.linear_solver.linear_solver_initialize_inputs()
 
 
@@ -3889,7 +3906,10 @@ class Simulation(picmistandard.PICMI_Simulation):
     self_fields_verbosity: int | None = Field(
         default=None, alias="warpx_self_fields_verbosity"
     )
-
+    tiny_profiler_flush_interval: int | str | None = Field(
+        default=None,
+        description="Sets interval(s) to write out tiny profiler data. When not set, the tiny profiler data will only be written out at the end of the simulation.",
+    )
     macroscopic_properties: list[MacroscopicProperty] = Field(
         default_factory=list,
         description="Macroscopic material properties added with add_macroscopic_property",
@@ -3977,6 +3997,8 @@ class Simulation(picmistandard.PICMI_Simulation):
         reduced_diags.intervals = self.reduced_diags_intervals
         reduced_diags.separator = self.reduced_diags_separator
         reduced_diags.precision = self.reduced_diags_precision
+
+        pywarpx.warpx.tiny_profiler_flush_interval = self.tiny_profiler_flush_interval
 
         particle_shape = self.particle_shape
         for s in self.species:

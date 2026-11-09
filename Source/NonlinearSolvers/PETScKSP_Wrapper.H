@@ -8,6 +8,7 @@
 #ifndef PETSC_KSP_WRAPPER_H_
 #define PETSC_KSP_WRAPPER_H_
 
+#include "Initialization/WarpXInit.H"
 #include "LinearSolver.H"
 #include "WarpX_PETSc.H"
 
@@ -60,6 +61,15 @@ public:
     void define (LinOp& a_linop) override
     {
         m_solver = std::make_unique<warpx_petsc::KSP_impl>(a_linop);
+    }
+
+    //! Destroy the PETSc objects around a finalize and re-initialize of PETSc;
+    //! they are created again on the next solve
+    bool reinitializePETSc () override
+    {
+        m_solver->destroyObjects();
+        warpx::initialization::reinitialize_petsc();
+        return true;
     }
 
     /**
