@@ -107,12 +107,13 @@ WarpX::ComputeDt ()
 
     if (m_const_dt.has_value()) {
             if (m_const_dt.value() > deltat) {
-                std::string const warnMsg = "Specified const_dt (" + std::format("{:.2e}", m_const_dt.value())
-                + ") is too large to respect the CFL condition (" + std::format("{:.2e}", deltat) + ")."
-                "This may lead to severe numerical instabilities and potentially even crash WarpX.";
+                std::ostringstream oss;
+                oss << "Specified const_dt (" << std::scientific << std::setprecision(6) << m_const_dt.value()
+                    << ") is too large to respect the CFL condition (" << std::scientific << std::setprecision(6) << deltat
+                    << "). This may lead to severe numerical instabilities and potentially even crash WarpX.";
                 ablastr::warn_manager::WMRecordWarning(
                     "Input",
-                    warnMsg,
+                    oss.str(),
                     ablastr::warn_manager::WarnPriority::high
                 );
             }
