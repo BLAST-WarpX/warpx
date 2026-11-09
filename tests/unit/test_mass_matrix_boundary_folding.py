@@ -13,7 +13,7 @@ J1 using valid E columns only. These currents must agree on every valid row.
 import numpy as np
 import pytest
 from conftest import rtol
-from helpers import make_sim
+from helpers import alloc_like, make_sim
 
 import pywarpx
 from pywarpx import picmi
@@ -233,6 +233,39 @@ def _apply_folded_pc(sigma, efield, current, n_cell, direction, pec_nodes, xp):
                 j[row_index] += values[row_index] * e[column_index]
 
 
+def _assert_currents_match(j0, j1, direction, xp):
+    """Compare every valid FAB row, reporting the first mismatching box."""
+    scale = np.max(np.abs(j0[...]))
+    # Check every FAB's valid rows, including all copies of shared nodes.
+    for mfi in j1:
+        reference = _valid_view(j0, mfi)
+        actual = _valid_view(j1, mfi)
+        assert bool(xp.all(xp.isfinite(actual))), f"J1{direction}: non-finite current"
+        error = xp.abs(actual - reference)
+        tolerance = rtol() * (scale + xp.abs(reference))
+        mismatches = xp.argwhere(~(error <= tolerance))
+        if len(mismatches):
+            valid = mfi.validbox()
+            lo = tuple(valid.small_end[axis] for axis in (0, 1))
+            hi = tuple(valid.big_end[axis] for axis in (0, 1))
+            lines = [
+                f"J1{direction} != J0{direction}: valid box {lo} to {hi}",
+                f"mismatches={len(mismatches)}/{actual.size}, "
+                f"max_abs_error={float(xp.max(error)):.16e}",
+                "Global grid indices; showing up to 20 mismatches:",
+                "ix iz comp J0 J1 abs_error tolerance",
+            ]
+            for index in mismatches[:20]:
+                ix, iz, comp = (int(value) for value in index)
+                key = (ix, iz, comp)
+                lines.append(
+                    f"{lo[0] + ix} {lo[1] + iz} {comp} "
+                    f"{float(reference[key]):.16e} {float(actual[key]):.16e} "
+                    f"{float(error[key]):.16e} {float(tolerance[key]):.16e}"
+                )
+            pytest.fail("\n".join(lines), pytrace=False)
+
+
 @pytest.mark.parametrize(
     "boundary_axes, pmc_lo",
     [
@@ -297,23 +330,11 @@ def test_mass_matrix_boundary_folding(boundary_axes, pmc_lo):
     warpx = sim.extension.warpx
     fields = sim.fields
     xp = _array_module()
+    alloc_like(sim, "J0", "current_fp")
+    alloc_like(sim, "J1", "current_fp")
     for idir, direction in enumerate(("x", "y", "z")):
         sigma = fields.get("MassMatrices_PC", direction, 0)
         _fill_cubic_pc(sigma, idir, xp)
-        template = fields.get("current_fp", direction, 0)
-        for name in ("J0", "J1"):
-            fields.alloc_init(
-                name,
-                direction,
-                0,
-                template.box_array(),
-                template.dm(),
-                template.n_comp,
-                template.n_grow_vect,
-                0.0,
-                redistribute=False,
-                redistribute_on_remake=False,
-            )
 
     # Sum box-local deposition contributions once, leaving physical BCs unfolded.
     warpx.sync_mass_matrices_pc()
@@ -372,34 +393,4 @@ def test_mass_matrix_boundary_folding(boundary_axes, pmc_lo):
             pec_nodes,
             xp,
         )
-        scale = np.max(np.abs(j0[...]))
-        # Check every FAB's valid rows, including all copies of shared nodes.
-        for mfi in j1:
-            reference = _valid_view(j0, mfi)
-            actual = _valid_view(j1, mfi)
-            assert bool(xp.all(xp.isfinite(actual))), (
-                f"J1{direction}: non-finite current"
-            )
-            error = xp.abs(actual - reference)
-            tolerance = rtol() * (scale + xp.abs(reference))
-            mismatches = xp.argwhere(~(error <= tolerance))
-            if len(mismatches):
-                valid = mfi.validbox()
-                lo = tuple(valid.small_end[axis] for axis in (0, 1))
-                hi = tuple(valid.big_end[axis] for axis in (0, 1))
-                lines = [
-                    f"J1{direction} != J0{direction}: valid box {lo} to {hi}",
-                    f"mismatches={len(mismatches)}/{actual.size}, "
-                    f"max_abs_error={float(xp.max(error)):.16e}",
-                    "Global grid indices; showing up to 20 mismatches:",
-                    "ix iz comp J0 J1 abs_error tolerance",
-                ]
-                for index in mismatches[:20]:
-                    ix, iz, comp = (int(value) for value in index)
-                    key = (ix, iz, comp)
-                    lines.append(
-                        f"{lo[0] + ix} {lo[1] + iz} {comp} "
-                        f"{float(reference[key]):.16e} {float(actual[key]):.16e} "
-                        f"{float(error[key]):.16e} {float(tolerance[key]):.16e}"
-                    )
-                pytest.fail("\n".join(lines), pytrace=False)
+        _assert_currents_match(j0, j1, direction, xp)

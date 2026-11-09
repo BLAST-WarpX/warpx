@@ -18,7 +18,7 @@ them against the result of pushing the particles and depositing the current.
 import numpy as np
 import pytest
 from conftest import rtol
-from helpers import N_AXES, add_uniform_particles, make_sim
+from helpers import N_AXES, add_uniform_particles, alloc_like, make_sim
 
 import pywarpx
 from pywarpx import picmi
@@ -31,30 +31,6 @@ pytestmark = pytest.mark.skipif(
     pywarpx.libwarpx.geometry_dim not in ("1d", "2d", "3d"),
     reason="full mass matrices are only implemented in Cartesian geometry",
 )
-
-
-def _alloc_like(sim, name, template):
-    """Register a zeroed vector field with the layout of vector field ``template``.
-
-    Same box arrays, staggering and guard cells for each of the three
-    components, so that the new field can stand in for
-    ``template`` wherever the C++ side expects that staggering.
-    """
-    fields = sim.fields
-    for direction in ("x", "y", "z"):
-        mf = fields.get(template, direction, 0)
-        fields.alloc_init(
-            name,
-            direction,
-            0,
-            mf.box_array(),
-            mf.dm(),
-            mf.n_comp,
-            mf.n_grow_vect,
-            0.0,
-            redistribute=False,
-            redistribute_on_remake=False,
-        )
 
 
 def _fill_periodic_random(mf, n_cell, rng, amplitude):
@@ -169,8 +145,8 @@ def test_mass_matrices_match_push_and_deposit(particle_shape, sync_scheme):
         # operator that the linear solver applies on every iteration.
         warpx.sync_mass_matrices()
 
-    _alloc_like(sim, "dE", "Efield_fp")
-    _alloc_like(sim, "dJ", "current_fp")
+    alloc_like(sim, "dE", "Efield_fp")
+    alloc_like(sim, "dJ", "current_fp")
 
     # The amplitude keeps the push non-relativistic: q dE dt / m is a fraction
     # of a meter per second
