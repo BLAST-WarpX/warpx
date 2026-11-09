@@ -1177,11 +1177,14 @@ MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer (
 }
 
 void
-MultiParticleContainer::doSecondaryEmission (int const step, bool const do_eb)
+MultiParticleContainer::doSecondaryEmission (bool const do_eb)
 {
     if (!m_do_secondary_emission) { return; }
 
     auto& particle_boundary_buffer = WarpX::GetInstance().GetParticleBoundaryBuffer();
+
+    // Fetch the step number so that it is consistent with what is used in gatherParticlesFromDomainBoundaries
+    const int step = WarpX::GetInstance().getistep(0);
 
 #ifdef AMREX_USE_EB
     int const boundary_start = do_eb ? 2*AMREX_SPACEDIM : 0;

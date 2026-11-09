@@ -373,7 +373,7 @@ public:
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
-    void doSecondaryEmission (int step, bool do_eb);
+    void doSecondaryEmission (bool do_eb);
 
     void InitSecondaryEmissionBoundaryBuffer (class ParticleBoundaryBuffer& particle_boundary_buffer) const;
 
