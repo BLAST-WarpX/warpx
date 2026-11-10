@@ -12,7 +12,7 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
     endforeach()
     set(invalid_gather "gathering requires the matching fixed-shape current")
     set(invalid_current "current requires the 3D conforming Yee interface")
-    set(invalid_cleaning "one static refinement, no divergence cleaning")
+    set(invalid_cleaning "exterior vacuum PML and disabled divergence cleaning")
     foreach(option IN ITEMS gather current cleaning)
         add_warpx_test(
             test_3d_conforming_yee_invalid_${option}

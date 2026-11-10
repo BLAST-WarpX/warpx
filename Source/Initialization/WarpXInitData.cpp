@@ -843,10 +843,16 @@ WarpX::InitData ()
             electrostatic_solver_id == ElectrostaticSolverAlgo::None &&
             grid_type == ablastr::utils::enums::GridType::Staggered &&
             field_gathering_algo == GatheringAlgo::EnergyConserving &&
-            !do_moving_window && regrid_int <= 0 && !load_balance_intervals.isActivated() &&
+            !do_moving_window && regrid_int <= 0 && !load_balance_intervals.isActivated(),
+            "The conforming Yee interface requires a single rank, one static refinement, "
+            "explicit staggered Yee and energy-conserving gathering.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !do_dive_cleaning && !do_divb_cleaning &&
             !do_pml_dive_cleaning && !do_pml_divb_cleaning && !m_do_initial_div_cleaning &&
-            !do_pml_in_domain && !pml_has_particles && !do_current_centering &&
+            !do_pml_in_domain && !pml_has_particles,
+            "The conforming Yee interface requires exterior vacuum PML and disabled divergence cleaning.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_current_centering &&
             !use_fdtd_nci_corr && !fft_do_time_averaging && !use_hybrid_QED &&
             gamma_boost == 1.0_rt && !do_fluid_species && m_num_mirrors == 0 &&
             mypc->nLasers() == 0 && mypc->nSpeciesGatherFromMainGrid() == 0 &&
@@ -856,8 +862,8 @@ WarpX::InitData ()
             (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero ||
              m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::constant) &&
             mypc->m_E_ext_particle_s != "read_from_file" && mypc->m_B_ext_particle_s != "read_from_file",
-            "The experimental conforming surface requires serial explicit staggered Yee, "
-            "one static refinement, no divergence cleaning and energy-conserving gathering.");
+            "The conforming Yee interface requires ordinary kinetic sources and zero or constant "
+            "external fields without a boost, mirrors, fluid species or parent-only particle coupling.");
     }
 
     // Diagnostics
