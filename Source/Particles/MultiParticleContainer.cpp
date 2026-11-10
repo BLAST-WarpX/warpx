@@ -111,11 +111,11 @@ namespace
     struct SecondaryEmissionTransform
     {
         int m_boundary;
-        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> & m_plo;
-        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> & m_phi;
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_phi;
         int m_normal_index;
         amrex::ParticleReal m_uth;
-        const GetParticlePosition<PIdx> & m_GetPosition;
+        const GetParticlePosition<PIdx> m_GetPosition;
 
         template <typename DstData, typename SrcData>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
