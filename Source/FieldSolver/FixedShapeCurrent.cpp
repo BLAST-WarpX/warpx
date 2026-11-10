@@ -153,6 +153,9 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
             "The fixed-shape current control requires ordinary physical "
             "particles with fixed species charge.");
     }
+    bool use_gather = false;
+    amrex::ParmParse("warpx").query("composite_yee_fixed_shape_gather",
+                                    use_gather);
     auto const domain = w.Geom(1).Domain();
     amrex::DistributionMapping dm(amrex::Vector<int>{0});
     valid_centers.define(amrex::BoxArray(w.Geom(0).Domain()), dm, 1, 0);
@@ -166,6 +169,24 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
         }
         fine_owns[d] = std::make_unique<amrex::iMultiFab>(ba, dm, 1, 0);
         fine_owns[d]->setVal(0);
+        if (use_gather) {
+            for (int s = 0; s < 2; ++s) {
+                auto const type =
+                    s ? FieldType::Bfield_fp : FieldType::Efield_fp;
+                auto const ix =
+                    w.m_fields.get(type, ablastr::fields::Direction{d}, 0)
+                        ->ixType();
+                coarse_gather[s][d] = std::make_unique<amrex::MultiFab>(
+                    amrex::BoxArray(amrex::convert(w.Geom(0).Domain(), ix)), dm,
+                    1, 0);
+                force[s][d] = w.m_fields.alloc_init(
+                    s ? "composite_fixed_B" : "composite_fixed_E",
+                    ablastr::fields::Direction{d}, 1,
+                    amrex::BoxArray(amrex::convert(domain, ix)), dm, 1,
+                    IntVect(WarpX::nox + 1), 0._rt, false, false, false);
+            }
+        }
+
         for (int k = 0; k < fine[d]->boxArray().size(); ++k) {
             fine_owns[d]->setVal(1, fine[d]->boxArray()[k], 0, 1);
         }
@@ -261,5 +282,79 @@ FixedShapeCurrent::Assemble (Real dt) {
         }
         cp[d]->setVal(0._rt);
     }
+}
+
+void
+FixedShapeCurrent::UpdateGather () {
+    if (!force[0][0]) {
+        return;
+    }
+    auto const r = w.refRatio(0);
+    for (int s = 0; s < 2; ++s) {
+        auto const type = s ? FieldType::Bfield_fp : FieldType::Efield_fp;
+        auto const coarse = w.m_fields.get_alldirs(type, 0),
+                   fine = w.m_fields.get_alldirs(type, 1);
+        for (int d = 0; d < 3; ++d) {
+            auto& parent = *coarse_gather[s][d];
+            auto& target = *force[s][d];
+            parent.ParallelCopy(*coarse[d]);
+            auto const src = parent.const_array(0);
+            auto const dst = target.array(0);
+            auto const nodal = target.ixType().toIntVect();
+            // Whitney prolongation outside the refined patch. Fine-owned values
+            // take precedence, including surface tangential E and normal B.
+            amrex::ParallelFor(
+                target.boxArray()[0],
+                [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    IntVect const q{i, j, k}, p = amrex::coarsen(q, r);
+                    Real frac[3];
+                    int hi[3];
+                    for (int a = 0; a < 3; ++a) {
+                        auto const rem = nodal[a] * (q[a] - p[a] * r[a]);
+                        frac[a] = Real(rem) / r[a];
+                        hi[a] = int(rem != 0);
+                    }
+                    Real sum = 0._rt;
+                    for (int z = 0; z <= hi[2]; ++z)
+                        for (int y = 0; y <= hi[1]; ++y)
+                            for (int x = 0; x <= hi[0]; ++x)
+                                sum += (x ? frac[0] : 1._rt - frac[0]) *
+                                       (y ? frac[1] : 1._rt - frac[1]) *
+                                       (z ? frac[2] : 1._rt - frac[2]) *
+                                       src(p + IntVect(x, y, z));
+                    dst(q) = sum;
+                });
+            target.ParallelCopy(*fine[d]);
+        }
+    }
+}
+
+FixedShapeGather
+get_fixed_shape_gather (
+    WarpX& w, int lev, std::array<amrex::MultiFab const*, 6> const* requested) {
+    FixedShapeGather out;
+    if (!w.m_fields.has_vector("composite_fixed_E", 1)) {
+        return out;
+    }
+    for (int s = 0; s < 2; ++s) {
+        for (int d = 0; d < 3; ++d) {
+            auto const dir = ablastr::fields::Direction{d};
+            if (requested && (*requested)[3 * s + d] !=
+                                 w.m_fields.get(s ? FieldType::Bfield_aux
+                                                  : FieldType::Efield_aux,
+                                                dir, lev)) {
+                return {};
+            }
+            out.fields[3 * s + d] = &(*w.m_fields.get(
+                s ? "composite_fixed_B" : "composite_fixed_E", dir, 1))[0];
+        }
+    }
+    return out;
+}
+#else
+FixedShapeGather
+get_fixed_shape_gather (WarpX&, int,
+                        std::array<amrex::MultiFab const*, 6> const*) {
+    return {};
 }
 #endif

@@ -762,6 +762,9 @@ CompositeYeeSurface::UpdateGatherFields () {
                                  g.w.Geom(1).periodicity());
         }
     }
+    if (g.fixed_shape_current) {
+        g.fixed_shape_current->UpdateGather();
+    }
 }
 #else
 struct CompositeYeeSurface::Implementation {};
