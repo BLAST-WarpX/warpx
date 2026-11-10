@@ -1,0 +1,26 @@
+# Affine Yee fields sampled by the initial plotfile, before Maxwell evolution.
+geometry.dims = 2
+geometry.prob_lo = 0 0
+geometry.prob_hi = 1 1
+amr.n_cell = 24 24
+amr.max_level = 0
+warpx.numprocs = 1 1
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+warpx.cfl = 0.1
+max_step = 1
+warpx.verbose = 0
+warpx.do_initial_div_cleaning = 0
+warpx.E_ext_grid_init_style = parse_e_ext_grid_function
+warpx.Ex_external_grid_function(x,y,z) = 1+x+2*z
+warpx.Ey_external_grid_function(x,y,z) = 2-2*x+z
+warpx.Ez_external_grid_function(x,y,z) = 3+3*x-z
+warpx.B_ext_grid_init_style = parse_b_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = 4-x+2*z
+warpx.By_external_grid_function(x,y,z) = 5+2*x+z
+warpx.Bz_external_grid_function(x,y,z) = 6-x-3*z
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz
