@@ -20,7 +20,10 @@ filename = sys.argv[1]
 ts = OpenPMDTimeSeries(filename)
 
 it = ts.iterations
-x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
+
+# Get the electron location at the second last step, when the ions were lost
+# and the secondary electrons were created (but not not propagated).
+x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-2])
 
 N_sec_e = np.size(z)
 expected_N_sec_e = 3
