@@ -54,7 +54,9 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 #ifdef AMREX_USE_EB
 #   include "AMReX_EBFabFactory.H"
 #endif
@@ -774,6 +776,24 @@ PML::PML (const int lev, const BoxArray& grid_ba,
 
     using ablastr::fields::Direction;
 
+    ParmParse const pp_warpx("warpx");
+    auto const extent = [&] (char const* name, int scalar) {
+        IntVect counts(scalar);
+        std::vector<int> values;
+        if (utils::parser::queryArrWithParser(pp_warpx, name, values)) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(values.size() == AMREX_SPACEDIM,
+                std::string(name) + " needs one value per mesh direction.");
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(values[d] > 0,
+                    std::string(name) + " requires positive cell counts.");
+                counts[d] = values[d];
+            }
+        }
+        return counts;
+    };
+    auto const widths = extent("pml_ncell_vect", ncell);
+    auto const depths = extent("pml_delta_vect", delta);
+
     // When `do_pml_in_domain` is true, the PML overlap with the last `ncell` of the physical domain or fine patch(es)
     // (instead of extending `ncell` outside of the physical domain or fine patch(es))
     // In order to implement this, we define a new reduced Box Array ensuring that it does not
@@ -793,8 +813,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                     // the size by ncells using growLo(idim,-ncell)
                     Box const& bb = amrex::adjCellLo(b, idim);
                     if ( ! grid_ba.intersects(bb) ) {
-                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(b.length(idim) > ncell, " box length must be greater that pml size");
-                        b.growLo(idim, -ncell);
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(b.length(idim) > widths[idim], " box length must be greater that pml size");
+                        b.growLo(idim, -widths[idim]);
                     }
                 }
                 if (do_pml_Hi[idim]) {
@@ -803,8 +823,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                     // the size by ncells using growHi(idim,-ncell)
                     Box const& bb = amrex::adjCellHi(b, idim);
                     if ( ! grid_ba.intersects(bb) ) {
-                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(b.length(idim) > ncell, " box length must be greater that pml size");
-                        b.growHi(idim, -ncell);
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(b.length(idim) > widths[idim], " box length must be greater that pml size");
+                        b.growHi(idim, -widths[idim]);
                     }
                 }
             }
@@ -814,7 +834,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     Box const domain0 = grid_ba_reduced.minimalBox();
     const bool is_single_box_domain = domain0.numPts() == grid_ba_reduced.numPts();
     const BoxArray& ba = ::MakeBoxArray(is_single_box_domain, domain0, *geom, grid_ba_reduced,
-                                      IntVect(ncell), do_pml_in_domain, do_pml_Lo, do_pml_Hi);
+                                      widths, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
 
 
     if (ba.empty()) {
@@ -976,7 +996,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     Box single_domain_box = is_single_box_domain ? domain0 : Box();
     // Empty box (i.e., Box()) means it's not a single box domain.
     sigba_fp = std::make_unique<MultiSigmaBox>(ba, dm, &grid_ba_reduced, geom->CellSize(),
-                                               IntVect(ncell), IntVect(delta), single_domain_box, v_sigma_sb);
+                                               widths, depths, single_domain_box, v_sigma_sb);
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
 #ifndef WARPX_USE_FFT
@@ -1015,10 +1035,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         BoxArray grid_cba = grid_ba;
         grid_cba.coarsen(ref_ratio);
 
-        IntVect cncells = IntVect(ncell)/ref_ratio;
-        IntVect cdelta = IntVect(delta)/ref_ratio;
+        IntVect cncells = widths/ref_ratio;
+        IntVect cdelta = depths/ref_ratio;
         bool match_physical_pml = true;
-        amrex::ParmParse("warpx").query("pml_match_parent_at_physical_boundary", match_physical_pml);
+        pp_warpx.query("pml_match_parent_at_physical_boundary", match_physical_pml);
         IntVect match_parent(0);
         Box const& physical_domain = cgeom->Domain();
         Box physical_interior = physical_domain;
@@ -1032,11 +1052,11 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                 // The coarse patch and the parent advance the same Maxwell response
                 // at this physical boundary. Subtract it with the same discrete PML.
                 match_parent[d] = 1;
-                cncells[d] = ncell;
-                cdelta[d] = delta;
+                cncells[d] = widths[d];
+                cdelta[d] = depths[d];
                 if (do_pml_in_domain) {
-                    if (do_pml_Lo[d]) { physical_interior.growLo(d, -ncell); }
-                    if (do_pml_Hi[d]) { physical_interior.growHi(d, -ncell); }
+                    if (do_pml_Lo[d]) { physical_interior.growLo(d, -widths[d]); }
+                    if (do_pml_Hi[d]) { physical_interior.growHi(d, -widths[d]); }
                 }
             }
         }
