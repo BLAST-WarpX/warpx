@@ -94,7 +94,7 @@ namespace
             // adjacent axis point. Interior ghosts do not contribute a second
             // copy when the parent subsequently sums its guard cells.
             int const im = amrex::max(i, axis);
-            if (mask[b].contains(im,j,k) && mask[b](im,j,k) && src[b](i,j,k,n) != 0._rt) {
+            if (mask[b].contains(im,j,k) && mask[b](im,j,k)) {
                 dst[b](i,j,k,n) += src[b](i,j,k,n);
             }
         });
