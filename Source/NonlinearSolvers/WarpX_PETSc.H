@@ -249,8 +249,8 @@ class SNES_impl : public PETScSolver_impl
         //! Evaluate the RHS
         void computeRHS(VecType&, const VecType&);
 
-        //! Prepare for the linear solve at the current iterate
-        void preLinearSolve();
+        //! Prepare for the linear solve at PETSc's zero-based Newton iteration a_iter.
+        void preLinearSolve(int a_iter);
 
         //! With -snes_fd: called when the KSP solve of a Newton iteration has returned, so its
         //! finite-difference Jacobian is complete and later residual evaluations are true residuals
@@ -356,7 +356,7 @@ class SNES_impl : public PETScSolver_impl
         mutable amrex::Real m_time = 0.0;
         //! Time step index
         mutable int m_step = 0;
-        //! Newton iteration index of the next residual evaluation
+        //! Residual evaluation counter, excluding finite-difference Jacobian evaluations.
         mutable int m_iter = 0;
 
         //! Total nonlinear iterations for the diagnostic file

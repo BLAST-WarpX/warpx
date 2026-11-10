@@ -118,11 +118,10 @@ PetscErrorCode PreLinearSolveFunction( SNES a_solver, PetscInt a_iter )
 {
     PetscFunctionBeginUser;
     BL_PROFILE("warpx_petsc::PreLinearSolveFunction()");
-    amrex::ignore_unused(a_iter);
 
     void* ctxt = nullptr;
     SNESGetApplicationContext(a_solver, &ctxt);
-    static_cast<SNES_impl*>(ctxt)->preLinearSolve();
+    static_cast<SNES_impl*>(ctxt)->preLinearSolve(static_cast<int>(a_iter));
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -900,19 +899,21 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
     if (!from_jacobian) { m_iter++; }
 }
 
-void SNES_impl::preLinearSolve()
+void SNES_impl::preLinearSolve(int const a_iter)
 {
     BL_PROFILE("SNES_impl::preLinearSolve()");
     AMREX_ALWAYS_ASSERT(isDefined());
 
-    // computeRHS has already incremented m_iter after evaluating the current residual.
+    // A line search can evaluate the residual multiple times per Newton iteration.
+    // Use PETSc's iteration for both PC and Jacobian mass-matrix refresh schedules;
+    // the residual counter m_iter would shift or skip scheduled updates.
     m_update_pc = m_force_pc_update ||
-        m_newton_params.UpdatePC(m_step, m_iter - 1, m_pc_initialized);
+        m_newton_params.UpdatePC(m_step, a_iter, m_pc_initialized);
 
     // m_U and m_F hold the current iterate and its RHS from the last residual evaluation
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(this->m_U);
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseRHS(m_F);
-    m_op->PreLinearSolve(m_update_pc, m_iter - 1);
+    m_op->PreLinearSolve(m_update_pc, a_iter);
 
     // With -snes_fd, the residual evaluations that follow build the Jacobian
     m_fd_jac_in_progress = m_fd_jac_comput;
