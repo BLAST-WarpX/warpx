@@ -58,8 +58,6 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     //    input, so curl(Z) must be valid that much further out again;
     //  - curl(Z) reads Z at i-1..i, so Z is needed one cell beyond that;
     //  - independently, the direct nabla^4 stencil reads Z at i-2..i+2.
-    // This is the same trick the hybrid-PIC solver uses to avoid communicating
-    // after its curl (see GuardCellManager).
     // With conducting (PEC) walls, chi curl(Z) is instead held over all the
     // guard cells of the mass matrices: the product there (from the guard-cell
     // mass-matrix deposits, which are not folded themselves) is folded back
@@ -73,12 +71,11 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     const ablastr::fields::VectorField SZ =
         warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
     const amrex::IntVect mm_half_width = m_ops->MassMatricesStencilHalfWidth();
-    const amrex::IntVect chidA_ng = m_ops->HasPEC()
+    const amrex::IntVect chidA_ng    = m_ops->HasPEC()
         ? amrex::elemwiseMax(amrex::IntVect(1), SX[0]->nGrowVect())
         : amrex::IntVect(1);
-    const amrex::IntVect dA_ng    = chidA_ng + mm_half_width;
-    // (These are the scratch's own widths; Z's is always zero.)
-    const amrex::IntVect Z_ng     = amrex::elemwiseMax(amrex::IntVect(2), dA_ng + 1);
+    const amrex::IntVect dA_ng       = chidA_ng + mm_half_width;
+    const amrex::IntVect Zscratch_ng = amrex::elemwiseMax(amrex::IntVect(2), dA_ng + 1);
 
     m_lapZ_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
                     Zvec[lev][0]->nComp(), Zvec[lev][0]->nGrowVect());
@@ -88,11 +85,11 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
                     Zvec[lev][2]->nComp(), Zvec[lev][2]->nGrowVect());
 
     m_Zscratch_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
-                        Zvec[lev][0]->nComp(), Z_ng);
+                        Zvec[lev][0]->nComp(), Zscratch_ng);
     m_Zscratch_y.define(Zvec[lev][1]->boxArray(), Zvec[lev][1]->DistributionMap(),
-                        Zvec[lev][1]->nComp(), Z_ng);
+                        Zvec[lev][1]->nComp(), Zscratch_ng);
     m_Zscratch_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
-                        Zvec[lev][2]->nComp(), Z_ng);
+                        Zvec[lev][2]->nComp(), Zscratch_ng);
 
     // curl(Z) and chi curl(Z) live on the E/A/J staggering
     const ablastr::fields::VectorField Efield =
@@ -106,9 +103,8 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     m_chidA_z.define(Efield[2]->boxArray(), Efield[2]->DistributionMap(), 1, chidA_ng);
 
     // ApplyMassMatrices() only fills as many guard cells of its output as the
-    // mass matrices themselves hold valid data for (they are summed out into
-    // their guard region by SumBoundaryJ), so those have to cover the one cell
-    // that the final curl reads.
+    // mass matrices themselves hold valid data for, so those have to cover
+    // the one cell that the final curl reads.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         SX[0]->nGrowVect().allGE(chidA_ng) &&
         SY[1]->nGrowVect().allGE(chidA_ng) &&
@@ -149,7 +145,7 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // SemiImplicitDarwin::ApplyScaledMassMatrices).
     //
     // Every stage of that expression is a short, local stencil, so the whole
-    // operator is one banded stencil on Z. Rather than exchanging guard cells
+    // operator is one stencil on Z. Rather than exchanging guard cells
     // between the stages, each intermediate is evaluated over enough of its own
     // guard region to feed the next one (widths are set in define()), and the
     // only communication is the single exchange on Zscratch below.
