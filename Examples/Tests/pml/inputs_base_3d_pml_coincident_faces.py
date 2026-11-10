@@ -28,6 +28,7 @@ def seed_pml():
         field.set_val(1.0, 0, 1, field.n_grow_vect)
 
 
+refinement_region = "if(x*x+y*y < 0.0265*0.0265, if(abs(z)<0.0416666666666667,1,0),0)"
 callbacks.installcallback("allocdata", seed_pml)
 libwarpx.initialize(
     [
@@ -42,8 +43,7 @@ libwarpx.initialize(
         "amr.blocking_factor=4",
         "amr.n_error_buf=0",
         "amr.grid_eff=1",
-        "warpx.ref_patch_function(x,y,z)="
-        "if(x*x+y*y < 0.0265*0.0265, if(abs(z)<0.0416666666666667,1,0),0)",
+        f"warpx.ref_patch_function(x,y,z)={refinement_region}",
         "boundary.field_lo=periodic periodic periodic",
         "boundary.field_hi=periodic periodic periodic",
         "warpx.const_dt=5e-13",
