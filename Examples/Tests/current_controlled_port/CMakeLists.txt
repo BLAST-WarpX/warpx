@@ -91,8 +91,7 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
     set_tests_properties(
         test_3d_overlapping_current_controlled_ports_rejected_picmi.run
         PROPERTIES
-            WILL_FAIL TRUE
-            PASS_REGULAR_EXPRESSION "separated by more than one grid cell"
+            PASS_REGULAR_EXPRESSION "port correction regions must be separated"
     )
 endif()
 

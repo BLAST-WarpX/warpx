@@ -51,8 +51,7 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
     set_tests_properties(
         test_3d_prescribed_current_antenna_rejected_hybrid.run
         PROPERTIES
-            WILL_FAIL TRUE
-            PASS_REGULAR_EXPRESSION "impressed-current antenna.*not supported by the Hybrid-PIC solver"
+            PASS_REGULAR_EXPRESSION "impressed-current antenna, not an ion species"
     )
 endif()
 
