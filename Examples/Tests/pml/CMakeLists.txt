@@ -89,6 +89,20 @@ add_warpx_test(
     OFF
 )
 
+set(pml_option_exterior "")
+set(pml_option_interior "--in-domain")
+foreach(placement IN ITEMS exterior interior)
+    add_warpx_test(
+        test_3d_pml_physical_boundary_${placement}
+        3
+        1
+        "inputs_base_3d_pml_physical_boundary.py ${pml_option_${placement}}"
+        OFF  # independent pulse check in the script
+        OFF
+        OFF
+    )
+endforeach()
+
 if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
     # The refined patch spans the periodic y direction, including the stepped
     # case where the active x/z absorbers extend into the patch's bounding box.

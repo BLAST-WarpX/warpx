@@ -1176,6 +1176,17 @@ Additional PML parameters
     the absorption coefficients of the PML increase.
     At a mesh-refinement boundary, this depth must span at least one coarse cell in each absorbing direction.
 
+.. pp:param:: warpx.pml_match_parent_at_physical_boundary
+    :type: ``bool``
+    :default: ``1``
+
+    For finite-difference mesh refinement, match the coarse-patch PML thickness and
+    damping depth to the parent in directions where every occupied column spans the
+    physical domain. Both coarse solves then use the same absorber at those boundaries.
+    A direction with an internal refinement face uses the fine-patch depth converted to
+    coarse cells. Set this parameter to ``0`` to restart an older checkpoint that stored
+    a coarsened PML at a spanning physical boundary, preserving its layout and damping.
+
 .. pp:param:: warpx.do_pml_in_domain
     :type: ``int``
     :default: 0
