@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--layout", choices=("box", "stepped"), required=True)
 parser.add_argument("--absorber", action="store_true")
 parser.add_argument("--restart", type=Path)
+parser.add_argument("--invalid", choices=("gather", "current", "cleaning"))
 args = parser.parse_args()
 
 n = 32
@@ -61,6 +62,8 @@ if args.absorber:
     settings.extend(
         [
             "warpx.pml_ncell=4",
+            "warpx.pml_ncell_vect=4 3 2",
+            "warpx.pml_delta_vect=4 3 2",
             "warpx.pml_delta=4",
             "diagnostics.diags_names=chk",
             "chk.diag_type=Full",
@@ -71,6 +74,14 @@ if args.absorber:
     )
 if args.restart:
     settings.append(f"amr.restart={args.restart}/diags/checkpoint000060")
+if args.invalid == "gather":
+    settings.append("warpx.composite_yee_fixed_shape_gather=1")
+elif args.invalid == "current":
+    settings.extend(
+        ["warpx.composite_yee_surface=0", "warpx.composite_yee_fixed_shape_current=1"]
+    )
+elif args.invalid == "cleaning":
+    settings.append("warpx.do_dive_cleaning=1")
 libwarpx.initialize(settings)
 fields = libwarpx.warpx.multifab_register()
 

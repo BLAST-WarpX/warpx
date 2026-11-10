@@ -820,7 +820,15 @@ WarpX::InitData ()
 
     Print() << utils::logo::get_logo();
 
-    amrex::ParmParse("warpx").query("composite_yee_surface", m_use_composite_yee_surface);
+    amrex::ParmParse const pp_surface("warpx");
+    bool fixed_current = false, fixed_gather = false;
+    pp_surface.query("composite_yee_surface", m_use_composite_yee_surface);
+    pp_surface.query("composite_yee_fixed_shape_current", fixed_current);
+    pp_surface.query("composite_yee_fixed_shape_gather", fixed_gather);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!fixed_current || m_use_composite_yee_surface,
+        "Fixed-shape current requires the 3D conforming Yee interface.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!fixed_gather || fixed_current,
+        "Fixed-shape gathering requires the matching fixed-shape current.");
     if (!restart_chkfile.empty()) {
         CompositeYeeSurface::CheckRestartIdentity(*this, restart_chkfile, m_use_composite_yee_surface);
     }
@@ -1282,10 +1290,7 @@ WarpX::InitPML ()
             pml[lev] = std::make_unique<PML>(
                 lev, boxArray(lev), DistributionMap(lev), do_similar_dm_pml,
                 &Geom(lev), &Geom(lev-1),
-                // A stepped box union allocates absorbers around each internal
-                // gap even when all exterior face flags are zero. The shared
-                // Maxwell trace owns these fields, so this level has no PML cells.
-                m_use_composite_yee_surface ? 0 : pml_ncell, pml_delta, refRatio(lev-1),
+                pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
                 m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
@@ -1294,7 +1299,10 @@ WarpX::InitPML ()
                 guard_cells.ng_FieldSolver.max(),
                 v_particle_pml,
                 m_fields,
-                do_pml_Lo[lev], do_pml_Hi[lev]);
+                do_pml_Lo[lev], do_pml_Hi[lev],
+                // The conforming trace owns the entire interior interface, including
+                // concave steps that cannot be disabled with exterior face flags.
+                !m_use_composite_yee_surface);
         }
     }
 }

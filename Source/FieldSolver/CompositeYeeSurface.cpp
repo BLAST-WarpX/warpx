@@ -533,7 +533,7 @@ struct CompositeYeeSurface::Implementation {
     explicit Implementation (WarpX& warpx) : w(warpx), ratio(w.refRatio(0)) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             sizeof(Real) == sizeof(double),
-            "Private surface controls require double precision.");
+            "The conforming Yee interface requires double precision.");
         Point r;
         std::array<Real, 3> hc{}, hf{};
         for (int d = 0; d < 3; ++d) {

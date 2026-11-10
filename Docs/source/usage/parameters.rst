@@ -956,6 +956,44 @@ Setting up the field mesh
     This patch is rectangular, and thus its extent is given here by the coordinates
     of the lower corner (:pp:param:`warpx.fine_tag_lo`) and upper corner (:pp:param:`warpx.fine_tag_hi`).
 
+.. pp:param:: warpx.composite_yee_surface
+    :type: bool
+    :default: 0
+
+    Experimental 3D conforming Yee interface on a closed, static fine patch.
+    Both levels advance their native Maxwell fields at the same timestep. Shared
+    tangential electric edges and normal magnetic fluxes couple the two meshes.
+    Rectangular and stepped patches are supported, including transverse-only
+    refinement. This option requires double precision, a single MPI rank,
+    explicit staggered Yee evolution, energy-conserving gathering and exactly
+    two levels. Divergence cleaning and subcycling must be disabled.
+
+    The fine patch must lie inside the physical domain. The patch and a collar
+    two parent cells wide must have vacuum material coefficients and active
+    Maxwell edges and faces. Conductors, embedded boundaries and prescribed
+    magnetic ports can occupy the exterior parent mesh. The physical outer
+    PML remains active on the parent. Restart with the same interface and
+    particle coupling.
+
+.. pp:param:: warpx.composite_yee_fixed_shape_current
+    :type: bool
+    :default: 0
+
+    On the 3D conforming interface, deposit a particle current with the same
+    physical shape across both leaf grids. Supports linear or cubic Esirkepov
+    or Villasenor deposition for kinetic particles with fixed species charge.
+    Particle trajectories and their deposition and filter stencils must remain
+    clear of material and physical boundaries. The reference implementation
+    allocates temporary source arrays at the fine spacing across the domain.
+
+.. pp:param:: warpx.composite_yee_fixed_shape_gather
+    :type: bool
+    :default: 0
+
+    Gather particle forces with the same physical support as the fixed-shape
+    current. This requires :pp:param:`warpx.composite_yee_fixed_shape_current`.
+    Fine-spacing force arrays span the full domain in this mode.
+
 .. pp:param:: warpx.conforming_radial_interface
     :type: ``bool``
     :default: ``0``

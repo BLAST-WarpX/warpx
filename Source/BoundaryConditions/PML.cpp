@@ -784,7 +784,7 @@ PML::PML (const int lev, const BoxArray& grid_ba, const DistributionMapping& gri
           const bool do_pml_divb_cleaning, const amrex::IntVect& fill_guards_fields,
           const amrex::IntVect& fill_guards_current, bool eb_enabled, int max_guard_EB,
           const amrex::Real v_sigma_sb, ablastr::fields::MultiFabRegister& fields,
-          const amrex::IntVect do_pml_Lo, const amrex::IntVect do_pml_Hi)
+          const amrex::IntVect do_pml_Lo, const amrex::IntVect do_pml_Hi, const bool enabled)
     : m_level(lev), m_dive_cleaning(do_pml_dive_cleaning), m_divb_cleaning(do_pml_divb_cleaning),
       m_fill_guards_fields(fill_guards_fields), m_fill_guards_current(fill_guards_current),
       m_geom(geom), m_cgeom(cgeom)
@@ -794,6 +794,11 @@ PML::PML (const int lev, const BoxArray& grid_ba, const DistributionMapping& gri
 #endif
 
     using ablastr::fields::Direction;
+
+    if (!enabled) {
+        m_ok = false;
+        return;
+    }
 
     ParmParse const pp_warpx("warpx");
     auto const extent = [&] (char const* name, int scalar) {

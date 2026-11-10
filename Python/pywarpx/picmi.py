@@ -1554,6 +1554,21 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         default=None,
         description="The advance method used to solve Maxwell's equations. WarpX supports 'Yee', 'CKC', 'PSATD', and 'ECT'.",
     )
+    composite_yee_surface: bool | None = Field(
+        default=None,
+        alias="warpx_composite_yee_surface",
+        description="Use the single-rank, two-level conforming Cartesian Yee interface.",
+    )
+    composite_yee_fixed_shape_current: bool | None = Field(
+        default=None,
+        alias="warpx_composite_yee_fixed_shape_current",
+        description="Deposit the particle current with the same physical shape across the interface.",
+    )
+    composite_yee_fixed_shape_gather: bool | None = Field(
+        default=None,
+        alias="warpx_composite_yee_fixed_shape_gather",
+        description="Gather the force with the shape used by the fixed-shape current.",
+    )
     conforming_radial_interface: bool | None = Field(
         default=None,
         description="Use a shared Yee interface for a full-length, axisymmetric bore refined by (2, 1).",
@@ -1625,6 +1640,13 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         pywarpx.warpx.pml_ncell = self.pml_ncell
         pywarpx.warpx.pml_ncell_vect = self.pml_ncell_vect
         pywarpx.warpx.pml_delta_vect = self.pml_delta_vect
+        pywarpx.warpx.composite_yee_surface = self.composite_yee_surface
+        pywarpx.warpx.composite_yee_fixed_shape_current = (
+            self.composite_yee_fixed_shape_current
+        )
+        pywarpx.warpx.composite_yee_fixed_shape_gather = (
+            self.composite_yee_fixed_shape_gather
+        )
         pywarpx.warpx.conforming_radial_interface = self.conforming_radial_interface
 
         if self.method == "PSATD":

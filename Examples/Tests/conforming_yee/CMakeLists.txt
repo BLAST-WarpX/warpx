@@ -10,6 +10,22 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
             OFF
         )
     endforeach()
+    set(invalid_gather "gathering requires the matching fixed-shape current")
+    set(invalid_current "current requires the 3D conforming Yee interface")
+    set(invalid_cleaning "one static refinement, no divergence cleaning")
+    foreach(option IN ITEMS gather current cleaning)
+        add_warpx_test(
+            test_3d_conforming_yee_invalid_${option}
+            3
+            1
+            "inputs_base_3d_conforming_yee.py --layout stepped --invalid ${option}"
+            OFF
+            OFF
+            OFF
+        )
+        set_tests_properties(test_3d_conforming_yee_invalid_${option}.run
+            PROPERTIES PASS_REGULAR_EXPRESSION "${invalid_${option}}")
+    endforeach()
     set(crossing_outward "")
     set(crossing_inward "--inward")
     foreach(direction IN ITEMS outward inward)

@@ -154,7 +154,8 @@ public:
          int max_guard_EB, amrex::Real v_sigma_sb,
          ablastr::fields::MultiFabRegister& fields,
          amrex::IntVect do_pml_Lo = amrex::IntVect::TheUnitVector(),
-         amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector());
+         amrex::IntVect do_pml_Hi = amrex::IntVect::TheUnitVector(),
+         bool enabled = true);
 
     /** Add -dt*sigma*src to dst, or solve dst=src/(1+dt*sigma). */
     void ApplyImplicitSigma (ablastr::fields::VectorField dst, ablastr::fields::VectorField src,
