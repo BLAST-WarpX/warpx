@@ -720,6 +720,7 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_c
     }
 }
 
+// NOLINTNEXTLINE(readability-make-member-function-const): writes m_divZ except in RZ
 void SemiImplicitDarwin::AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
                                            const ablastr::fields::VectorField& a_Z,
                                            int lev )
