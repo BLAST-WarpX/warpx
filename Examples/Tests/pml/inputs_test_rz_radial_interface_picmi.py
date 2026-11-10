@@ -12,6 +12,7 @@ parser.add_argument("--direction", choices=("in", "out"), required=True)
 parser.add_argument("--polarization", choices=("bz", "bt"), required=True)
 parser.add_argument("--restart")
 parser.add_argument("--reference")
+parser.add_argument("--ordinary-restart", action="store_true")
 parser.add_argument("--particle-at-interface", action="store_true")
 args = parser.parse_args()
 c = picmi.constants.c
@@ -31,12 +32,16 @@ grid = picmi.CylindricalGrid(
     lower_boundary_conditions_particles=["none", "periodic"],
     upper_boundary_conditions_particles=["absorbing", "periodic"],
     n_azimuthal_modes=1,
-    refined_regions=[[1, [0, -nz * dz / 2], [radius / 2, nz * dz / 2]]],
+    refined_regions=[[1, [0, -nz * dz / 2], [radius / 2, nz * dz / 2], [2, 1]]],
     warpx_max_grid_size=512,
     warpx_blocking_factor=4,
 )
 sim = picmi.Simulation(
-    solver=picmi.ElectromagneticSolver(grid=grid, method="Yee"),
+    solver=picmi.ElectromagneticSolver(
+        grid=grid,
+        method="Yee",
+        warpx_conforming_radial_interface=not args.ordinary_restart,
+    ),
     max_steps=steps,
     time_step_size=dt,
     warpx_use_filter=0,
@@ -61,10 +66,6 @@ sim.add_diagnostic(
 )
 sim.initialize_inputs()
 amr.n_error_buf = 0
-amr.ref_ratio_vect = [2, 1]
-warpx.n_field_gather_buffer = 0
-warpx.n_current_deposition_buffer = 0
-warpx.conforming_radial_interface = 1
 warpx.do_initial_div_cleaning = 0
 warpx.pml_ncell = 4
 warpx.pml_delta = 4

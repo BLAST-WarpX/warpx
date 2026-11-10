@@ -1554,6 +1554,10 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         default=None,
         description="The advance method used to solve Maxwell's equations. WarpX supports 'Yee', 'CKC', 'PSATD', and 'ECT'.",
     )
+    conforming_radial_interface: bool | None = Field(
+        default=None,
+        description="Use a shared Yee interface for a full-length, axisymmetric bore refined by (2, 1).",
+    )
     pml_ncell: int | None = Field(
         default=None, description="The depth of the PML, in number of cells"
     )
@@ -1611,6 +1615,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         self.grid.grid_initialize_inputs()
 
         pywarpx.warpx.pml_ncell = self.pml_ncell
+        pywarpx.warpx.conforming_radial_interface = self.conforming_radial_interface
 
         if self.method == "PSATD":
             pywarpx.psatd.periodic_single_box_fft = self.psatd_periodic_single_box_fft

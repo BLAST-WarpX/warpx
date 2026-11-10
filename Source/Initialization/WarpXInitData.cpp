@@ -1090,23 +1090,25 @@ void
 WarpX::InitPML ()
 {
 #ifdef WARPX_DIM_RZ
-    amrex::ParmParse("warpx").query("conforming_radial_interface", m_conforming_radial_interface);
     if (!restart_chkfile.empty()) {
-        bool stored = amrex::FileExists(restart_chkfile + "/ConformingRadialInterface");
-        if (!stored && m_conforming_radial_interface) {
-            // Early radial checkpoints recorded the method in their native job
-            // information, before they had a dedicated grid-type marker.
-            std::ifstream job(restart_chkfile + "/warpx_job_info");
-            for (std::string line; std::getline(job, line); ) {
-                std::istringstream record(line);
-                std::string key, equals, value;
-                if (record >> key >> equals >> value &&
-                    key == "warpx.conforming_radial_interface" && equals == "=") {
-                    stored = value == "1" || value == "true";
-                    break;
+        int stored = 0;
+        if (ParallelDescriptor::IOProcessor()) {
+            stored = amrex::FileExists(restart_chkfile + "/ConformingRadialInterface");
+            if (!stored) {
+                // Early radial checkpoints only recorded the method in their job information.
+                std::ifstream job(restart_chkfile + "/warpx_job_info");
+                for (std::string line; std::getline(job, line); ) {
+                    std::istringstream record(line);
+                    std::string key, equals, value;
+                    if (record >> key >> equals >> value &&
+                        key == "warpx.conforming_radial_interface" && equals == "=") {
+                        stored = value == "1" || value == "true";
+                        break;
+                    }
                 }
             }
         }
+        ParallelDescriptor::Bcast(&stored, 1, ParallelDescriptor::IOProcessorNumber());
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(stored == m_conforming_radial_interface,
             "The checkpoint and the requested radial interface use different Maxwell grids.");
     }
@@ -1120,10 +1122,12 @@ WarpX::InitPML ()
             evolve_scheme == EvolveScheme::Explicit && grid_type == GridType::Staggered &&
             !m_do_subcycling && !EB::enabled() &&
             !do_dive_cleaning && !do_divb_cleaning && !do_moving_window &&
-            m_em_solver_medium == MediumForEM::Vacuum && n_field_gather_buffer == 0 &&
-            n_current_deposition_buffer == 0,
+            m_em_solver_medium == MediumForEM::Vacuum && !do_pml_in_domain &&
+            n_field_gather_buffer == 0 && n_current_deposition_buffer == 0 &&
+            mypc->nSpeciesGatherFromMainGrid() == 0 && mypc->nSpeciesDepositOnMainGrid() == 0,
             "The conforming radial interface requires two single-box axisymmetric Yee grids, "
-            "a (2,1) ratio, a single rank, zero buffers and a vacuum collar.");
+            "a (2,1) ratio, a single rank, exterior absorbers, zero buffers and a vacuum collar. "
+            "All particles must gather and deposit on their own mesh.");
         using warpx::fields::FieldType;
         auto const aux = m_fields.get_alldirs(FieldType::Bfield_aux, 1);
         auto const fp = m_fields.get_alldirs(FieldType::Bfield_fp, 1);

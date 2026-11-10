@@ -1062,6 +1062,14 @@ WarpX::ReadParameters ()
         pp_warpx.query("do_dive_cleaning", do_dive_cleaning);
         pp_warpx.query("do_divb_cleaning", do_divb_cleaning);
 
+#ifdef WARPX_DIM_RZ
+        pp_warpx.query("conforming_radial_interface", m_conforming_radial_interface);
+        if (m_conforming_radial_interface) {
+            // Each particle deposits and gathers on its own physical Yee mesh.
+            n_field_gather_buffer = 0;
+            n_current_deposition_buffer = 0;
+        }
+#endif
         utils::parser::queryWithParser(
             pp_warpx, "n_field_gather_buffer", n_field_gather_buffer);
         utils::parser::queryWithParser(

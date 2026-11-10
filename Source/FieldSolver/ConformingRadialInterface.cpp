@@ -125,7 +125,7 @@ WarpX::CheckRadialInterfaceCollar ()
             auto const jfield = (*current)[0].const_array();
             reduction.eval(collar, result,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept -> Result {
-                    return {static_cast<int>(jfield(i, j, k,0) != 0._rt)};
+                    return {static_cast<int>(jfield(i, j, k, 0) != 0._rt)};
                 });
         }
     }

@@ -313,6 +313,19 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
         test_rz_radial_interface_bz_in_picmi
     )
     add_warpx_test(
+        test_rz_radial_interface_wrong_grid_picmi_restart
+        RZ
+        1
+        "inputs_test_rz_radial_interface_picmi.py --direction in --polarization bz --ordinary-restart --restart ../test_rz_radial_interface_bz_in_picmi/diags/chk000144"
+        OFF
+        OFF
+        test_rz_radial_interface_bz_in_picmi
+    )
+    set_tests_properties(
+        test_rz_radial_interface_wrong_grid_picmi_restart.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "different Maxwell grids"
+    )
+    add_warpx_test(
         test_rz_radial_interface_particle_rejected_picmi
         RZ
         1

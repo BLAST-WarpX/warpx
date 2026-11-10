@@ -969,8 +969,9 @@ Setting up the field mesh
     This experimental option requires explicit staggered Yee evolution, one azimuthal
     mode, one rank, one regular box per level and a radial refinement ratio of two with
     axial ratio one. The fine patch must include the axis and span the axial domain.
-    Set ``warpx.n_field_gather_buffer`` and ``warpx.n_current_deposition_buffer`` to zero.
-    Particle fields must retain the Maxwell staggering. Currents and particles may
+    Physical absorbing boundaries use exterior PMLs. The gather and deposition buffers
+    default to zero in this mode and must remain zero. Each species gathers and deposits
+    on its own mesh, with particle fields on the native Yee staggering. Currents and particles may
     occupy either mesh away from the join. An active particle stencil or a deposited
     current in its vacuum collar ends the run with a diagnostic. Use the same grid
     method when restarting a checkpoint.
