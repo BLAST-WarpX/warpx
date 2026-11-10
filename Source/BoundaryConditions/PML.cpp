@@ -387,6 +387,11 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
     {
 #if (AMREX_SPACEDIM >= 2)
+        if (ncell[idim] == 0) {
+            FillZero(sigma[idim], sigma_cumsum[idim], sigma_star[idim], sigma_star_cumsum[idim],
+                     box.smallEnd(idim), box.bigEnd(idim));
+            continue;
+        }
         const int jdim = (idim+1) % AMREX_SPACEDIM;
 #endif
 #if defined(WARPX_DIM_3D)
@@ -1001,9 +1006,31 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         Box const cdomain = grid_cba_reduced.minimalBox();
 
         const IntVect cncells = IntVect(ncell)/ref_ratio;
-        const IntVect cdelta = IntVect(delta)/ref_ratio;
+        IntVect cdelta = IntVect(delta)/ref_ratio;
 
-        // Assuming that refinement ratio is equal in all dimensions
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (cncells[idim] > 0 && cdelta[idim] > 0) { continue; }
+            // A stepped patch can have absorbing faces inside its bounding box.
+            // Inspect the fine PML that was actually allocated, including corners
+            // and periodic axes that the patch spans from end to end.
+            bool absorbs = false;
+            for (int i = 0; i < grid_ba_reduced.size() && !absorbs; ++i) {
+                Box const& grid = grid_ba_reduced[i];
+                absorbs = ba.intersects(amrex::adjCellLo(grid, idim)) ||
+                          ba.intersects(amrex::adjCellHi(grid, idim));
+            }
+            if (absorbs) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(cncells[idim] > 0,
+                    "The active coarse-patch PML requires warpx.pml_ncell to cover at least one coarse cell in each absorbing direction.");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(cdelta[idim] > 0,
+                    "The active coarse-patch PML requires warpx.pml_delta to cover at least one coarse cell in each absorbing direction.");
+            } else {
+                // SigmaBox computes a coefficient in every direction. An unused
+                // tangential coefficient still needs a finite denominator.
+                cdelta[idim] = std::max(cdelta[idim], 1);
+            }
+        }
+
         const BoxArray& cba = ::MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
                                            cncells, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
         DistributionMapping cdm;

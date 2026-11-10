@@ -1159,6 +1159,7 @@ Additional PML parameters
     :default: 10
 
     The depth of the PML, in number of cells.
+    At a mesh-refinement boundary, the depth must span at least one coarse cell in each absorbing direction.
 
 .. pp:param:: do_similar_dm_pml
     :type: ``int``
@@ -1172,7 +1173,8 @@ Additional PML parameters
     :default: 10
 
     The characteristic depth, in number of cells, over which
-    the absorption coefficients of the PML increases.
+    the absorption coefficients of the PML increase.
+    At a mesh-refinement boundary, this depth must span at least one coarse cell in each absorbing direction.
 
 .. pp:param:: warpx.do_pml_in_domain
     :type: ``int``
