@@ -696,12 +696,12 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
     // Refined levels use the low-order coarse/fine interpolation path for both B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {
+        amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         BoxArray const& nba = Bfield_aux[lev][0]->boxArray();
-        BoxArray const& cnba = amrex::coarsen(nba,2);
+        BoxArray const& cnba = amrex::coarsen(nba, refinement_ratio);
         DistributionMapping const& dm = Bfield_aux[lev][0]->DistributionMap();
         amrex::Periodicity const& cperiod = Geom(lev-1).periodicity();
 
-        amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         amrex::IntVect const& ng_src = guard_cells.ng_FieldGather;
 
         UpdateAuxiliaryDataStagToNodalField(
