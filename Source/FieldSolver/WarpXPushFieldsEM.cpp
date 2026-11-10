@@ -1433,6 +1433,21 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
 }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+namespace
+{
+    // Grow only the outer faces of the FAB. Negative-r deposits are folded
+    // into the physical cells below, so leave those source guards untouched.
+    amrex::Box radial_scaling_box (amrex::MFIter const& mfi, amrex::MultiFab const& field,
+                                   bool const touches_axis)
+    {
+        auto box = mfi.tilebox(field.ixType().toIntVect(), field.nGrowVect());
+        if (touches_axis) {
+            box.setSmall(0, amrex::max(box.smallEnd(0), mfi.validbox().smallEnd(0)));
+        }
+        return box;
+    }
+}
+
 // This scales the current by the inverse volume and wraps around the deposition at negative radius.
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
@@ -1450,6 +1465,10 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
+#if defined(WARPX_DIM_RZ)
+    int const nmodes = n_rz_azimuthal_modes;
+#endif
+
     for (amrex::MFIter mfi(*Jx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
@@ -1457,44 +1476,20 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
         amrex::Array4<amrex::Real> const& Jt_arr = Jy->array(mfi);
         amrex::Array4<amrex::Real> const& Jz_arr = Jz->array(mfi);
 
-        amrex::Box const & tilebox = mfi.tilebox();
-        amrex::Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
-        amrex::Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
-        amrex::Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Real rmin  = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tbr = radial_scaling_box(mfi, *Jx, rmin == 0._rt);
+        auto const tbt = radial_scaling_box(mfi, *Jy, rmin == 0._rt);
+        auto const tbz = radial_scaling_box(mfi, *Jz, rmin == 0._rt);
+        const amrex::Real rminr = rmin + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = rmin + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = rmin + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const int irmin = valid.smallEnd(0);
 
         // For ishift, 1 means cell centered, 0 means node centered
         int const ishift_r = (rminr > rmin ? 1 : 0);
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
-
-        // Grow the tileboxes to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0._rt) {
-           tbr.growLo(0, ngJ[0]);
-           tbt.growLo(0, ngJ[0]);
-           tbz.growLo(0, ngJ[0]);
-        }
-        tbr.growHi(0, ngJ[0]);
-        tbt.growHi(0, ngJ[0]);
-        tbz.growHi(0, ngJ[0]);
-#if defined(WARPX_DIM_RZ)
-        tbr.grow(1, ngJ[1]);
-        tbt.grow(1, ngJ[1]);
-        tbz.grow(1, ngJ[1]);
-
-        const int nmodes = n_rz_azimuthal_modes;
-#endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
         // included in the current deposition.
@@ -1662,6 +1657,10 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
+    int const ncomp_rr = Sxx->nComp();
+    int const ncomp_tt = Syy->nComp();
+    int const ncomp_zz = Szz->nComp();
+
     for ( amrex::MFIter mfi(*Sxx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
 
@@ -1669,46 +1668,20 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
         amrex::Array4<amrex::Real> const& Stt_arr = Syy->array(mfi);
         amrex::Array4<amrex::Real> const& Szz_arr = Szz->array(mfi);
 
-        amrex::Box const & tilebox = mfi.tilebox();
-        amrex::Box tbr = convert( tilebox, Sxx->ixType().toIntVect() );
-        amrex::Box tbt = convert( tilebox, Syy->ixType().toIntVect() );
-        amrex::Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
-
-        int const ncomp_rr = Sxx->nComp();
-        int const ncomp_tt = Syy->nComp();
-        int const ncomp_zz = Szz->nComp();
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Real rmin  = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tbr = radial_scaling_box(mfi, *Sxx, rmin == 0._rt);
+        auto const tbt = radial_scaling_box(mfi, *Syy, rmin == 0._rt);
+        auto const tbz = radial_scaling_box(mfi, *Szz, rmin == 0._rt);
+        const amrex::Real rminr = rmin + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = rmin + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = rmin + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const int irmin = valid.smallEnd(0);
 
         // For ishift, 1 means cell centered, 0 means node centered
         int const ishift_r = (rminr > rmin ? 1 : 0);
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
-
-        // Grow the tileboxes to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0._rt) {
-           tbr.growLo(0, ngS[0]);
-           tbt.growLo(0, ngS[0]);
-           tbz.growLo(0, ngS[0]);
-        }
-        tbr.growHi(0, ngS[0]);
-        tbt.growHi(0, ngS[0]);
-        tbz.growHi(0, ngS[0]);
-#if defined(WARPX_DIM_RZ)
-        tbr.grow(1, ngS[1]);
-        tbt.grow(1, ngS[1]);
-        tbz.grow(1, ngS[1]);
-#endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
         // included in the current deposition.
@@ -1817,35 +1790,17 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev,
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
 #endif
 
-    amrex::Box tilebox;
-
     for (amrex::MFIter mfi(*Rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
         amrex::Array4<amrex::Real> const& Rho_arr = Rho->array(mfi);
 
-        tilebox = mfi.tilebox();
-        amrex::Box tb = convert( tilebox, Rho->ixType().toIntVect() );
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const amrex::Real rmin = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tb = radial_scaling_box(mfi, *Rho, rmin == 0._rt);
+        const int irmin = valid.smallEnd(0);
+        const amrex::Real rminr = rmin + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const int ishift = (rminr > rmin ? 1 : 0);
-
-        // Grow the tilebox to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0.) {
-           tb.growLo(0, ngRho[0]);
-        }
-        tb.growHi(0, ngRho[0]);
-#if defined(WARPX_DIM_RZ)
-        tb.grow(1, ngRho[1]);
-#endif
 
         // Rescale charge in r-z mode since the inverse volume factor was not
         // included in the charge deposition.
