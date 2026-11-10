@@ -1,0 +1,68 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 23
+
+amr.n_cell = 64 64
+amr.max_level = 0
+amr.max_grid_size = 32
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -2.0
+geometry.prob_hi = 2.0  2.0
+warpx.n_rz_azimuthal_modes = 1
+
+my_constants.radius = 0.2
+
+#################################
+###### BOUNDARY CONDITIONS ######
+#################################
+boundary.field_lo = none pec
+boundary.field_hi = pec  pec
+boundary.particle_lo = none reflecting
+boundary.particle_hi = absorbing reflecting
+
+# Embedded boundary: a sphere of the given radius, centered on the origin.
+warpx.eb_implicit_function = "-(x**2+y**2+z**2-radius**2)"
+# Specularly reflect the particles when they reach the embedded boundary
+# (instead of the default behavior, which is to absorb them).
+boundary.particle_eb = reflecting
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.const_dt = 1e-11
+warpx.do_electrostatic = labframe
+warpx.poisson_solver = Multigrid
+warpx.self_fields_absolute_tolerance = 1e-7
+algo.particle_shape = 1
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = electrons
+
+# A single electron is launched towards the embedded boundary. Its initial
+# momenta are given as the proper velocity (gamma*v) normalized by the speed
+# of light: here ux = 0.5e10/clight and uz = 1.0e10/clight (m/s).
+electrons.species_type = electron
+electrons.injection_style = MultipleParticles
+electrons.multiple_particles_pos_x = 0.0
+electrons.multiple_particles_pos_y = 0.0
+electrons.multiple_particles_pos_z = -0.25
+electrons.multiple_particles_ux = 16.6782047599076
+electrons.multiple_particles_uy = 0.0
+electrons.multiple_particles_uz = 33.3564095198152
+electrons.multiple_particles_weight = 1
+electrons.initialize_self_fields = 0
+electrons.save_particles_at_eb = 1
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = Er Ez phi rho rho_electrons
+diag1.format = openpmd
+diag1.species = electrons

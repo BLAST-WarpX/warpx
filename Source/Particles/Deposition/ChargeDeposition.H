@@ -59,8 +59,11 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
-    // Loop over particles and deposit into rho_fab
-    amrex::ParallelFor(
+    // Loop over particles and deposit into rho_fab.
+    // amrex::For instead of amrex::ParallelFor: iterations are not independent
+    // (particles scatter-add into shared rho nodes), so the CPU SIMD pragma of
+    // ParallelFor must not be used here (see issue #7097).
+    amrex::For(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
             // --- Get particle quantities
@@ -265,7 +268,8 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                   nblocks, threads_per_block, shared_mem_bytes, amrex::Gpu::gpuStream(),
                   [=] AMREX_GPU_DEVICE () noexcept
 #else // defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
-    amrex::ParallelFor(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip_orig) noexcept
+    // amrex::For: iterations scatter-add into shared rho nodes (no SIMD pragma, see issue #7097)
+    amrex::For(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip_orig) noexcept
 #endif
       {
 #if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)

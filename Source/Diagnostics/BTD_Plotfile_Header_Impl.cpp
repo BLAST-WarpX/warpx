@@ -390,6 +390,7 @@ BTDSpeciesHeaderImpl::ReadHeader ()
         is >> real_comp_name;
     }
     is >> m_num_output_int;
+    m_int_comp_names.resize(m_num_output_int);
     for (auto& int_comp_name : m_int_comp_names) {
         is >> int_comp_name;
     }

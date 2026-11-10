@@ -22,6 +22,8 @@
 // forward declarations
 class WarpXSolverVec;
 class ImplicitSolver;
+struct NonlinearSolverParams;
+struct NewtonSolverParams;
 // end of forward declarations
 
 /* \brief Implementations of linear and nonlinear solvers using PETSc
@@ -72,6 +74,9 @@ class PETScSolver_impl
 
         //! Assemble the sparse matrix for preconditioner
         [[nodiscard]] int assemblePCMatrix(LinOpType* const);
+        //! Destroy the PETSc objects, e.g. before PETSc is finalized; they are created again
+        //! by createObjects
+        virtual void destroyObjects ();
 
         //! Work vector
         mutable VecType m_U;
@@ -96,13 +101,16 @@ class PETScSolver_impl
         bool m_is_defined = false;
 
         //! Preconditioner type
-        PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
+        PreconditionerType m_pc_type = PreconditionerType::none;
 
         // Return the PC type
         PreconditionerType getPreconditionerType () const
         {
             return m_pc_type;
         }
+
+        //! Set the GMRES restart length, unless it is given as a PETSc option
+        void setRestartLength(int) const;
 
     protected:
 
@@ -140,6 +148,9 @@ class KSP_impl : public PETScSolver_impl
 
         //! Create PETSc objects
         void createObjects (const VecType&);
+        void destroyObjects () override;
+        //! Set the GMRES restart length, also for the objects created later
+        void setRestartLength (int);
 
         //! Set tolerances
         void setTolerances(amrex::Real, amrex::Real, int);
@@ -147,19 +158,22 @@ class KSP_impl : public PETScSolver_impl
         //! Set max iters
         void setMaxIters(int);
 
+        //! Rebuild the PETSc matrix and preconditioner on the next linear solve.
+        void invalidatePreconditioner () { m_pc_needs_update = true; }
+
         //! Solve
         void solve(VecType&, const VecType&);
 
         //! Set verbosity
         void setVerbose(int);
 
-        //! Get number of iterations for recentmost solve
+        //! Get number of iterations for recent most solve
         inline int getNumIters() const { return m_niters; }
 
-        //! Get status for recentmost solve
+        //! Get status for recent most linear solve
         inline int getStatus() const { return m_status; }
 
-        //! Get relative norm for recentmost solve
+        //! Get relative norm for recent most solve
         inline amrex::Real getResidualNorm() const { return m_norm; }
 
         //! Check if object is defined
@@ -173,20 +187,25 @@ class KSP_impl : public PETScSolver_impl
 
     private:
 
+        //! Whether the PETSc preconditioner matrix needs reassembly.
+        bool m_pc_needs_update = true;
+
         //! absolute tolerance
         amrex::Real m_atol = 1e-12;
         //! relative tolerance
         amrex::Real m_rtol = 1e-8;
         //! maximum iterations
         int m_maxits= 100;
+        //! GMRES restart length (negative: PETSc's default)
+        int m_restart_length = -1;
         //! verbosity
         int m_verbose = 1;
 
-        //! number of iterations for recentmost solve
+        //! number of iterations for recent most solve
         int m_niters = -1;
-        //! status for recentmost solve
+        //! status for recent most solve
         int m_status = -1;
-        //! residual norm (relative) for recentmost solve
+        //! residual norm (relative) for recent most solve
         amrex::Real m_norm = DBL_MAX;
 
         //! Solver object
@@ -209,10 +228,14 @@ class SNES_impl : public PETScSolver_impl
     public:
 
         //! Constructor
-        SNES_impl (const VecType&, TIType*);
+        SNES_impl (const VecType&, TIType*,
+                   const NonlinearSolverParams&, const NewtonSolverParams&);
 
         //! Destructor
         ~SNES_impl() override;
+        //! Create the PETSc objects (done by the constructor, and again after destroyObjects)
+        void createObjects ();
+        void destroyObjects () override;
 
         //! Check if object is defined
         [[nodiscard]] bool isDefined () const
@@ -220,37 +243,44 @@ class SNES_impl : public PETScSolver_impl
             return (this->m_is_defined && (m_op != nullptr) && (this->m_linop != nullptr));
         }
 
-        //! Set tolerances
-        void setTolerances(amrex::Real, amrex::Real, int,
-                           amrex::Real, amrex::Real, int);
-
-        //! Set max iters
-        void setMaxIters(int, int);
-
         //! Solve the system
         void solve(VecType&, const VecType&, amrex::Real, amrex::Real, int) const;
 
         //! Evaluate the RHS
-        void computeRHS(VecType&, const VecType&) const;
+        void computeRHS(VecType&, const VecType&);
+
+        //! Prepare for the linear solve at the current iterate
+        void preLinearSolve();
+
+        //! With -snes_fd: called when the KSP solve of a Newton iteration has returned, so its
+        //! finite-difference Jacobian is complete and later residual evaluations are true residuals
+        void endFDJacobian() const { m_fd_jac_in_progress = false; }
+
+        //! Record that the PC has been set up
+        void setPCInitialized() const { m_pc_initialized = true; }
+
+        //! Require a PC update before the next linear solve.
+        void invalidatePreconditioner() { m_pc_initialized = false; }
+
+        //! Allow the owner to force PC updates during adaptive substepping.
+        void setForcePreconditionerUpdate(bool force_update)
+        {
+            m_force_pc_update = force_update;
+        }
 
         //! Returns if a preconditioner is being used
         [[nodiscard]] bool usePC() const;
 
+        //! Whether the PC is updated at the current nonlinear iteration.
+        [[nodiscard]] bool updatePC() const { return m_update_pc; }
+
         //! Set verbosity
         void setVerbose(bool);
 
-        //! Get parameters
-        AMREX_FORCE_INLINE
-        void getSolverParams ( amrex::Real&  a_rtol,
-                               amrex::Real&  a_atol,
-                               int&          a_maxits ) const
-        {
-            a_rtol = m_rtol;
-            a_atol = m_atol;
-            a_maxits = m_maxits;
-        }
+        //! Whether the residual norms are printed
+        [[nodiscard]] bool verbose() const { return m_verbose; }
 
-        //! Print parameters
+        //! Print parameters of the linear operator
         void printParams () const;
 
         AMREX_FORCE_INLINE
@@ -260,10 +290,10 @@ class SNES_impl : public PETScSolver_impl
         auto numTotalIters() const { return m_total_iters; }
 
         AMREX_FORCE_INLINE
-        auto normAbs() const { return -1.0; /* absolute norm is not tracked */}
+        auto normAbs() const { return m_norm; }
 
         AMREX_FORCE_INLINE
-        auto normRel() const { return m_norm; }
+        auto normRel() const { return m_norm_rel; }
 
         AMREX_FORCE_INLINE
         auto numLinIters() const { return m_niters_l; }
@@ -274,48 +304,59 @@ class SNES_impl : public PETScSolver_impl
         AMREX_FORCE_INLINE
         auto normLinResidual() const { return m_norm_lin; }
 
+        //! Get status for recent most nonlinear solve
+        inline int getStatus() const { return m_status; }
+
         //! Using SNES FD?
         bool m_fd_jac_comput = false;
+
+        /** With -snes_fd, SNES builds the Jacobian of each Newton iteration from residual
+         *  evaluations. True while these are in progress: from the start of a Newton
+         *  iteration until its KSP solve for the Newton update has returned.
+         */
+        mutable bool m_fd_jac_in_progress = false;
 
         //! Linear operator object
         std::unique_ptr<LinOpType> m_linop;
 
     private:
 
-        //! absolute tolerance
-        amrex::Real m_atol = 0.;
-        //! relative tolerance
-        amrex::Real m_rtol = 1e-6;
-        //! step tolerance
-        amrex::Real m_stol = 1e-16;
-        //! maximum iterations
-        int m_maxits= 100;
+        //! Set the SNES and KSP tolerances and maximum iterations from the input parameters
+        void setTolerances();
+
+        //! Input parameters common to all nonlinear solvers
+        const NonlinearSolverParams& m_params;
+        //! Input parameters of the Newton-type solvers
+        const NewtonSolverParams& m_newton_params;
+
+        //! Ensure the first linear solve initializes the PC, including after restart.
+        mutable bool m_pc_initialized = false;
+        //! PC update decision for the current nonlinear iteration.
+        mutable bool m_update_pc = true;
+        //! Override the normal PC update decision until disabled by the owner.
+        bool m_force_pc_update = false;
+
         //! verbosity
         bool m_verbose = true;
-        //! verbosity for linear solver
-        int m_verbose_l = 2;
 
-        //! absolute tolerance
-        amrex::Real m_atol_l = 0.;
-        //! relative tolerance
-        amrex::Real m_rtol_l = 1e-4;
-        //! maximum iterations
-        int m_maxits_l = 1000;
-
-        //! number of iterations for recentmost solve
+        //! number of iterations for recent most solve
         mutable int m_niters = -1;
-        //! number of linear solver iterations for recentmost solve
+        //! number of linear solver iterations for recent most solve
         mutable int m_niters_l = -1;
-        //! status for recentmost solve
+        //! status for recent most solve
         mutable int m_status = -1;
-        //! residual norm (relative) for recentmost solve
+        //! residual norm (absolute) for recent most solve
         mutable amrex::Real m_norm = DBL_MAX;
-        //! residual norm (relative) for recentmost linear solve
+        //! residual norm relative to the initial one for recent most solve
+        mutable amrex::Real m_norm_rel = DBL_MAX;
+        //! residual norm (relative) for recent most linear solve
         mutable amrex::Real m_norm_lin = DBL_MAX;
 
         //! Simulation time
         mutable amrex::Real m_time = 0.0;
-        //! Simulation time iter
+        //! Time step index
+        mutable int m_step = 0;
+        //! Newton iteration index of the next residual evaluation
         mutable int m_iter = 0;
 
         //! Total nonlinear iterations for the diagnostic file

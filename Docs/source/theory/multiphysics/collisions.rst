@@ -59,17 +59,19 @@ Pulsed Decay
 
 This collision module can be used to have a parent species decay into two product
 species with a user-defined decay rate. Mathematically, it solves the following
-rate equations on a cell-by-cell basis:
+rate equations on a particle basis:
 
     .. math::
 
        \begin{aligned}
-        \frac{dn_1}{dt} &= -\nu(t)n_1, \\
-        \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
+        \frac{dN_1}{dt} &= -\nu(t)N_1, \\
+        \frac{dN_A}{dt} &= +\nu(t)N_1 = \frac{dN_B}{dt}, \\
        \end{aligned}
 
-where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
-and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+where :math:`N_1` is the number of the parent species particles, :math:`N_A` and :math:`N_B` are the numbers of the product species, and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+For each parent particle, the decay probability is calculated as :math:`1-\exp[-\nu(x,y,z,t)\Delta t]`, where :math:`\Delta t` is the time-step size.
+If that probability is greater than a randomly chosen number, the parent particle decays into the products whose number and weight is scaled by the integer weight ratio.
+After decaying, the parent particle is removed.
 
 This can be used, for example, to represent ionization of a parent species by an externally applied laser pulse.
 
@@ -108,7 +110,7 @@ The ``elastic`` option uses isotropic scattering, i.e., with a differential
 cross section that is independent of angle.
 This scattering process as well as the ones below that relate to it, are all
 performed in the center-of-momentum (COM) frame. Designating the COM velocity of
-the particle as :math:`\vec{u}_c` and its labframe velocity as :math:`\vec{u}_l`,
+the particle as :math:`\boldsymbol{u}_c` and its labframe velocity as :math:`\boldsymbol{u}_l`,
 the transformation from lab frame to COM frame is done with a general Lorentz
 boost (see function ``ParticleUtils::doLorentzTransform()``):
 
@@ -135,14 +137,14 @@ where :math:`\gamma` is the Lorentz factor of the relative speed between the lab
 
     .. math::
 
-        \vec{v}^{COM} = \frac{m \vec{u_c}}{\gamma_u m + M}
+        \boldsymbol{v}^{COM} = \frac{m \boldsymbol{u}_c}{\gamma_u m + M}
 
 The particle velocity in the COM frame is then isotropically scattered using the function ``ParticleUtils::RandomizeVelocity()``. After the direction of the velocity vector has been appropriately changed, it is transformed back to the lab frame with the reversed Lorentz transform as was done above followed by the reverse Galilean transformation using the starting neutral velocity.
 
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\boldsymbol{u}_c`.
 
 Excitation
 ^^^^^^^^^^

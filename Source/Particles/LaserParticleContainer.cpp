@@ -157,7 +157,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     }
 
     //Check if profile exists
-    if(laser_profiles_dictionary.count(laser_type_s) == 0 ){
+    if(!laser_profiles_dictionary.contains(laser_type_s)){
         WARPX_ABORT_WITH_MESSAGE(std::string("Unknown laser type: ").append(laser_type_s));
     }
     m_up_laser_profile = laser_profiles_dictionary.at(laser_type_s)();
@@ -306,8 +306,8 @@ LaserParticleContainer::ContinuousInjection (const RealBox& injection_box)
     // the case for the R coordinate of the laser antenna in RZ (since
     // that equals 0 and thus coincides with the low end of the injection
     // box along R, which also equals 0).
-    const bool is_contained = (injection_box.lo(1) < p_pos[1] &&
-                               p_pos[1] < injection_box.hi(1));
+    const bool is_contained = (injection_box.lo(1) <= p_pos[1] &&
+                               p_pos[1] <= injection_box.hi(1));
 #else
     const bool is_contained = injection_box.contains(p_pos);
 #endif
@@ -678,7 +678,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                 DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                0, np_to_deposit, thread_num,
-                               lev, lev, dt, relative_time, push_type);
+                               lev, lev, dt, relative_time, push_type, WarpX::nox);
 
                 if (has_buffer)
                 {
@@ -688,7 +688,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                     DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                    np_to_deposit, np-np_to_deposit, thread_num,
-                                   lev, lev-1, dt, relative_time, push_type);
+                                   lev, lev-1, dt, relative_time, push_type, WarpX::nox);
                 }
             }
 
@@ -784,7 +784,8 @@ void
 LaserParticleContainer::PushP (int /*lev*/, Real /*dt*/,
                                const MultiFab&, const MultiFab&, const MultiFab&,
                                const MultiFab&, const MultiFab&, const MultiFab&,
-                               MomentumPushType /*momentum_push_type*/)
+                               MomentumPushType /*momentum_push_type*/,
+                               std::optional<FieldGatherOrders> /*gather_orders*/)
 {
     // Laser particles are not advanced using a particle pusher.
     // Therefore, PushP does nothing in this implementation.

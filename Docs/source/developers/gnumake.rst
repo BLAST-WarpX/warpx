@@ -64,6 +64,8 @@ options are:
     * ``USE_MPI=TRUE`` or ``FALSE``: Whether to compile with MPI support.
     * ``USE_OMP=TRUE`` or ``FALSE``: Whether to compile with OpenMP support.
     * ``USE_GPU=TRUE`` or ``FALSE``: Whether to compile for Nvidia GPUs (requires CUDA).
+      Set the target architecture with the ``AMREX_CUDA_ARCH`` environment variable, e.g. ``export AMREX_CUDA_ARCH=8.0`` for A100 (it defaults to ``7.0``).
+      This is the GNU Make spelling only: the CMake build uses ``CUDAARCHS``/``CMAKE_CUDA_ARCHITECTURES`` instead, and our HPC profiles set that one.
     * ``USE_OPENPMD=TRUE`` or ``FALSE``: Whether to support openPMD for I/O (requires openPMD-api).
     * ``MPI_THREAD_MULTIPLE=TRUE`` or ``FALSE``: Whether to initialize MPI with thread multiple support. Required to use asynchronous IO with more than :pp:param:`amrex.async_out_nfiles` (by default, 64) MPI tasks.
       Please see :ref:`data formats <dataanalysis-formats>` for more information.

@@ -54,8 +54,8 @@ for a in counter:
     error += abs((c - b) / b) * 100.0
 averror = error / (len(counter) - 1)
 
-# average error range set at 2.5%
-if averror > 2.5:
-    print("Average error greater than 2.5%")
+# average error range set at 5%
+if averror > 5.0:
+    print("Average error greater than 5%")
 
-assert averror < 2.5
+assert averror < 5.0

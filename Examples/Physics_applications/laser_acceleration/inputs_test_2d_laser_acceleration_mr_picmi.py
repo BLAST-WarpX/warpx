@@ -39,7 +39,9 @@ grid = picmi.Cartesian2DGrid(
     moving_window_velocity=[0.0, c],
     warpx_max_grid_size=max_grid_size,
     warpx_blocking_factor=blocking_factor,
-    refined_regions=[[1, [xmin_refined, zmin_refined], [xmax_refined, zmax_refined]]],
+    refined_regions=[
+        [1, [xmin_refined, zmin_refined], [xmax_refined, zmax_refined], [2, 2]]
+    ],
 )
 
 # Particles: plasma electrons

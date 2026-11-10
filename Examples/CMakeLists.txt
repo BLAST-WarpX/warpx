@@ -108,20 +108,18 @@ function(add_warpx_test
         return()
     endif()
 
-    # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
-    # "There are not enough slots available in the system to satisfy the 2 slots
-    # that were requested by the application"
-    set(MPI_HOST_NUMPROC --host localhost:${nprocs})
-
     # set MPI executable
-    set(THIS_MPI_TEST_EXE
-        ${MPIEXEC_EXECUTABLE}
-        ${MPI_ALLOW_ROOT}
-        ${MPI_HOST_NUMPROC}
-        ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
-        ${MPIEXEC_POSTFLAGS}
-        ${MPIEXEC_PREFLAGS}
-    )
+    if(WarpX_MPI)
+        set(THIS_MPI_TEST_EXE
+            ${MPIEXEC_EXECUTABLE}
+            ${MPI_ALLOW_ROOT}
+            ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
+            ${MPIEXEC_POSTFLAGS}
+            ${MPIEXEC_PREFLAGS}
+        )
+    else()
+        set(THIS_MPI_TEST_EXE "")
+    endif()
 
     # set Python executable
     if(python)
@@ -245,6 +243,7 @@ function(add_warpx_test
         # add paths for custom Python modules
         set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Regression/Checksum")
         set_property(TEST ${name}.checksum APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+        set_property(TEST ${name}.checksum APPEND PROPERTY ENVIRONMENT "WARPX_COMPUTE=${WarpX_COMPUTE}")
     endif()
 
     # CI: remove test directory after run

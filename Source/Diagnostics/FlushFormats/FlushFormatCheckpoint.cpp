@@ -74,7 +74,7 @@ FlushFormatCheckpoint::WriteToFile (
     // const int nlevels = finestLevel()+1;
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);
 
-    WriteWarpXHeader(checkpointname, geom);
+    WriteWarpXHeader(checkpointname, geom, /*is_checkpoint=*/true);
 
     WriteJobInfo(checkpointname);
 
@@ -185,6 +185,9 @@ FlushFormatCheckpoint::WriteToFile (
             }
 #endif
         }
+
+        warpx.m_fields.write_checkpoints(lev, amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, ""));
+
     }
 
     CheckpointParticles(checkpointname, particle_diags);

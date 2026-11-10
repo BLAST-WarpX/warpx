@@ -67,7 +67,6 @@
 #include <AMReX_GpuBuffer.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuDevice.H>
-#include <AMReX_GpuElixir.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_INT.H>
@@ -204,6 +203,21 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     );
 
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
+
+    // The hybrid-PIC electron-ion temperature relaxation (Q_ei) needs the
+    // shape-aware ion temperature of every charged species, so turn the
+    // deposition on automatically when it is configured. Done here (rather
+    // than in HybridPICModel) because the flag must be known by AllocData.
+    if (!m_do_temperature_deposition && m_charge != 0._prt) {
+        const ParmParse pp_hybrid("hybrid_pic_model");
+        bool solve_electron_energy_equation = false;
+        pp_hybrid.query("solve_electron_energy_equation", solve_electron_energy_equation);
+        std::string nu_ei_expression;
+        if (solve_electron_energy_equation &&
+            pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", nu_ei_expression)) {
+            m_do_temperature_deposition = true;
+        }
+    }
 
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
@@ -351,7 +365,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     m_boundary_conditions.Set_reflect_all_velocities(flag);
 
     // currently supports only isotropic thermal distribution
-    // same distribution is applied to all boundaries
+    // same distribution is applied to all boundaries (the domain faces and,
+    // when boundary.particle_eb = thermal, the embedded boundary)
     const amrex::ParmParse pp_species_boundary("boundary." + species_name);
     if (WarpX::isAnyParticleBoundaryThermal()) {
         amrex::Real boundary_uth = 0;
@@ -429,6 +444,47 @@ PhysicalParticleContainer::BackwardCompatibility ()
         WARPX_ABORT_WITH_MESSAGE(
             "<species>.momentum_distribution_type = radial_expansion is not supported anymore. "
             "Please use momentum_distribution_type = parse_momentum_function instead.");
+    }
+
+    const std::string juttner_drift_msg =
+        "The Maxwell-Juttner bulk drift is now set with the normalized momentum "
+        "<species>.ux_mean/uy_mean/uz_mean (gamma*v/c), optionally selecting between a "
+        "constant and a parser value with "
+        "<species>.maxwell_juttner_u_mean_distribution_type = constant (default) or parser "
+        "(in which case provide <species>.ux_mean_function(x,y,z), uy_mean_function(x,y,z), "
+        "uz_mean_function(x,y,z)).";
+    std::string backward_string;
+    for (const std::string old_param : {"bulk_vel_dir", "beta_distribution_type",
+                                        "beta_function(x,y,z)", "beta"}) {
+        if (pp_species_name.query(old_param, backward_string)) {
+            std::string msg = "<species>.";
+            msg += old_param;
+            msg += " is no longer supported. ";
+            msg += juttner_drift_msg;
+            WARPX_ABORT_WITH_MESSAGE(msg);
+        }
+    }
+
+    std::string mom_dist_s;
+    if (pp_species_name.query("momentum_distribution_type", mom_dist_s) &&
+        mom_dist_s == "maxwell_juttner") {
+        const std::string juttner_temp_msg =
+            "Maxwell-Juttner thermal spread is now specified with temperature_in_eV. "
+            "Use <species>.maxwell_juttner_temperature_in_eV_distribution_type = constant "
+            "(default), parser, or read_from_file, and provide <species>.temperature_in_eV, "
+            "<species>.temperature_in_eV_function(x,y,z), or "
+            "<species>.read_temperature_in_eV_from_path. "
+            "Requires species_type or mass.";
+        for (const std::string old_param :
+             {"theta", "theta_distribution_type", "theta_function(x,y,z)"}) {
+            if (pp_species_name.query(old_param, backward_string)) {
+                std::string msg = "<species>.";
+                msg += old_param;
+                msg += " is no longer supported. ";
+                msg += juttner_temp_msg;
+                WARPX_ABORT_WITH_MESSAGE(msg);
+            }
+        }
     }
 }
 
@@ -547,15 +603,13 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             FArrayBox const* byfab = &By[pti];
             FArrayBox const* bzfab = &Bz[pti];
 
-            Elixir exeli, eyeli, ezeli, bxeli, byeli, bzeli;
-
             if (WarpX::use_fdtd_nci_corr)
             {
                 // Filter arrays Ex[pti], store the result in
                 // filtered_Ex and update pointer exfab so that it
                 // points to filtered_Ex (and do the same for all
                 // components of E and B).
-                applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                applyNCIFilter(lev, pti.tilebox(),
                                filtered_Ex, filtered_Ey, filtered_Ez,
                                filtered_Bx, filtered_By, filtered_Bz,
                                Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
@@ -664,7 +718,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         // filtered_Ex and update pointer cexfab so that it
                         // points to filtered_Ex (and do the same for all
                         // components of E and B)
-                        applyNCIFilter(lev-1, cbox, exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                        applyNCIFilter(lev-1, cbox,
                                        filtered_Ex, filtered_Ey, filtered_Ez,
                                        filtered_Bx, filtered_By, filtered_Bz,
                                        cEx[pti], cEy[pti], cEz[pti],
@@ -716,7 +770,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -724,7 +778,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     if (has_buffer)
                     {
@@ -734,7 +788,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
-                                       lev, lev-1, dt, relative_time, push_type);
+                                       lev, lev-1, dt, relative_time, push_type, WarpX::nox);
                     }
                 } // end of "if skip_deposition"
 
@@ -744,7 +798,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         long const offset = 0;
-                        ImplicitPushXPSubOrbits(pti, fields,
+                        ImplicitPushXPSubOrbits(pti,
                                                 exfab, eyfab, ezfab,
                                                 bxfab, byfab, bzfab,
                                                 implicit_options,
@@ -775,7 +829,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
 
                         long const offset = num_unconverged_particles;
-                        ImplicitPushXPSubOrbits(pti, fields,
+                        ImplicitPushXPSubOrbits(pti,
                                                 cexfab, ceyfab, cezfab,
                                                 cbxfab, cbyfab, cbzfab,
                                                 implicit_options,
@@ -832,7 +886,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
 void
 PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                                                int lev, Real dt)
+                                                int lev, Real dt,
+                                                ImplicitOptions const& implicit_options)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -884,7 +939,8 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
             amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
             WarpXParticleContainer::DepositMassMatrices(pti, wp, uxp, uyp, uzp,
                               Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
-                              bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
+                              bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt,
+                              implicit_options);
 
             amrex::Gpu::synchronize();
         }
@@ -895,8 +951,6 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
 void
 PhysicalParticleContainer::applyNCIFilter (
     int lev, const Box& box,
-    Elixir& exeli, Elixir& eyeli, Elixir& ezeli,
-    Elixir& bxeli, Elixir& byeli, Elixir& bzeli,
     FArrayBox& filtered_Ex, FArrayBox& filtered_Ey, FArrayBox& filtered_Ez,
     FArrayBox& filtered_Bx, FArrayBox& filtered_By, FArrayBox& filtered_Bz,
     const FArrayBox& Ex, const FArrayBox& Ey, const FArrayBox& Ez,
@@ -924,9 +978,9 @@ PhysicalParticleContainer::applyNCIFilter (
 #endif
 
     // Filter Ex (Both 2D and 3D)
-    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()));
-    // Safeguard for GPU
-    exeli = filtered_Ex.elixir();
+    // Allocated on the async arena so that the memory of the previous
+    // iteration stays valid until the GPU kernels using it complete
+    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()), 1, amrex::The_Async_Arena());
     // Apply filter on Ex, result stored in filtered_Ex
 
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ex, Ex, filtered_Ex.box());
@@ -934,37 +988,31 @@ PhysicalParticleContainer::applyNCIFilter (
     ex_ptr = &filtered_Ex;
 
     // Filter Ez
-    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()));
-    ezeli = filtered_Ez.elixir();
+    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Ez, Ez, filtered_Ez.box());
     ez_ptr = &filtered_Ez;
 
     // Filter By
-    filtered_By.resize(amrex::convert(tbox,By.box().ixType()));
-    byeli = filtered_By.elixir();
+    filtered_By.resize(amrex::convert(tbox,By.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_By, By, filtered_By.box());
     by_ptr = &filtered_By;
 #if defined(WARPX_DIM_3D)
     // Filter Ey
-    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()));
-    eyeli = filtered_Ey.elixir();
+    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ey, Ey, filtered_Ey.box());
     ey_ptr = &filtered_Ey;
 
     // Filter Bx
-    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()));
-    bxeli = filtered_Bx.elixir();
+    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Bx, Bx, filtered_Bx.box());
     bx_ptr = &filtered_Bx;
 
     // Filter Bz
-    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()));
-    bzeli = filtered_Bz.elixir();
+    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Bz, Bz, filtered_Bz.box());
     bz_ptr = &filtered_Bz;
 #else
-    amrex::ignore_unused(eyeli, bxeli, bzeli,
-        filtered_Ey, filtered_Bx, filtered_Bz,
+    amrex::ignore_unused(filtered_Ey, filtered_Bx, filtered_Bz,
         Ey, Bx, Bz, ey_ptr, bx_ptr, bz_ptr);
 #endif
 }
@@ -1179,7 +1227,8 @@ void
 PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                   const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                  MomentumPushType momentum_push_type)
+                                  MomentumPushType momentum_push_type,
+                                  std::optional<FieldGatherOrders> gather_orders)
 {
     ABLASTR_PROFILE("PhysicalParticleContainer::PushP()");
 
@@ -1213,16 +1262,20 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
             const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
             const amrex::ParticleReal Ez_external_particle = m_E_external_particle[2];
+#if !defined(WARPX_DIM_RSPHERE)
             const amrex::ParticleReal Bx_external_particle = m_B_external_particle[0];
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
-
+#endif
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
 
             const bool galerkin_interpolation = WarpX::galerkin_interpolation;
             const int nox = WarpX::nox;
+            // Only used with explicitly set gather orders (split_gather below)
+            const FieldGatherOrders orders = gather_orders.value_or(
+                FieldGatherOrders{nox, galerkin_interpolation, nox});
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
             amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
@@ -1262,9 +1315,18 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
-            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
-                               {exteb_runtime_flag},
-                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
+            // fused_gather: gather E and B together with the global order and Galerkin
+            // settings; split_gather: gather E and B separately with the orders given
+            // in gather_orders
+            enum gather_flags : int { fused_gather, split_gather };
+
+            const int gather_runtime_flag = gather_orders ? split_gather : fused_gather;
+
+            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
+                                        CompileTimeOptions<fused_gather,split_gather>>{},
+                               {exteb_runtime_flag, gather_runtime_flag},
+                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
+                                                         auto gather_control)
             {
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
@@ -1272,17 +1334,36 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                 amrex::ParticleReal Exp = Ex_external_particle;
                 amrex::ParticleReal Eyp = Ey_external_particle;
                 amrex::ParticleReal Ezp = Ez_external_particle;
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal Bxp = 0._prt;
+                amrex::ParticleReal Byp = 0._prt;
+                amrex::ParticleReal Bzp = 0._prt;
+#else
                 amrex::ParticleReal Bxp = Bx_external_particle;
                 amrex::ParticleReal Byp = By_external_particle;
                 amrex::ParticleReal Bzp = Bz_external_particle;
+#endif
 
                 if (!t_do_not_gather){
                     // first gather E and B to the particle positions
-                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                   ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                   ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
-                                   nox, galerkin_interpolation);
+                    if (gather_control == fused_gather) {
+                        doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                       dinv, xyzmin, lo, n_rz_azimuthal_modes,
+                                       nox, galerkin_interpolation);
+                    } else {
+                        doDirectGatherVectorField(orders.e_shape, orders.e_galerkin,
+                                                  xp, yp, zp, Exp, Eyp, Ezp,
+                                                  ex_arr, ey_arr, ez_arr,
+                                                  ex_type, ey_type, ez_type,
+                                                  dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                        doDirectGatherVectorField(orders.b_shape, false,
+                                                  xp, yp, zp, Bxp, Byp, Bzp,
+                                                  bx_arr, by_arr, bz_arr,
+                                                  bx_type, by_type, bz_type,
+                                                  dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                    }
                 }
 
                 // Externally applied E and B-field in Cartesian co-ordinates
@@ -1710,13 +1791,14 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                          blp_resample_actual);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_synchronization);
-    const amrex::Real global_numparts = TotalNumberOfParticles();
+    amrex::Real global_numparts = TotalNumberOfParticles();
     ABLASTR_PROFILE_VAR_STOP(blp_resample_synchronization);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_actual);
     if (m_resampler.triggered(timestep, global_numparts))
     {
         Redistribute();
+        global_numparts = TotalNumberOfParticles();
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
@@ -1726,10 +1808,15 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
         }
         deleteInvalidParticles();
         if (verbose) {
+            const amrex::Long new_global_numparts = TotalNumberOfParticles();
             amrex::Print() << Utils::TextMsg::Info(
                 "Resampled " + species_name + " at step " + std::to_string(timestep)
                 + ": macroparticle count decreased by "
-                + std::to_string(static_cast<int>(global_numparts - TotalNumberOfParticles()))
+                + std::to_string(static_cast<int>(global_numparts - new_global_numparts))
+                + " from "
+                + std::to_string(static_cast<int>(global_numparts))
+                + " to "
+                + std::to_string(new_global_numparts)
             );
         }
     }
@@ -1852,13 +1939,16 @@ PhysicalParticleContainer::DepositTemperature (
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }
 
-    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
-        || push_type != PushType::Explicit
+    // The temperature deposit runs its own shape-N moment kernels
+    // (doVarianceDepositionShapeN) and works with any current-deposition
+    // algorithm; implicit pushers and shared-memory deposition change the
+    // u/x staging assumptions and are not supported.
+    if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "Temperature Deposition only works with explicit solvers "
             "and non-shared memory deposition."
         );
     }
@@ -2111,7 +2201,13 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
 
-        // Normalize variance after accumulating sums cell by cell
+        // Normalize variance after accumulating sums cell by cell.
+        // Use tilebox(ixType, nGrow) so each component is converted to its
+        // staggered index type (and grown). growntilebox(ixType) treats the
+        // IntVect as extra ghost growth, not an index-type conversion, and can
+        // miss valid staggered points at grid boundaries.
+        const bool single_pass = (depos_type == TemperatureDepositionType::SINGLE_PASS);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2133,12 +2229,12 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
             amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
 
-            const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
-            const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
-            const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
-
-
-            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const amrex::Box tbx = mfi.tilebox(T_vf[lev][0]->ixType().toIntVect(),
+                                               T_vf[lev][0]->nGrowVect());
+            const amrex::Box tby = mfi.tilebox(T_vf[lev][1]->ixType().toIntVect(),
+                                               T_vf[lev][1]->nGrowVect());
+            const amrex::Box tbz = mfi.tilebox(T_vf[lev][2]->ixType().toIntVect(),
+                                               T_vf[lev][2]->nGrowVect());
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
@@ -2184,7 +2280,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                         }
                     }
                 });
-
         }
 
         amrex::Gpu::streamSynchronize();

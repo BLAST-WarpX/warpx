@@ -12,8 +12,9 @@
 
 #include "CollisionFilterFunc.H"
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/Collision/CollisionBase.H"
 #include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
@@ -35,6 +36,7 @@
  * used for binary Coulomb collisions and the nuclear fusion module.
  */
 class DSMCFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -66,7 +68,8 @@ public:
         /**
          * \brief Executor of the DSMCFunc class. Performs DSMC collisions at the cell level.
          * Note that this function does not yet create the product particles, but
-         * instead fills an array p_mask that stores which pairs result in a collision event.
+         * instead fills an array p_mask that stores, for each pair, the index of
+         * the selected scattering process plus one (or 0 if no collision occurs for that pair).
          *
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
@@ -77,9 +80,9 @@ public:
          * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
-         * @param[out] p_mask is a mask that will be set to true if a fusion event occurs for a given
-         * pair. It is only needed here to store information that will be used later on when actually
-         * creating the product particles.
+         * @param[out] p_mask for each pair: 0 if no collision occurs ;
+         * index+1 of the selected process for that pair if a collision occurs,
+         * where `index` is the index of the process in the `m_scattering_processes_data` array.
          * @param[out] p_pair_indices_1,p_pair_indices_2 arrays that store the indices of the
          * particles of a given pair. They are only needed here to store information that will be used
          * later on when actually creating the product particles.
@@ -102,7 +105,8 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
+            index_type const cell_start_pair, amrex::IntVect const /*global_index*/,
+            index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* /*p_product_data*/,
@@ -142,12 +146,12 @@ public:
                 // reduced to zero from a previous collision
                 if (idcpu1[ I1[i1] ]==amrex::ParticleIdCpus::Invalid ||
                     idcpu2[ I2[i2] ]==amrex::ParticleIdCpus::Invalid ) {
-                    p_mask[pair_index] = false;
+                    p_mask[pair_index] = index_type(0);
                 } else {
 
                     const int max_process_count = 4; // Pre-defined value, for performance reasons
                     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        (m_process_count < max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow 4). Update the max_process_count value in source code to allow more scattering processes."
+                        (m_process_count <= max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow up to 4). Update the max_process_count value in source code to allow more scattering processes."
                     );
                     CollisionPairFilter<max_process_count>(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
@@ -182,7 +186,7 @@ public:
         ScatteringProcess::Executor* m_scattering_processes_data;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     bool use_global_debye_length() { return false; }
 

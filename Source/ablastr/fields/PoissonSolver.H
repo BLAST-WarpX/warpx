@@ -14,6 +14,7 @@
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
+#include <ablastr/fields/MLMGOptions.H>
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 
@@ -65,12 +66,10 @@ namespace ablastr::fields {
  *
  * \param[in] rho The charge density a given species
  * \param[in] finest_level The most refined mesh refinement level
- * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
  */
 inline amrex::Real getMaxNormRho (
     ablastr::fields::ConstMultiLevelScalarField const& rho,
-    int finest_level,
-    amrex::Real & absolute_tolerance)
+    int finest_level)
 {
     amrex::Real max_norm_rho = 0.0;
     for (int lev=0; lev<=finest_level; lev++) {
@@ -79,7 +78,6 @@ inline amrex::Real getMaxNormRho (
     amrex::ParallelDescriptor::ReduceRealMax(max_norm_rho);
 
     if (max_norm_rho == 0) {
-        if (absolute_tolerance == 0.0) { absolute_tolerance = amrex::Real(1e-6); }
         ablastr::warn_manager::WMRecordWarning(
                 "ElectrostaticSolver",
                 "Max norm of rho is 0",
@@ -157,11 +155,11 @@ inline void interpolatePhiBetweenLevels (
 /** Compute the potential `phi` by solving the Poisson equation
  *
  * Uses `rho` as a source, assuming that the source moves at a
- * constant speed \f$\vec{\beta}\f$. This uses the AMReX solver.
+ * constant speed \f$\boldsymbol{\beta}\f$. This uses the AMReX solver.
  *
  * More specifically, this solves the equation
  * \f[
- *   \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
+ *   \nabla^2 r \phi - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
  * \f]
  *
  * \tparam T_PostPhiCalculationFunctor a calculation per level directly after phi was calculated
@@ -170,10 +168,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] rho The charge density a given species
  * \param[out] phi The potential to be computed by this function
  * \param[in] beta Represents the velocity of the source of `phi`
- * \param[in] relative_tolerance The relative convergence threshold for the MLMG solver
- * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
- * \param[in] verbosity The verbosity setting for the MLMG solver
+ * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
  * \param[in] geom the geometry per level (e.g., from AmrMesh)
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
@@ -198,10 +193,7 @@ computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     std::array<amrex::Real, 3> const beta,
-    amrex::Real relative_tolerance,
-    amrex::Real absolute_tolerance,
-    int max_iters,
-    int verbosity,
+    MLMGOptions const & mlmg_options,
     amrex::Vector<amrex::Geometry> const& geom,
     amrex::Vector<amrex::DistributionMapping> const& dmap,
     amrex::Vector<amrex::BoxArray> const& grids,
@@ -262,6 +254,22 @@ computePhi (
         "Components of beta_solver must be < 1.");
 
     amrex::LPInfo info;
+    applyMLMGOptions(info, mlmg_options);
+
+#if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
+    // determine if rho is zero everywhere
+    amrex::Real const max_norm_b = getMaxNormRho(
+        amrex::GetVecOfConstPtrs(rho), finest_level);
+
+    // A charge density that is zero everywhere makes a purely relative
+    // convergence criterion meaningless, so require a finite absolute
+    // tolerance in that case.
+    amrex::Real const absolute_tolerance =
+        (max_norm_b == 0._rt && mlmg_options.absolute_tolerance == 0._rt) ?
+            amrex::Real(1.e-6) : mlmg_options.absolute_tolerance;
+#else
+    amrex::Real const absolute_tolerance = mlmg_options.absolute_tolerance;
+#endif
 
     for (int lev=0; lev<=finest_level; lev++) {
         amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx_scaled
@@ -270,9 +278,6 @@ computePhi (
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
 #if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
-        // determine if rho is zero everywhere
-        const amrex::Real max_norm_b = getMaxNormRho(
-            amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {
@@ -401,8 +406,7 @@ computePhi (
 
         // Solve the Poisson equation
         amrex::MLMG mlmg(*linop); // actual solver defined here
-        mlmg.setVerbose(verbosity);
-        mlmg.setMaxIter(max_iters);
+        applyMLMGOptions(mlmg, mlmg_options);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
 
@@ -417,7 +421,7 @@ computePhi (
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
-                     relative_tolerance, absolute_tolerance );
+                     mlmg_options.relative_tolerance, absolute_tolerance );
 
         const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
         const int ncomp = linop->getNComp();

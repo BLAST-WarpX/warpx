@@ -21,6 +21,7 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "FieldIO.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -215,6 +216,11 @@ WarpX::InitFromCheckpoint ()
             AllocLevelData(lev, ba, dm);
         }
 
+        // Initialize MultiFabs associated with the particle species
+        // Do this here so that the MultiFabs can be included in the diagnostics
+        // and can be read in from the restart data.
+        mypc->AllocData();
+
         ExecutePythonCallback("allocdata");
 
         mypc->ReadHeader(is);
@@ -281,6 +287,23 @@ WarpX::InitFromCheckpoint ()
                 }
             } else {
                 multi_diags->GetDiag(idiag).InitData(*mypc);
+            }
+        }
+
+        // Older checkpoints end here; retain the configured seed for those.
+        // Always read the optional entry when present, independently of RKF45.
+        is >> std::ws;
+        if (!is.eof()) {
+            int substeps = 0;
+            is >> word >> substeps;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                word == "hybrid_pic_substeps" && substeps >= 2 && substeps % 2 == 0,
+                "Invalid hybrid-PIC substep count in checkpoint header");
+            // Fixed-RK4 restarts must honor the input count, which may have been
+            // increased to stabilize the run. Restore the learned count only when
+            // RKF45 is configured, including intervals that skip the restart step.
+            if (m_hybrid_pic_model && m_hybrid_pic_model->m_rkf45_intervals.isActivated()) {
+                m_hybrid_pic_model->m_substeps = substeps;
             }
         }
     }
@@ -398,6 +421,11 @@ WarpX::InitFromCheckpoint ()
                             amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "jz_cp"));
             }
         }
+
+        // Read any fields flagged checkpoint_restart in the field register
+        // (mirrors FlushFormatCheckpoint's write_checkpoints call). Flagged
+        // fields absent from an older checkpoint are skipped, not errors.
+        m_fields.read_restarts(lev, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, ""));
     }
 
     InitPML();
@@ -420,7 +448,6 @@ WarpX::InitFromCheckpoint ()
     reduced_diags->ReadCheckpointData(restart_chkfile);
 
     // Initialize particles
-    mypc->AllocData();
     mypc->Restart(restart_chkfile);
 
     if (m_implicit_solver) {

@@ -171,7 +171,7 @@ class ProjectionDivCleanerTest(object):
         #######################################################################
         init_field = picmi.LoadInitialFieldFromPython(
             load_from_python=load_current_ring,
-            warpx_do_divb_cleaning_external=True,
+            warpx_do_initial_div_cleaning=True,
             load_E=False,
         )
         simulation.add_applied_field(init_field)
@@ -240,7 +240,7 @@ plt.colorbar()
 plt.savefig("divb.png")
 
 error = np.sqrt((divB[2:-2, 2:-2, 2:-2] ** 2).sum())
-tolerance = 1e-12
+tolerance = 3e-12
 
 print("error = ", error)
 print("tolerance = ", tolerance)

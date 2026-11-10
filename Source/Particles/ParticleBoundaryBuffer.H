@@ -82,6 +82,9 @@ private:
     std::vector<std::string> m_boundary_names;
 
     mutable std::vector<std::string> m_species_names;
+    /** Guards the lazy read of m_species_names for this instance.
+     */
+    mutable bool m_species_names_initialized = false;
 };
 
 #endif /*WARPX_PARTICLEBOUNDARYBUFFER_H_*/

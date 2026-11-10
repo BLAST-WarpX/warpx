@@ -120,7 +120,14 @@ class CallbackFunctions(object):
     def clearlist(self):
         """Unregister/clear out all registered C callbacks"""
         self.funcs = []
-        libwarpx.libwarpx_so.remove_python_callback(self.name)
+        # timings of a finalized simulation must not be added to the next one
+        self.time = 0.0
+        self.timers = {}
+        # only reach into the compiled module if it is already loaded:
+        # accessing libwarpx_so would otherwise load it, which needs the
+        # geometry and thus fails if no simulation was initialized
+        if libwarpx.libwarpx_so_loaded:
+            libwarpx.libwarpx_so.remove_python_callback(self.name)
 
     def __bool__(self):
         """Returns True if functions are installed, otherwise False"""

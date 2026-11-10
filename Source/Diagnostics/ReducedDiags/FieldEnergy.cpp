@@ -14,6 +14,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -47,6 +48,16 @@ FieldEnergy::FieldEnergy (const std::string& rd_name)
     constexpr int noutputs = 3; // total energy, E-field energy and B-field energy
     // resize data array
     m_data.resize(noutputs*nLevel, 0.0_rt);
+
+    if (WarpX::GetInstance().evolve_scheme == EvolveScheme::Semi_Implicit_Darwin)
+    {
+        ablastr::warn_manager::WMRecordWarning(
+            "Diagnostics",
+            "With the semi-implicit Darwin scheme, the FieldEnergy diagnostic "
+            "only includes the electrostatic component of the E-field in the "
+            "E-field energy; the inductive component (E = -dA/dt) is not included.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
@@ -170,11 +181,11 @@ FieldEnergy::ComputeNorm2(amrex::MultiFab const& field, [[maybe_unused]]int lev)
         amrex::IntVect const tb_hi = validbox.bigEnd();
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // Lower corner of tile box physical domain
+        // Use the valid-box origin consistently with the index offset below.
         auto const & warpx = WarpX::GetInstance();
         amrex::Geometry const & geom = warpx.Geom(lev);
         amrex::Real const dr = geom.CellSize(0);
-        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(validbox, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x + (is_nodal[0] ? 0._rt : 0.5_rt*dr);
 #endif
 

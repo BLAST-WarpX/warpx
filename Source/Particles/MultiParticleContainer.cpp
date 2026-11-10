@@ -77,6 +77,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -129,8 +130,7 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
 void
 MultiParticleContainer::ReadParameters ()
 {
-    static bool initialized = false;
-    if (!initialized)
+    if (!m_params_initialized)
     {
         const ParmParse pp_particles("particles");
 
@@ -142,6 +142,12 @@ MultiParticleContainer::ReadParameters ()
                        m_B_ext_particle_s.end(),
                        m_B_ext_particle_s.begin(),
                        ::tolower);
+#if defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_B_ext_particle_s == "none",
+            "RSPHERE does not support external magnetic fields: "
+            "particles.B_ext_particle_init_style must be none.");
+#endif
         pp_particles.query("E_ext_particle_init_style", m_E_ext_particle_s);
         std::transform(m_E_ext_particle_s.begin(),
                        m_E_ext_particle_s.end(),
@@ -322,8 +328,10 @@ MultiParticleContainer::ReadParameters ()
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
                 if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
-                    const auto physical_species =
-                        species::from_string(type_string);
+                    const auto physical_species = species::from_string(type_string);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        physical_species.has_value(),
+                        "'" + type_string + "' is not a valid species_type");
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }
@@ -396,7 +404,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_qed_schwinger, "zmax", m_qed_schwinger_zmax);
         }
 #endif
-        initialized = true;
+        m_params_initialized = true;
     }
 }
 
@@ -413,12 +421,12 @@ MultiParticleContainer::GetParticleContainerFromName (const std::string& name) c
 }
 
 amrex::ParticleReal
-MultiParticleContainer::maxParticleVelocity() {
-    amrex::ParticleReal max_v = 0.0_prt;
+MultiParticleContainer::maxParticleDtInv() {
+    amrex::ParticleReal max_dt_inv = 0.0_prt;
     for (const auto &pc : allcontainers) {
-        max_v = std::max(max_v, pc->maxParticleVelocity());
+        max_dt_inv = amrex::max(max_dt_inv, pc->maxParticleDtInv());
     }
-    return max_v;
+    return max_dt_inv;
 }
 
 void
@@ -434,6 +442,8 @@ MultiParticleContainer::AllocData ()
     for (auto& pc : allcontainers) {
         pc->AllocData();
     }
+
+    collisionhandler->AllocData();
 }
 
 void
@@ -506,25 +516,18 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev)->setVal(0.0);
             }
 
-            // If using a preconditioner (pc), suborbit particles deposit their contribution
-            // during the nonlinear-stage of JFNK. Do not reset if from linear stage of JNK.
-            const bool zero_mass_matrices_pc = implicit_options->use_mass_matrices_pc &&
-                                              !implicit_options->linear_stage_of_jfnk;
-            if (zero_mass_matrices_pc) {
-                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
-            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition,
+                   position_push_type, momentum_push_type, implicit_options);
     }
 }
 
 void
 MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                                             int lev, amrex::Real dt)
+                                             int lev, amrex::Real dt,
+                                             ImplicitOptions const& implicit_options)
 {
     using ablastr::fields::Direction;
 
@@ -535,7 +538,7 @@ MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& 
     }
 
     for (auto& pc : allcontainers) {
-        pc->DepositMassMatrices(fields, lev, dt);
+        pc->DepositMassMatrices(fields, lev, dt, implicit_options);
     }
 }
 
@@ -551,10 +554,11 @@ void
 MultiParticleContainer::PushP (int lev, Real dt,
                                const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                               MomentumPushType momentum_push_type)
+                               MomentumPushType momentum_push_type,
+                               std::optional<FieldGatherOrders> gather_orders)
 {
     for (auto& pc : allcontainers) {
-        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type);
+        pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type, gather_orders);
     }
 }
 
@@ -586,7 +590,8 @@ MultiParticleContainer::GetZeroChargeDensity (const int lev)
 void
 MultiParticleContainer::DepositCurrent (
     ablastr::fields::MultiLevelVectorField const & J,
-    const amrex::Real dt, const amrex::Real relative_time)
+    const amrex::Real dt, const amrex::Real relative_time,
+    const PushType push_type, const std::optional<int> particle_shape)
 {
     // Reset the J arrays
     for (const auto& J_lev : J)
@@ -599,16 +604,9 @@ MultiParticleContainer::DepositCurrent (
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
-        pc->DepositCurrent(J, dt, relative_time);
+        pc->DepositCurrent(J, dt, relative_time, push_type, particle_shape);
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int lev = 0; lev < J.size(); ++lev)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
-            J[lev][0], J[lev][1], J[lev][2], lev);
-    }
-#endif
 }
 
 void
@@ -627,25 +625,17 @@ MultiParticleContainer::DepositCharge (
 
     bool const local = true;
     bool const reset = false;
-    bool const apply_boundary_and_scale_volume = false;
     bool const interpolate_across_levels = false;
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
         if (pc->do_not_deposit) { continue; }
-        pc->DepositCharge(rho, local, reset, apply_boundary_and_scale_volume,
-                              interpolate_across_levels);
+        pc->DepositCharge(rho, local, reset, interpolate_across_levels);
     }
 
     // Push the particles back in time
     if (relative_time != 0.) { PushX(-relative_time); }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int lev = 0; lev < rho.size(); ++lev)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
-    }
-#endif
 }
 
 void
@@ -679,13 +669,14 @@ MultiParticleContainer::DepositTemperatures (
 }
 
 std::unique_ptr<MultiFab>
-MultiParticleContainer::GetChargeDensity (int lev, bool local)
+MultiParticleContainer::GetChargeDensityOnLevel (int lev, bool local, bool finalize)
 {
+
     std::unique_ptr<MultiFab> rho = GetZeroChargeDensity(lev);
 
     for (auto& container : allcontainers) {
         if (container->do_not_deposit) { continue; }
-        const std::unique_ptr<MultiFab> rhoi = container->GetChargeDensity(lev, true);
+        const auto rhoi = container->GetChargeDensityOnLevel(lev, /*local=*/true, /*finalize=*/false);
         MultiFab::Add(*rho, *rhoi, 0, 0, rho->nComp(), rho->nGrowVect());
     }
     if (!local) {
@@ -697,6 +688,12 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
             WarpX::do_single_precision_comms, gm.periodicity());
     }
 
+    if (finalize) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !local,
+            "GetChargeDensityOnLevel requires local=false when finalize=true.");
+        WarpX::GetInstance().FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
+    }
     return rho;
 }
 
@@ -898,12 +895,17 @@ MultiParticleContainer::deleteInvalidParticles ()
 }
 
 void
-MultiParticleContainer::RedistributeLocal (const int max_cells_travelled)
+MultiParticleContainer::RedistributeLocal (const amrex::IntVect& max_cells_travelled)
 {
+    ABLASTR_PROFILE("MultiParticleContainer::RedistributeLocal");
     for (auto& pc : allcontainers) {
-        // The local argument specifies the number of cells a particle
-        // might have travelled outside its current tile / box.
-        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/0, /*local=*/max_cells_travelled);
+        // max_cells_travelled specifies, per direction, the number of cells a
+        // particle might have travelled outside its current tile / box. Passing
+        // it per direction lets the local redistribute exchange particles only
+        // as far as needed along each axis (the cell size, and hence the number
+        // of cells crossed, differs between dimensions).
+        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/amrex::IntVect(0),
+                         /*local=*/true, /*max_cells_moved=*/max_cells_travelled);
     }
 }
 
@@ -1239,8 +1241,23 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
-    for (auto& pc : allcontainers) {
-        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+    if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting ||
+        WarpX::eb_particle_boundary == ParticleBoundaryType::Thermal) {
+        auto& warpx = WarpX::GetInstance();
+        for (auto& pc : allcontainers) {
+            amrex::ParticleReal const mass = pc->getMass();
+            amrex::ParticleReal const uth = pc->getBoundaryThermalVelocity();
+            for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
+                amrex::Real const dt_lev = warpx.getdt(lev);
+                scrapeParticlesAtEB(*pc, distance_to_eb, lev,
+                    ParticleBoundaryProcess::ParticleBoundaryInteraction{
+                        dt_lev, mass, WarpX::eb_particle_boundary, uth});
+            }
+        }
+    } else {
+        for (auto& pc : allcontainers) {
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        }
     }
 }
 
@@ -1644,7 +1661,7 @@ MultiParticleContainer::doQEDSchwinger ()
     for (MFIter mfi(Ex, TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
         // Make the box cell centered to avoid creating particles twice on the tile edges
-        amrex::Box box = enclosedCells(mfi.nodaltilebox());
+        amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
 
         // Get the box representing global Schwinger boundaries
         const amrex::Box global_schwinger_box = ComputeSchwingerGlobalBox();

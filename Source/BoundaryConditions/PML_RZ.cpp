@@ -45,26 +45,19 @@ PML_RZ::PML_RZ (int lev, amrex::BoxArray const& grid_ba, amrex::DistributionMapp
 {
     using ablastr::fields::Direction;
 
-    bool const remake = false;
-    bool const redistribute_on_remake = false;
-
     amrex::MultiFab const& Er_fp = *fields.get(FieldType::Efield_fp, Direction{0}, lev);
     amrex::MultiFab const& Et_fp = *fields.get(FieldType::Efield_fp, Direction{1}, lev);
     amrex::BoxArray const ba_Er = amrex::convert(grid_ba, Er_fp.ixType().toIntVect());
     amrex::BoxArray const ba_Et = amrex::convert(grid_ba, Et_fp.ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Er, grid_dm, Er_fp.nComp(), Er_fp.nGrowVect(), 0.0_rt,
-                              remake, redistribute_on_remake);
-    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Et, grid_dm, Et_fp.nComp(), Et_fp.nGrowVect(), 0.0_rt,
-                              remake, redistribute_on_remake);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Er, grid_dm, Er_fp.nComp(), Er_fp.nGrowVect(), 0.0_rt);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Et, grid_dm, Et_fp.nComp(), Et_fp.nGrowVect(), 0.0_rt);
 
     amrex::MultiFab const& Br_fp = *fields.get(FieldType::Bfield_fp,Direction{0},lev);
     amrex::MultiFab const& Bt_fp = *fields.get(FieldType::Bfield_fp,Direction{1},lev);
     amrex::BoxArray const ba_Br = amrex::convert(grid_ba, Br_fp.ixType().toIntVect());
     amrex::BoxArray const ba_Bt = amrex::convert(grid_ba, Bt_fp.ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Br, grid_dm, Br_fp.nComp(), Br_fp.nGrowVect(), 0.0_rt,
-                              remake, redistribute_on_remake);
-    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_Bt, grid_dm, Bt_fp.nComp(), Bt_fp.nGrowVect(), 0.0_rt,
-                              remake, redistribute_on_remake);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Br, grid_dm, Br_fp.nComp(), Br_fp.nGrowVect(), 0.0_rt);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_Bt, grid_dm, Bt_fp.nComp(), Bt_fp.nGrowVect(), 0.0_rt);
 
 }
 
