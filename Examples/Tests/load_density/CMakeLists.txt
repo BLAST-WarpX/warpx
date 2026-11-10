@@ -90,3 +90,13 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_rz_refined_axis_deposition_picmi
+    RZ
+    1
+    inputs_test_rz_refined_axis_deposition_picmi.py
+    OFF
+    OFF
+    OFF
+)
