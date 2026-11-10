@@ -1561,6 +1561,14 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     pml_ncell: int | None = Field(
         default=None, description="The depth of the PML, in number of cells"
     )
+    pml_ncell_vect: list[int] | None = Field(
+        default=None,
+        description="Finite-difference PML thickness in cells along each mesh direction.",
+    )
+    pml_delta_vect: list[int] | None = Field(
+        default=None,
+        description="Finite-difference PML damping depth in cells along each mesh direction.",
+    )
     # option name (warpx_periodic_single_box_fft) differs from the field name:
     psatd_periodic_single_box_fft: bool | None = Field(
         default=None,
@@ -1615,6 +1623,8 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         self.grid.grid_initialize_inputs()
 
         pywarpx.warpx.pml_ncell = self.pml_ncell
+        pywarpx.warpx.pml_ncell_vect = self.pml_ncell_vect
+        pywarpx.warpx.pml_delta_vect = self.pml_delta_vect
         pywarpx.warpx.conforming_radial_interface = self.conforming_radial_interface
 
         if self.method == "PSATD":

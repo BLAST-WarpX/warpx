@@ -1197,6 +1197,25 @@ Additional PML parameters
     the absorption coefficients of the PML increase.
     At a mesh-refinement boundary, this depth must span at least one coarse cell in each absorbing direction.
 
+.. pp:param:: warpx.pml_ncell_vect
+    :type: list of integers
+    :optional:
+
+    Set the thickness of a finite-difference PML separately in each mesh direction.
+    Supply one positive cell count per direction. These values override
+    :pp:param:`warpx.pml_ncell`. For example, on an RZ mesh with half the radial spacing
+    and the same axial spacing as a reference mesh, ``8 4`` matches the physical
+    thickness of a four-cell reference absorber in both directions.
+
+.. pp:param:: warpx.pml_delta_vect
+    :type: list of integers
+    :optional:
+
+    Set the damping depth in positive cell counts for each mesh direction. These
+    values override :pp:param:`warpx.pml_delta` for a finite-difference PML.
+    Specify both directional parameters when matching the physical damping profile
+    and thickness of absorbers at different mesh spacings.
+
 .. pp:param:: warpx.pml_match_parent_at_physical_boundary
     :type: ``bool``
     :default: ``1``

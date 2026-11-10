@@ -101,7 +101,42 @@ foreach(placement IN ITEMS exterior interior)
         OFF
         OFF
     )
+    add_warpx_test(
+        test_3d_pml_directional_shell_${placement}
+        3
+        1
+        "inputs_base_3d_pml_directional_shell.py ${pml_option_${placement}}"
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_3d_pml_directional_${placement}
+        3
+        1
+        "inputs_base_3d_pml_physical_boundary.py ${pml_option_${placement}} --directional --reference ../test_3d_pml_physical_boundary_${placement}/pml_response.npz"
+        OFF
+        OFF
+        test_3d_pml_physical_boundary_${placement}
+    )
 endforeach()
+if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
+    foreach(invalid IN ITEMS length value)
+        add_warpx_test(
+            test_3d_pml_directional_invalid_${invalid}
+            3
+            1
+            "inputs_base_3d_pml_physical_boundary.py --invalid ${invalid}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+    set_tests_properties(test_3d_pml_directional_invalid_length.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "needs one value per mesh direction")
+    set_tests_properties(test_3d_pml_directional_invalid_value.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "requires positive cell counts")
+endif()
 
 if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
     # The refined patch spans the periodic y direction, including the stepped
