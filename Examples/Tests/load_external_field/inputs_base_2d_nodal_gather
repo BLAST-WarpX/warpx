@@ -12,7 +12,8 @@ warpx.fine_tag_lo = 0.25 0.25
 warpx.fine_tag_hi = 0.75 0.75
 boundary.field_lo = periodic periodic
 boundary.field_hi = periodic periodic
-warpx.pml_ncell = 2
+# Keep a nonzero coarse-patch PML for each tested refinement ratio.
+warpx.pml_ncell = 6
 warpx.do_dive_cleaning = 0
 warpx.do_initial_div_cleaning = 0
 warpx.use_filter = 0
