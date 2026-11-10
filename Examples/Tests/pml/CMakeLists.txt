@@ -80,6 +80,37 @@ foreach(size IN ITEMS 24 96)
 endforeach()
 
 if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
+    # The refined patch spans the periodic y direction, including the stepped
+    # case where the active x/z absorbers extend into the patch's bounding box.
+    set(patch_box "(abs(x)<0.5)*(abs(z)<0.5)")
+    set(patch_stepped "${patch_box}*((x<0)+(z<0)>0)")
+    foreach(layout IN ITEMS box stepped)
+        add_warpx_test(
+            test_3d_coarse_pml_periodic_${layout}
+            3
+            1
+            "inputs_base_3d_pml_coarse_resolution amr.ref_ratio_vect=2 4 2 warpx.ref_patch_function(x,y,z)=if(${patch_${layout}},1,0) warpx.pml_ncell=2 warpx.pml_delta=2 amrex.fpe_trap_zero=1 max_step=1"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+    foreach(parameter IN ITEMS pml_ncell pml_delta)
+        add_warpx_test(
+            test_3d_coarse_${parameter}_unresolved
+            3
+            1
+            "inputs_base_3d_pml_coarse_resolution warpx.${parameter}=1"
+            OFF
+            OFF
+            OFF
+        )
+        set_tests_properties(
+            test_3d_coarse_${parameter}_unresolved.run
+            PROPERTIES PASS_REGULAR_EXPRESSION "requires warpx[.]${parameter}"
+        )
+    endforeach()
+
     add_warpx_test(
         test_3d_pml_conflicting_faces_rejected
         3
