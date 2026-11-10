@@ -268,6 +268,29 @@ namespace
     }
 
 
+    // All occupied columns must reach both physical boundaries. A stepped layout
+    // can span the domain in its bounding box and still contain internal faces.
+    bool
+    spans_physical_direction (BoxArray const& grids, Box const& bounds, Box const& domain,
+                              bool rectangular, int d)
+    {
+        if (bounds.smallEnd(d) != domain.smallEnd(d) || bounds.bigEnd(d) != domain.bigEnd(d)) {
+            return false;
+        }
+        if (rectangular) { return true; }
+        for (int i = 0; i < grids.size(); ++i) {
+            Box const& grid = grids[i];
+            bool const missing_lo = grid.smallEnd(d) > domain.smallEnd(d) &&
+                                    !grids.contains(amrex::adjCellLo(grid, d));
+            bool const missing_hi = grid.bigEnd(d) < domain.bigEnd(d) &&
+                                    !grids.contains(amrex::adjCellHi(grid, d));
+            if (missing_lo || missing_hi) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     BoxArray
     MakeBoxArray (bool is_single_box_domain, const amrex::Box& regular_domain,
                     const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
@@ -992,31 +1015,61 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         BoxArray grid_cba = grid_ba;
         grid_cba.coarsen(ref_ratio);
 
+        IntVect cncells = IntVect(ncell)/ref_ratio;
+        IntVect cdelta = IntVect(delta)/ref_ratio;
+        bool match_physical_pml = true;
+        amrex::ParmParse("warpx").query("pml_match_parent_at_physical_boundary", match_physical_pml);
+        IntVect match_parent(0);
+        Box const& physical_domain = cgeom->Domain();
+        Box physical_interior = physical_domain;
+        Box const bounds = grid_cba.minimalBox();
+        bool const rectangular = bounds.numPts() == grid_cba.numPts();
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            if (match_physical_pml &&
+                WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD &&
+                ref_ratio[d] > 1 && (do_pml_Lo[d] || do_pml_Hi[d]) &&
+                spans_physical_direction(grid_cba, bounds, physical_domain, rectangular, d)) {
+                // The coarse patch and the parent advance the same Maxwell response
+                // at this physical boundary. Subtract it with the same discrete PML.
+                match_parent[d] = 1;
+                cncells[d] = ncell;
+                cdelta[d] = delta;
+                if (do_pml_in_domain) {
+                    if (do_pml_Lo[d]) { physical_interior.growLo(d, -ncell); }
+                    if (do_pml_Hi[d]) { physical_interior.growHi(d, -ncell); }
+                }
+            }
+        }
         BoxArray grid_cba_reduced = grid_cba;
         if (do_pml_in_domain) {
             BoxList bl = grid_cba.boxList();
             for (auto& b : bl) {
                 for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                    if (match_parent[idim]) { continue; }
                     if (do_pml_Lo[idim]) {
                         Box const& bb = amrex::adjCellLo(b, idim);
                         if ( ! grid_cba.intersects(bb) ) {
-                            b.growLo(idim, -ncell/ref_ratio[idim]);
+                            b.growLo(idim, -cncells[idim]);
                         }
                     }
                     if (do_pml_Hi[idim]) {
                         Box const& bb = amrex::adjCellHi(b, idim);
                         if ( ! grid_cba.intersects(bb) ) {
-                            b.growHi(idim, -ncell/ref_ratio[idim]);
+                            b.growHi(idim, -cncells[idim]);
                         }
                     }
                 }
             }
             grid_cba_reduced = BoxArray(std::move(bl));
+            if (physical_interior != physical_domain) {
+                // A physical absorber can span several coarsened FABs.
+                grid_cba_reduced = amrex::intersect(grid_cba_reduced, physical_interior);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!grid_cba_reduced.empty(),
+                    "The in-domain coarse-patch PML must leave regular cells.");
+            }
         }
         Box const cdomain = grid_cba_reduced.minimalBox();
-
-        const IntVect cncells = IntVect(ncell)/ref_ratio;
-        IntVect cdelta = IntVect(delta)/ref_ratio;
+        bool const single_coarse_domain = cdomain.numPts() == grid_cba_reduced.numPts();
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             if (cncells[idim] > 0 && cdelta[idim] > 0) { continue; }
@@ -1041,12 +1094,12 @@ PML::PML (const int lev, const BoxArray& grid_ba,
             }
         }
 
-        const BoxArray& cba = ::MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
+        const BoxArray& cba = ::MakeBoxArray(single_coarse_domain, cdomain, *cgeom, grid_cba_reduced,
                                            cncells, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
         DistributionMapping cdm;
         if (do_similar_dm_pml) {
             auto ng_sim = amrex::elemwiseMax(amrex::elemwiseMax(nge, ngb), ngf);
-            cdm = amrex::MakeSimilarDM(cba, grid_cba_reduced, grid_dm, ng_sim);
+            cdm = amrex::MakeSimilarDM(cba, grid_cba, grid_dm, ng_sim);
         } else {
             cdm.define(cba);
         }
@@ -1121,7 +1174,7 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         fields.alloc_init(FieldType::pml_j_cp, Direction{1}, lev, cba_jy, cdm, 1, ngb, 0.0_rt, false, false);
         fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, 1, ngb, 0.0_rt, false, false);
 
-        single_domain_box = is_single_box_domain ? cdomain : Box();
+        single_domain_box = single_coarse_domain ? cdomain : Box();
         sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, &grid_cba_reduced, cgeom->CellSize(),
                                                    cncells, cdelta, single_domain_box, v_sigma_sb);
 
