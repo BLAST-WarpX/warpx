@@ -182,9 +182,9 @@ namespace
                 ParticleUtils::transform_momentum_to_cartesian(ux, uy, uz, theta, phi);
 #endif
             } else {
-                amrex::ParticleReal nx = src.m_runtime_rdata[m_normal_index][i_src];
-                amrex::ParticleReal ny = src.m_runtime_rdata[m_normal_index+1][i_src];
-                amrex::ParticleReal nz = src.m_runtime_rdata[m_normal_index+2][i_src];
+                amrex::ParticleReal const nx = src.m_runtime_rdata[m_normal_index][i_src];
+                amrex::ParticleReal const ny = src.m_runtime_rdata[m_normal_index+1][i_src];
+                amrex::ParticleReal const nz = src.m_runtime_rdata[m_normal_index+2][i_src];
                 amrex::ParticleReal un = -1._prt;
                 amrex::ParticleReal ut1 = 0._prt;
                 amrex::ParticleReal ut2 = 0._prt;
