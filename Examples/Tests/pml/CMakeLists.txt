@@ -323,7 +323,7 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
     )
     set_tests_properties(
         test_rz_radial_interface_wrong_grid_picmi_restart.run
-        PROPERTIES PASS_REGULAR_EXPRESSION "different Maxwell grids"
+        PROPERTIES PASS_REGULAR_EXPRESSION "checkpoint and the requested radial interface"
     )
     add_warpx_test(
         test_rz_radial_interface_particle_rejected_picmi
