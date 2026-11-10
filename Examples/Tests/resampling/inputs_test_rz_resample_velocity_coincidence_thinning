@@ -35,8 +35,8 @@ ring.zmax = 0.25e-3
 ring.do_not_push = 1
 ring.initialize_self_fields = 0
 ring.momentum_distribution_type = parse_momentum_function
-ring.momentum_function_ux(x,y,z) = -0.1*y/sqrt(x^2+y^2)
-ring.momentum_function_uy(x,y,z) = 0.1*x/sqrt(x^2+y^2)
+ring.momentum_function_ux(x,y,z) = -0.1*sin(atan2(y,x))
+ring.momentum_function_uy(x,y,z) = 0.1*cos(atan2(y,x))
 ring.momentum_function_uz(x,y,z) = 0.0
 
 ring.do_resampling = 1
