@@ -75,3 +75,34 @@ add_warpx_test(
     OFF  # checksum (RZ current normalization oracle)
     OFF  # dependency
 )
+
+# Exercise physical drive sizes smaller than a cell in one direction.
+add_warpx_test(
+    test_2d_prescribed_current_subcell
+    2
+    1
+    "inputs_test_2d_prescribed_current_injection ${prescribed_current_waveform} ${prescribed_current_override} warpx.current_injection.pair_0.drive.zlo=0.015625 warpx.current_injection.pair_0.drive.zhi=0.046875 warpx.current_injection.pair_0.drive.A=0.03125"
+    "analysis.py --jx-integral 750 --jy-integral 1500 --jz-integral -375"
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_prescribed_current_subcell
+    3
+    1
+    "inputs_base_3d_prescribed_current_injection ${prescribed_current_waveform} ${prescribed_current_override} warpx.current_injection.pair_0.drive.ylo=0.015625 warpx.current_injection.pair_0.drive.yhi=0.046875 warpx.current_injection.pair_0.drive.A=0.015625"
+    "analysis.py --jx-integral 1250 --jy-integral -625 --check-continuity"
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_prescribed_current_refined_shell
+    RZ
+    1
+    "inputs_test_rz_prescribed_current_injection ${prescribed_current_waveform} amr.n_cell=64 64 amr.max_grid_size=64 amr.max_level=1 warpx.fine_tag_lo=0.375 -0.125 warpx.fine_tag_hi=0.625 0.125 warpx.n_rz_azimuthal_modes=1 warpx.n_current_deposition_buffer=0 warpx.n_field_gather_buffer=0 warpx.pml_ncell=4 warpx.pml_delta=4"
+    "analysis_rz_refined_shell.py diags/diag1000001"
+    OFF
+    OFF
+)

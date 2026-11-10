@@ -4219,8 +4219,10 @@ included in the Hybrid-PIC ion current.
 
 The antenna supports static mesh refinement (SMR) in 2D XZ and 3D with explicit or theta-implicit
 field evolution and no moving window. Antenna regions may span refinement boundaries.
-Particles are seeded on the finest available cells, with weights set by each cell's
-physical volume; covered coarse cells do not duplicate the source. The displacement
+Each leaf cell intersecting the drive seeds a pair at its center. The weights use the
+physical overlap of the drive with that cell, including fractional cells and the
+annular volume in RZ. This preserves the integrated source of a subcell drive.
+The particle shape distributes the cell-averaged source across neighboring grid points. The displacement
 limit uses the finest cell spacing. On restart, all levels are reconstructed from the
 waveform integral at the checkpoint time. RZ supports explicit Yee SMR; its
 cylindrical absorbing layers require exterior vacuum without divergence cleaning.
@@ -4256,8 +4258,8 @@ For each index ``N`` (starting from 0):
     Cross-sectional area of the antenna region [m^2] used to convert current :math:`I(t)`
     to current density :math:`J = I(t)/A`. In RZ, this parameter is optional and unused
     for a radial (``dir = 0``) drive: WarpX instead applies the coaxial profile
-    :math:`J_r = I(t)/(2\pi r L_z)`, where :math:`L_z` is the discrete axial extent of
-    the drive box.
+    :math:`J_r = I(t)/(2\pi r L_z)`, where :math:`L_z` is the physical axial length of the drive inside the domain,
+    shared by all refinement levels.
 
 * ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
     Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
