@@ -397,6 +397,63 @@ struct Bound {
                            });
     }
 };
+// Match both tangential E and the integrated normal B at startup. Faraday
+// subsequently preserves the normal condition when the tangential traces agree.
+void
+check_trace (Matrix const& map, Vector const& source, Vector const& target) {
+    auto const mat = map.view();
+    auto const* x = source.data();
+    auto const* y = target.data();
+    amrex::ReduceOps<amrex::ReduceOpMax, amrex::ReduceOpMax> ops;
+    amrex::ReduceData<Real, Real> data(ops);
+    using Tuple = decltype(data)::Type;
+    ops.eval(static_cast<int>(target.size()), data,
+             [=] AMREX_GPU_DEVICE(int i) -> Tuple {
+                 auto const prediction = mat.apply(i, x);
+                 return {std::abs(y[i] - prediction),
+                         amrex::max(std::abs(y[i]), std::abs(prediction))};
+             });
+    auto const result = data.value();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        amrex::get<0>(result) <= 128._rt *
+                                     std::numeric_limits<Real>::epsilon() *
+                                     amrex::get<1>(result),
+        "Initial tangential electric and normal magnetic traces must agree "
+        "across the Yee surface.");
+}
+
+void
+check_normal_flux (WarpX& w, std::vector<Site> const& boundary,
+                   Point const& ratio) {
+    Sites coarse, fine;
+    Rows average(boundary.size());
+    for (auto const& face : boundary) {
+        auto const c = coarse.insert(face);
+        int const normal = face[0];
+        auto const u = (normal + 1) % 3, v = (normal + 2) % 3;
+        Point p = coord(face);
+        for (int d = 0; d < 3; ++d) {
+            p[d] *= ratio[d];
+        }
+        for (int a = 0; a < ratio[u]; ++a) {
+            for (int b = 0; b < ratio[v]; ++b) {
+                auto const f =
+                    fine.insert(site(normal, shift(shift(p, u, a), v, b)));
+                average[c][f] = 1._rt / (ratio[u] * ratio[v]);
+            }
+        }
+    }
+    Vector bc(coarse.ordered.size()), bf(fine.ordered.size());
+    Bound readc, readf;
+    readc.bind(w.m_fields.get_alldirs(FieldType::Bfield_fp, 0), coarse);
+    readf.bind(w.m_fields.get_alldirs(FieldType::Bfield_fp, 1), fine);
+    readc.read(bc);
+    readf.read(bf);
+    Matrix map;
+    map.set(average);
+    check_trace(map, bf, bc);
+}
+
 } // namespace
 #endif
 
@@ -473,6 +530,10 @@ struct CompositeYeeSurface::Implementation {
             }
         }
         prolong.set(p);
+        edges[0].read(electric[0]);
+        edges[1].read(electric[1]);
+        check_trace(prolong, electric[0], electric[1]);
+        check_normal_flux(w, boundary, r);
         transpose.set(pt);
         // Every fine surface edge interpolates a coarse tangential trace. The
         // positive coarse dual volumes make the Jacobi solve contractive.

@@ -840,8 +840,10 @@ WarpX::InitData ()
             gamma_boost == 1.0_rt && !do_fluid_species && m_num_mirrors == 0 &&
             mypc->nLasers() == 0 && mypc->nSpeciesGatherFromMainGrid() == 0 &&
             mypc->nSpeciesDepositOnMainGrid() == 0 &&
-            m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::default_zero &&
-            m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero &&
+            (m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::default_zero ||
+             m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::constant) &&
+            (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero ||
+             m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::constant) &&
             mypc->m_E_ext_particle_s != "read_from_file" && mypc->m_B_ext_particle_s != "read_from_file",
             "The experimental conforming surface requires fresh serial explicit staggered Yee, "
             "one static refinement, no divergence cleaning and energy-conserving gathering.");
