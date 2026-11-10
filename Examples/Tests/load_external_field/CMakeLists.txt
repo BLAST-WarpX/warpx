@@ -15,6 +15,21 @@ foreach(style IN ITEMS constant parser)
     endforeach()
 endforeach()
 
+if(WarpX_EB)
+    foreach(ratio IN ITEMS "2 2 1" "1 2 2" "2 2 2")
+        string(REPLACE " " "x" layout "${ratio}")
+        add_warpx_test(
+            test_3d_refined_magnetic_flux_${layout}
+            3
+            1
+            "inputs_base_3d_refined_magnetic_flux.py --ratio ${ratio}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+endif()
+
 add_warpx_test(
     test_3d_load_external_field_grid_picmi  # name
     3  # dims

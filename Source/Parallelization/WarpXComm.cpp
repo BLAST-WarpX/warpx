@@ -504,6 +504,15 @@ namespace
                 int const components = field_aux[lev][0]->nComp();
                 Vector<Array<BCRec, AMREX_SPACEDIM>> const boundary_conditions(
                     components);
+                // FaceDivFree supports only ratios 2 and 4 in each direction.
+                // FaceLinear copies a coarse face to its subfaces and interpolates
+                // in the normal direction. Each fine cell then inherits the coarse
+                // divergence, also along directions with unit refinement.
+                amrex::Interpolater* face_interp = &amrex::face_divfree_interp;
+                if (std::any_of(refinement_ratio.begin(), refinement_ratio.end(),
+                                [](int r) { return r != 2 && r != 4; })) {
+                    face_interp = &amrex::face_linear_interp;
+                }
                 Array<IArrayBox*, AMREX_SPACEDIM> const solve_mask{};
                 for (MFIter mfi(*field_aux[lev][0]); mfi.isValid(); ++mfi) {
                     Array<FArrayBox*, AMREX_SPACEDIM> coarse_faces{};
@@ -518,7 +527,7 @@ namespace
                             &(*field_aux[lev][component])[mfi];
                     }
                     Box const cells = amrex::enclosedCells(mfi.validbox());
-                    amrex::face_divfree_interp.interp_arr(
+                    face_interp->interp_arr(
                         coarse_faces, 0, fine_faces, 0, components, cells,
                         refinement_ratio, solve_mask, warpx.Geom(lev - 1),
                         warpx.Geom(lev), boundary_conditions, 0, 0,
