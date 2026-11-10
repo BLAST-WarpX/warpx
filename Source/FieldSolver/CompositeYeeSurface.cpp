@@ -73,6 +73,9 @@ CompositeYeeSurface::CheckRestartIdentity (WarpX& w,
         "A conforming Yee checkpoint must be restarted with the same interface "
         "solver.");
     if (enabled) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !std::filesystem::exists(std::filesystem::path(directory) / "Level_1" / "pml_Bx_fp_H"),
+            "This checkpoint evolved an interior absorber on its stepped Yee interface.");
         std::ifstream marker(file);
         std::ostringstream text;
         text << marker.rdbuf();

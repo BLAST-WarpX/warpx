@@ -1282,7 +1282,10 @@ WarpX::InitPML ()
             pml[lev] = std::make_unique<PML>(
                 lev, boxArray(lev), DistributionMap(lev), do_similar_dm_pml,
                 &Geom(lev), &Geom(lev-1),
-                pml_ncell, pml_delta, refRatio(lev-1),
+                // A stepped box union allocates absorbers around each internal
+                // gap even when all exterior face flags are zero. The shared
+                // Maxwell trace owns these fields, so this level has no PML cells.
+                m_use_composite_yee_surface ? 0 : pml_ncell, pml_delta, refRatio(lev-1),
                 dt[lev], nox_fft, noy_fft, noz_fft, grid_type,
                 do_moving_window, pml_has_particles, do_pml_in_domain,
                 m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning, do_pml_divb_cleaning,
