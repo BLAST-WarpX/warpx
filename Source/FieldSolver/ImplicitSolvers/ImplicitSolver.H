@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus, Debojyoti Ghosh
+/* Copyright 2024-2026 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -10,16 +10,20 @@
 #include "ImplicitSolver_fwd.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "FieldSolver/ImplicitSolvers/SparseJacobianMatrix.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "NonlinearSolvers/MatrixSolverOps.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 #include <AMReX_LO_BCTYPES.H>
 
 #include <map>
+#include <memory>
 #include <string>
 
 /**
@@ -70,6 +74,12 @@ public:
 
     virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
 
+    /**
+     * \brief Finalize and re-initialize PETSc after the steps given by
+     *        implicit_evolve.petsc_reinit_interval
+     */
+    void ReinitializePETScIfDue (int a_step, bool verbose_step);
+
     [[nodiscard]] ImplicitOptions const& GetImplicitOptions () const { return m_implicit_options; }
 
     /**
@@ -100,13 +110,12 @@ public:
                        const WarpXSolverVec& a_E,
                              amrex::Real     a_time,
                              int             a_nl_iter,
-                             bool            a_from_jacobian,
-                             bool            update_pc = true) = 0;
+                             bool            a_from_jacobian) = 0;
 
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve (bool update_pc = true);
+    void PreLinearSolve (bool update_pc);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -123,6 +132,11 @@ public:
         if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
+
+    /**
+     * \brief Create the matrix ops for the assembled preconditioner matrix of a_ops
+     */
+    [[nodiscard]] static std::unique_ptr<MatrixSolverOps<WarpXSolverVec>> MakePCMatrixOps (ImplicitSolver* a_ops);
 
     /**
      * \brief Return reference to the multifabs for curl curl mask
@@ -151,6 +165,21 @@ public:
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
     /**
+     * \brief Assemble the sparse Jacobian matrix for the preconditioner.
+     *        Creates the SparseJacobianMatrix on first call (lazy init).
+     */
+    void AssemblePCMatrix ();
+
+    /**
+     * \brief Copy the assembled sparse matrix data to caller-provided device vectors.
+     */
+    void GetPCMatrix (amrex::Gpu::DeviceVector<int>& a_r_indices_g,
+                      amrex::Gpu::DeviceVector<int>& a_num_nz,
+                      amrex::Gpu::DeviceVector<int>& a_c_indices_g,
+                      amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
+                      int& a_n, int& a_ncols_max);
+
+    /**
      * \brief Apply deposited mass matrices to a vector field.
      * Computes a_out += a_scale * S * (a_in - a_in_ref) [+ a_baseline],
      * where S is the mass matrix, accumulating into a_out.
@@ -167,6 +196,15 @@ public:
         const ablastr::fields::MultiLevelVectorField* a_baseline = nullptr,
         amrex::Real a_scale = 1.0,
         bool a_zero_out_first = false );
+
+    /**
+     * \brief Half-width, in cells and per direction, of the stencil that
+     *  ApplyMassMatrices() gathers over: evaluating the mass matrices at a cell
+     *  reads the input field no further than this many cells away.
+     *
+     *  Only valid after InitializeMassMatrices() has run.
+     */
+    [[nodiscard]] amrex::IntVect MassMatricesStencilHalfWidth () const;
 
     /**
      * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
@@ -186,6 +224,11 @@ public:
      * \brief Finish filling the mass matrices after deposit
      */
     void FinishMassMatricesDeposition ();
+
+    /**
+     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
+     */
+    void SyncMassMatricesPCAndApplyBCs ();
 
     /**
      * \brief Finish the implicit particle update after the converged time-centered solve
@@ -264,6 +307,16 @@ protected:
     ImplicitOptions m_implicit_options;
 
     /**
+     * \brief Finalize and re-initialize PETSc every this many steps (0: never), to release
+     *        the host memory PETSc's GPU vector operations leak until PetscFinalize
+     */
+#ifdef AMREX_USE_GPU
+    int m_petsc_reinit_interval = 1000;
+#else
+    int m_petsc_reinit_interval = 0;
+#endif
+
+    /**
      * \brief whether to skip the full Picard update of particles on the initial newton step
      */
     bool m_skip_particle_picard_init = false;
@@ -315,6 +368,16 @@ protected:
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
     /**
+     * \brief Whether InitializePCMatrixAssembly() has been called
+     */
+    bool m_pc_matrix_assembly_initialized = false;
+
+    /**
+     * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)
+     */
+    std::unique_ptr<SparseJacobianMatrix> m_sparse_jacobian;
+
+    /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
@@ -341,13 +404,7 @@ protected:
     void PreRHSOp (amrex::Real a_cur_time,
                    int         a_nl_iter,
                    bool        a_from_jacobian,
-                   amrex::Real a_dt_scale,
-                   bool        update_pc = true);
-
-    /**
-     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
-     */
-    void SyncMassMatricesPCAndApplyBCs ();
+                   amrex::Real a_dt_scale);
 
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
@@ -363,6 +420,12 @@ protected:
      * \brief Save E at start of each Newton step
      */
     void SaveE ();
+
+    /**
+     * \brief Perform one-time setup before assembling the preconditioner matrix.
+     *        Derived classes initialize required data, such as curl-curl BC masks.
+     */
+    virtual void InitializePCMatrixAssembly () {}
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

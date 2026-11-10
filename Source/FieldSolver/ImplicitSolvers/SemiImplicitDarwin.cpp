@@ -10,6 +10,7 @@
 #include "SemiImplicitDarwin.H"
 #include "BoundaryConditions/WarpX_PEC.H"
 #include "Python/callbacks.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
@@ -112,15 +113,16 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Particle shape used for the magnetostatic part of the solve (current and
     // mass matrices deposition, inductive E-field gather, and B-field gather).
     // Defaults to the electrostatic particle shape, algo.particle_shape.
-    m_ms_particle_shape = WarpX::nox;
+    m_magnetostatic_particle_shape = WarpX::nox;
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
-    pp_implicit_evolve.query("ms_particle_shape", m_ms_particle_shape);
+    utils::parser::queryWithParser(
+        pp_implicit_evolve, "magnetostatic_particle_shape", m_magnetostatic_particle_shape);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_ms_particle_shape >= 1 && m_ms_particle_shape <= WarpX::nox,
-        "implicit_evolve.ms_particle_shape must be between 1 and algo.particle_shape");
+        m_magnetostatic_particle_shape >= 1 && m_magnetostatic_particle_shape <= WarpX::nox,
+        "implicit_evolve.magnetostatic_particle_shape must be between 1 and algo.particle_shape");
 
     // Multiplier of the grad-div penalty coefficient (see AddGradDivZTerm)
-    pp_implicit_evolve.query("graddiv_factor", m_graddiv_factor);
+    utils::parser::queryWithParser(pp_implicit_evolve, "graddiv_factor", m_graddiv_factor);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_graddiv_factor >= 0.0_rt,
         "implicit_evolve.graddiv_factor must be non-negative");
@@ -141,6 +143,13 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
+
+    // Initialize the mass matrices for plasma response (their stencil width
+    // is set by the magnetostatic particle shape). This has to come before the
+    // linear operator is defined below, since the operator sizes its scratch
+    // space from the mass matrix stencil.
+    InitializeMassMatrices(m_magnetostatic_particle_shape);
+    InitializeImplicitOptions();
 
     // Get the linear solver input parameters
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
@@ -173,11 +182,6 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
-    // Initialize the mass matrices for plasma response (their stencil width
-    // is set by the magnetostatic particle shape)
-    InitializeMassMatrices(m_ms_particle_shape);
-    InitializeImplicitOptions();
-
     // The predictor velocity push gathers the electrostatic E-field with the
     // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
     // momentum-conserving gathering.
@@ -207,7 +211,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
-    amrex::Print()     << "Magnetostatic particle shape:                  " << m_ms_particle_shape << "\n";
+    amrex::Print()     << "Magnetostatic particle shape:                  " << m_magnetostatic_particle_shape << "\n";
     amrex::Print()     << "Grad-div penalty factor:                       " << m_graddiv_factor << "\n";
     if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
@@ -229,6 +233,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Fields have E^{n} (from phi^n only), B^{n-1/2}
     // Particles have u^{n-1/2} and x^{n}.
+
+    // The electrostatic solve at the end of the previous step only sets E in the
+    // valid cells, so exchange guard cells now (this happens in
+    // WarpX::ExplicitFillBoundaryEBUpdateAux for explicit solvers).
+    m_WarpX->FillBoundaryE(m_WarpX->getngEB());
 
     // Save u and x at the start of the time step
     // TODO: only save u since we don't need to keep x
@@ -252,7 +261,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
             MomentumPushType::Full,
             FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
-                              /*b_shape=*/m_ms_particle_shape}
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
 
@@ -322,8 +331,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
             MomentumPushType::Full,
-            FieldGatherOrders{/*e_shape=*/m_ms_particle_shape, /*e_galerkin=*/false,
-                              /*b_shape=*/m_ms_particle_shape}
+            FieldGatherOrders{/*e_shape=*/m_magnetostatic_particle_shape,
+                              /*e_galerkin=*/false,
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
 
@@ -345,8 +355,7 @@ void SemiImplicitDarwin::ComputeRHS ( [[maybe_unused]] WarpXSolverVec& a_RHS,
                                       [[maybe_unused]] const WarpXSolverVec& a_Z,
                                       [[maybe_unused]] amrex::Real start_time,
                                       [[maybe_unused]] int a_nl_iter,
-                                      [[maybe_unused]] bool a_from_jacobian,
-                                      [[maybe_unused]] const bool update_pc )
+                                      [[maybe_unused]] bool a_from_jacobian )
 {
     // The Darwin scheme is linear in its unknown and never installs a
     // nonlinear solver, so it has no nonlinear residual to compute. This
@@ -433,7 +442,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // before depositing.
     m_WarpX->GetPartContainer().DepositCurrent(
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
-        m_dt, 0.0_rt, PushType::Implicit, m_ms_particle_shape);
+        m_dt, 0.0_rt, PushType::Implicit, m_magnetostatic_particle_shape);
 
     // Zero and accumulate the mass matrices from all species. This shares the
     // zero-then-deposit machinery with the electromagnetic implicit solvers
@@ -450,13 +459,21 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
 
-    // At conducting (PEC) walls, fold the guard-cell current deposited by
-    // particles near the wall back into the domain, and set image guard
-    // values, which curl(J) in CalculateSourceVector() reads. No-op for
-    // periodic boundaries. See FoldGuardCellsAtPEC() for why this always uses
-    // the PEC fold convention, whatever the particle boundary condition.
-    FoldGuardCellsAtPEC(
-        m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev), lev);
+    // Apply the current boundary conditions. At conducting (PEC) walls, fold
+    // the guard-cell current deposited by particles near the wall back into
+    // the domain, and set image guard values, which curl(J) in
+    // CalculateSourceVector() reads. See FoldGuardCellsAtPEC() for why this
+    // always uses the PEC fold convention, whatever the particle boundary
+    // condition. It replaces WarpX::FinalizeJ(), whose fold follows the
+    // particle boundary condition: applying both would fold the current twice
+    // (with reflecting particles, the two folds cancel the current within the
+    // guard-cell depth of the wall).
+    if (m_has_pec) {
+        FoldGuardCellsAtPEC(
+            m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev), lev);
+    } else {
+        m_WarpX->FinalizeJ();
+    }
 
     // Sum boundaries for mass matrices.
     // At conducting (PEC) walls the mass matrices are deliberately NOT folded:
@@ -539,12 +556,12 @@ void SemiImplicitDarwin::CalculateSourceVector ()
 
     // Calculate the vector Laplacian of B and write result into first temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorLaplacian(
-        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate the curl of J and write result into second temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate 2 * laplacian(B) + 2 * mu_0 curl(J) and write result in m_source
@@ -617,7 +634,7 @@ void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
 
     // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
+        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag_fp()[lev], lev
     );
     for (int ii = 0; ii < 3; ii++)
     {
@@ -732,10 +749,15 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
 
     // The mass matrices were summed over their guard cells (SyncMassMatrices),
     // so that the stencil of a valid cell reaches one cell beyond the guard
-    // cells of J (see guardCellManager::Init). Only the valid cells of rhs are
-    // checked, since its guard cells are overwritten by FillBoundaryAndSync below.
+    // cells of J (see guardCellManager::Init). Check that dA has enough guard
+    // cells for the valid cells of rhs not to be clipped.
     AssertMassMatricesStencilNotClipped(rhs, dA);
 
+    // Without PEC walls, no guard-cell exchange is needed on the result:
+    // ApplyMassMatrices() already fills as many guard cells of `rhs` as `rhs`
+    // and the mass matrices have in common, computing them from the same
+    // wide-stencil read of `dA` that the valid region uses. The caller sizes
+    // `rhs` so that this covers whatever it goes on to read.
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
@@ -744,20 +766,22 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
         /* a_scale         = */ scale,
         /* a_zero_out_first = */ false);
 
-    for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
-        // At conducting (PEC) walls, fold the guard-cell products (from the
-        // guard-cell mass-matrix deposits, which are not folded themselves,
-        // and the image-filled dA values) back into the domain and set image
-        // guard values, consistently with the fold of the deposited current
-        // (see AccumulateCurrentAndMassMatrices). This must precede the
-        // FillBoundaryAndSync below so that neighboring boxes' guard cells
-        // pick up the folded valid values.
-        FoldGuardCellsAtPEC(rhs[lev], lev);
-
-        // Fill and sync guard cells & edges
-        rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+    // At conducting (PEC) walls, fold the guard-cell products (from the
+    // guard-cell mass-matrix deposits, which are not folded themselves, and the
+    // image-filled dA values) back into the domain and set image guard values,
+    // consistently with the fold of the deposited current (see
+    // AccumulateCurrentAndMassMatrices). The fold changes valid cells next to
+    // the walls, so, unlike in the periodic case, the guard cells of rhs must
+    // then be re-exchanged for neighboring boxes to pick up the folded values.
+    // The caller sizes rhs to hold all the guard-cell deposits of the mass
+    // matrices when there is a PEC wall (see DarwinLinearFieldOperator::define).
+    if (m_has_pec) {
+        for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
+            FoldGuardCellsAtPEC(rhs[lev], lev);
+            rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+            rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+            rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+        }
     }
 }
 

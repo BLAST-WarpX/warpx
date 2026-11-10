@@ -163,6 +163,14 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 
     utils::parser::queryArrWithParser(pp_particles, "E_external_particle", m_E_external_particle);
     utils::parser::queryArrWithParser(pp_particles, "B_external_particle", m_B_external_particle);
+#if defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_B_external_particle[0] == 0. &&
+        m_B_external_particle[1] == 0. &&
+        m_B_external_particle[2] == 0.,
+        "RSPHERE does not support external magnetic fields: "
+        "particles.B_external_particle must be 0 0 0.");
+#endif
 
     // Initialize temporary local arrays for charge/current deposition
 #ifdef AMREX_USE_OMP
@@ -469,19 +477,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // are not trivial, this check might be too relaxed and we might include a particle that should
     // deposit part of its current in a neighboring box. However, this should catch particles
     // traveling many cells away, for example with algorithms that allow for large time steps.
-
-#if   defined(WARPX_DIM_1D_Z)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_3D)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#endif
+    const amrex::IntVect shape_extent(particle_shape/2);
 
     // On CPU: particles deposit on tile arrays, which have a small number of guard cells ng_J
     // On GPU: particles deposit directly on the J arrays, which usually have a larger number of guard cells
@@ -642,8 +638,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     ABLASTR_PROFILE_VAR_START(blp_deposit);
 
-    // If doing shared mem current deposition, get tile info
-    if (WarpX::do_shared_mem_current_deposition) {
+    // If doing shared mem current deposition, get tile info.
+    // The shared-memory kernel bins particles on the grid of level lev, so it cannot deposit
+    // in the buffers of the coarser level (depos_lev<lev): the normal kernels are used instead.
+    if (WarpX::do_shared_mem_current_deposition && (depos_lev == lev)) {
         const Geometry& geom = Geom(lev);
         const auto dxi = geom.InvCellSizeArray();
         const auto plo = geom.ProbLoArray();
@@ -662,11 +660,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
             const int ntiles = numTilesInBox(box, true, bin_size);
 
-            bins.build(ptile.numParticles(), ptd, ntiles,
-                    [=] AMREX_GPU_HOST_DEVICE (const ParticleType& p) -> unsigned int
+            // Only bin the particles [offset, offset+np_to_deposit): the bin permutation then
+            // indexes from offset, like GetPosition and the particle attributes in the kernel.
+            bins.build(np_to_deposit, ptd, ntiles,
+                    [=] AMREX_GPU_HOST_DEVICE (ParticleTileType::ParticleTileDataType const & a_ptd,
+                                               long const ip) -> unsigned int
                     {
                         Box tbox;
-                        auto iv = getParticleCell(p, plo, dxi, domain);
+                        auto iv = getParticleCell(a_ptd, static_cast<int>(ip + offset),
+                                                  plo, dxi, domain);
                         AMREX_ASSERT(box.contains(iv));
                         auto tid = getTileIndex(iv, box, true, bin_size, tbox);
                         return static_cast<unsigned int>(tid);
@@ -739,7 +741,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             ABLASTR_PROFILE_VAR_STOP(direct_current_dep_kernel);
         }
     }
-    // If not doing shared memory deposition, call normal kernels
+    // If not doing shared memory deposition (or depositing in the buffers), call normal kernels
     else {
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             if (push_type == PushType::Explicit) {
@@ -1520,30 +1522,19 @@ WarpXParticleContainer::DepositCurrent (
     }
 }
 
-void WarpXParticleContainer::DepositCurrent (
+void WarpXParticleContainer::DepositCurrentOnLevel (
     const std::string& mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
 ) {
     auto& warpx = WarpX::GetInstance();
     // allocate temporary multifab to deposit current density into
-    ablastr::fields::MultiLevelVectorField current {
+    const ablastr::fields::MultiLevelVectorField current {
         warpx.m_fields.get_alldirs(mf_name, lev)
     };
 
     DepositCurrent(current, dt, relative_time);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        warpx.ApplyInverseVolumeScalingToCurrentDensity(
-            current[lev][0], current[lev][1], current[lev][2], lev
-        );
-#endif
-
     // Sum guard cells
     warpx.SyncCurrent(mf_name);
-
-    // Apply boundary conditions
-    warpx.ApplyJfieldBoundary(
-        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
-    );
 }
 
 /* \brief Charge Deposition for thread thread_num
@@ -1578,12 +1569,10 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         ": not enough components allocated (" + std::to_string(rho->nComp()) + "!"
     );
 
-    if (WarpX::do_shared_mem_charge_deposition)
+    // The shared-memory kernel bins particles on the grid of level lev, so it cannot deposit
+    // in the buffers of the coarser level (depos_lev<lev): the kernels below are used instead.
+    if (WarpX::do_shared_mem_charge_deposition && (depos_lev == lev))
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
-                                         (depos_lev==(lev  )),
-                                         "Deposition buffers only work for lev-1");
-
         // If no particles, do not do anything
         if (np_to_deposit == 0) { return; }
 
@@ -1629,15 +1618,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate);
 
         // Get tile box where charge is deposited.
-        // The tile box is different when depositing in the buffers (depos_lev<lev)
-        // or when depositing inside the level (depos_lev=lev)
-        Box tilebox;
-        if (lev == depos_lev) {
-            tilebox = pti.tilebox();
-        } else {
-            const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
-            tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
-        }
+        Box tilebox = pti.tilebox();
 
         const auto ix_type = rho->ixType().toIntVect();
 #ifndef AMREX_USE_GPU
@@ -1695,11 +1676,15 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
             const amrex::IntVect bin_size = WarpX::shared_tilesize;
             const int ntiles = numTilesInBox(box, true, bin_size);
 
-            bins.build(ptile.numParticles(), ptd, ntiles,
-                       [=] AMREX_GPU_HOST_DEVICE (ParticleType const & p) -> unsigned int
+            // Only bin the particles [offset, offset+np_to_deposit): the bin permutation then
+            // indexes from offset, like GetPosition, wp and ion_lev in the deposition kernel.
+            bins.build(np_to_deposit, ptd, ntiles,
+                       [=] AMREX_GPU_HOST_DEVICE (ParticleTileType::ParticleTileDataType const & a_ptd,
+                                                  long const ip) -> unsigned int
                        {
                            Box tbx;
-                           auto iv = getParticleCell(p, plo, dxi, domain);
+                           auto iv = getParticleCell(a_ptd, static_cast<int>(ip + offset),
+                                                     plo, dxi, domain);
                            AMREX_ASSERT(box.contains(iv));
                            auto tid = getTileIndex(iv, box, true, bin_size, tbx);
                            return static_cast<unsigned int>(tid);
@@ -1731,7 +1716,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                    const auto bin_stop = offsets_ptr[ibin+1];
                                    if (bin_start < bin_stop) {
                                        // static_cast until https://github.com/AMReX-Codes/amrex/pull/3684
-                                       auto const i = static_cast<int>(permutation[bin_start]);
+                                       auto const i = static_cast<int>(permutation[bin_start] + offset);
                                        Box tbx;
                                        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
                                        AMREX_ASSERT(box.contains(iv));
@@ -1862,7 +1847,6 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 void
 WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                                        const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const bool interpolate_across_levels,
                                        const int icomp)
 {
@@ -1872,8 +1856,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
     auto const finest_level = static_cast<int>(rho.size() - 1);
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        DepositCharge (
-            rho[lev], lev, local, reset, apply_boundary_and_scale_volume, icomp
+        DepositChargeOnLevel (
+            rho[lev], lev, local, reset, icomp
         );
     }
 
@@ -1901,9 +1885,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
 }
 
 void
-WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
+WarpXParticleContainer::DepositChargeOnLevel (amrex::MultiFab* rho,
                                        const int lev, const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const int icomp)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1941,13 +1924,6 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     }
 #endif
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-    }
-#endif
-
     // Exchange guard cells
     if ( !local ) {
         // Possible performance optimization:
@@ -1958,19 +1934,12 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
             m_gdb->Geom(lev).periodicity()
         );
     }
-
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
-    }
-#endif
 }
 
 std::unique_ptr<MultiFab>
-WarpXParticleContainer::GetChargeDensity (int lev, bool local)
+WarpXParticleContainer::GetChargeDensityOnLevel (int lev, bool local, bool finalize)
 {
+
     const auto& ba = m_gdb->ParticleBoxArray(lev);
     const auto& dm = m_gdb->DistributionMap(lev);
     BoxArray nba = ba;
@@ -1990,7 +1959,13 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     const int ng_rho = warpx.get_ng_depos_rho().max();
 
     auto rho = std::make_unique<MultiFab>(nba, dm, WarpX::ncomps,ng_rho);
-    DepositCharge(rho.get(), lev, local, true, true, 0);
+    DepositChargeOnLevel(rho.get(), lev, local, /*reset=*/true, /*icomp=*/0);
+    if (finalize) { // Apply boundary conditions to rho, and then apply volume scaling
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !local,
+            "GetChargeDensityOnLevel requires local=false when finalize=true.");
+        WarpX::GetInstance().FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
+    }
     return rho;
 }
 
