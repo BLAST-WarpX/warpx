@@ -807,6 +807,7 @@ WarpX::UpdateAuxiliaryDataSameType ()
             MultiFab::Copy(*Bfield_aux[1][d], *Bfield_fp[1][d], 0, 0, 1,
                            Bfield_aux[1][d]->nGrowVect());
         }
+        FillRadialInterfaceGatherGuards();
         return;
     }
 #endif

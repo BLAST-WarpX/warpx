@@ -658,7 +658,10 @@ WarpX::OneStep_nosub (
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
 #ifdef WARPX_DIM_RZ
-        if (m_conforming_radial_interface) { CheckRadialInterfaceCurrent(); ShareRadialInterface(false); }
+        if (m_conforming_radial_interface) {
+            CheckRadialInterfaceCollar();
+            ShareRadialInterface(false);
+        }
 #endif
 
         // G shares the electric-field time staggering and is advanced with B at n+1/2.

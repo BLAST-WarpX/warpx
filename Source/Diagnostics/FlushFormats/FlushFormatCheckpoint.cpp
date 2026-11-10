@@ -76,6 +76,15 @@ FlushFormatCheckpoint::WriteToFile (
 
     WriteWarpXHeader(checkpointname, geom, /*is_checkpoint=*/true);
 
+#ifdef WARPX_DIM_RZ
+    if (warpx.usesConformingRadialInterface() && ParallelDescriptor::IOProcessor()) {
+        auto const filename = checkpointname + "/ConformingRadialInterface";
+        std::ofstream marker(filename);
+        marker << "Axisymmetric conforming radial Yee grid, version 1\n";
+        marker.close();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(marker.good(), "Could not save the radial interface type.");
+    }
+#endif
     WriteJobInfo(checkpointname);
 
     for (int lev = 0; lev < nlev; ++lev)

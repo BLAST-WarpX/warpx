@@ -3,13 +3,15 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         CompositeCurrentControlledPort.cpp
-        ConformingRadialInterface.cpp
         CurrentControlledPort.cpp
         WarpXPushFieldsEM.cpp
         WarpXPushFieldsHybridPIC.cpp
         WarpX_QED_Field_Pushers.cpp
         WarpXSolveFieldsES.cpp
     )
+    if(D STREQUAL "RZ")
+        target_sources(lib_${SD} PRIVATE ConformingRadialInterface.cpp)
+    endif()
 endforeach()
 
 add_subdirectory(ElectrostaticSolvers)

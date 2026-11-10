@@ -956,6 +956,26 @@ Setting up the field mesh
     This patch is rectangular, and thus its extent is given here by the coordinates
     of the lower corner (:pp:param:`warpx.fine_tag_lo`) and upper corner (:pp:param:`warpx.fine_tag_hi`).
 
+.. pp:param:: warpx.conforming_radial_interface
+    :type: ``bool``
+    :default: ``0``
+
+    Join the axisymmetric plasma bore to its radial exterior using the two neighboring
+    magnetic samples and one shared tangential electric field at the common radius.
+    The inner and outer Maxwell grids have the same axial spacing. The radial magnetic
+    differences use the distance between the adjacent sample centers and the cylindrical
+    dual area for the axial Ampere update. Exterior axial PML fields use the same join.
+
+    This experimental option requires explicit staggered Yee evolution, one azimuthal
+    mode, one rank, one regular box per level and a radial refinement ratio of two with
+    axial ratio one. The fine patch must include the axis and span the axial domain.
+    Set ``warpx.n_field_gather_buffer`` and ``warpx.n_current_deposition_buffer`` to zero.
+    Particle fields must retain the Maxwell staggering. Currents and particles may
+    occupy either mesh away from the join. An active particle stencil or a deposited
+    current in its vacuum collar ends the run with a diagnostic. Use the same grid
+    method when restarting a checkpoint.
+
+
 .. pp:param:: warpx.ref_patch_function(x,y,z)
     :type: ``string``
     :optional:

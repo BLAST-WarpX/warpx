@@ -288,3 +288,41 @@ add_warpx_test(
     OFF
     OFF
 )
+
+if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
+    foreach(polarization IN ITEMS bz bt)
+        foreach(direction IN ITEMS in out)
+            add_warpx_test(
+                test_rz_radial_interface_${polarization}_${direction}_picmi
+                RZ
+                1
+                "inputs_test_rz_radial_interface_picmi.py --direction ${direction} --polarization ${polarization}"
+                OFF
+                OFF
+                OFF
+            )
+        endforeach()
+    endforeach()
+    add_warpx_test(
+        test_rz_radial_interface_bz_in_picmi_restart
+        RZ
+        1
+        "inputs_test_rz_radial_interface_picmi.py --direction in --polarization bz --restart ../test_rz_radial_interface_bz_in_picmi/diags/chk000144 --reference ../test_rz_radial_interface_bz_in_picmi/radial_fields.npz"
+        OFF
+        OFF
+        test_rz_radial_interface_bz_in_picmi
+    )
+    add_warpx_test(
+        test_rz_radial_interface_particle_rejected_picmi
+        RZ
+        1
+        "inputs_test_rz_radial_interface_picmi.py --direction in --polarization bz --particle-at-interface"
+        OFF
+        OFF
+        OFF
+    )
+    set_tests_properties(
+        test_rz_radial_interface_particle_rejected_picmi.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "particle stencil or a deposited current"
+    )
+endif()

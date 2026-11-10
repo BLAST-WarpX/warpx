@@ -10,6 +10,9 @@
  */
 #include "WarpX.H"
 
+#include <fstream>
+#include <sstream>
+
 #include "BoundaryConditions/PML.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
@@ -1088,22 +1091,50 @@ WarpX::InitPML ()
 {
 #ifdef WARPX_DIM_RZ
     amrex::ParmParse("warpx").query("conforming_radial_interface", m_conforming_radial_interface);
+    if (!restart_chkfile.empty()) {
+        bool stored = amrex::FileExists(restart_chkfile + "/ConformingRadialInterface");
+        if (!stored && m_conforming_radial_interface) {
+            // Early radial checkpoints recorded the method in their native job
+            // information, before they had a dedicated grid-type marker.
+            std::ifstream job(restart_chkfile + "/warpx_job_info");
+            for (std::string line; std::getline(job, line); ) {
+                std::istringstream record(line);
+                std::string key, equals, value;
+                if (record >> key >> equals >> value &&
+                    key == "warpx.conforming_radial_interface" && equals == "=") {
+                    stored = value == "1" || value == "true";
+                    break;
+                }
+            }
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(stored == m_conforming_radial_interface,
+            "The checkpoint and the requested radial interface use different Maxwell grids.");
+    }
     if (m_conforming_radial_interface) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             finest_level == 1 && max_level == 1 && boxArray(0).size() == 1 &&
             boxArray(1).size() == 1 && ParallelDescriptor::NProcs() == 1 &&
-            refRatio(0) == IntVect(2,1) && n_rz_azimuthal_modes == 1 &&
+            refRatio(0) == IntVect(2, 1) && n_rz_azimuthal_modes == 1 &&
             electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
-            Geom(0).ProbLo(0) == 0._rt && !m_do_subcycling && !EB::enabled() &&
+            Geom(0).ProbLo(0) == 0._rt && Geom(0).Domain().smallEnd(0) == 0 &&
+            evolve_scheme == EvolveScheme::Explicit && grid_type == GridType::Staggered &&
+            !m_do_subcycling && !EB::enabled() &&
             !do_dive_cleaning && !do_divb_cleaning && !do_moving_window &&
             m_em_solver_medium == MediumForEM::Vacuum && n_field_gather_buffer == 0 &&
             n_current_deposition_buffer == 0,
             "The conforming radial interface requires two single-box axisymmetric Yee grids, "
             "a (2,1) ratio, a single rank, zero buffers and a vacuum collar.");
+        using warpx::fields::FieldType;
+        auto const aux = m_fields.get_alldirs(FieldType::Bfield_aux, 1);
+        auto const fp = m_fields.get_alldirs(FieldType::Bfield_fp, 1);
+        for (int d = 0; d < 3; ++d) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(aux[d]->ixType() == fp[d]->ixType(),
+                "The radial interface requires particle fields on the native Yee staggering.");
+        }
         auto const& fb = boxArray(1)[0];
         auto const& domain = Geom(1).Domain();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            fb.smallEnd(0) == 0 && fb.bigEnd(0) < domain.bigEnd(0)-4 &&
+            fb.smallEnd(0) == 0 && fb.bigEnd(0) >= 3 && fb.bigEnd(0) < domain.bigEnd(0) - 4 &&
             fb.smallEnd(1) == domain.smallEnd(1) && fb.bigEnd(1) == domain.bigEnd(1),
             "The refined bore must include the axis and span the full axial domain.");
     }

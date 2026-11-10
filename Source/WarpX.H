@@ -712,9 +712,10 @@ public:
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
 #ifdef WARPX_DIM_RZ
-    bool m_conforming_radial_interface = false;
-    void ShareRadialInterface (bool electric);
-    void CheckRadialInterfaceCurrent ();
+    [[nodiscard]] bool usesConformingRadialInterface () const { return m_conforming_radial_interface; }
+    // NVCC requires the parent of an extended device lambda to have public access.
+    void CheckRadialInterfaceCollar ();
+    void FillRadialInterfaceGatherGuards ();
 #endif
 
     // Fill boundary cells including coarse/fine boundaries
@@ -1515,6 +1516,10 @@ private:
 
     // whether to use subcycling
     bool m_do_subcycling = false;
+#ifdef WARPX_DIM_RZ
+    bool m_conforming_radial_interface = false;
+    void ShareRadialInterface (bool electric);
+#endif
 
     //! Flag whether the Verboncoeur correction is applied to the current and charge density
     //! on the axis when using RZ.
