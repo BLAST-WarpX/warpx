@@ -753,7 +753,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
-    mypc->doSecondaryEmission(false);
+    mypc->doSecondaryEmission(cur_time, finest_level, false);
 
     // Without mesh refinement, use a local redistribute when particles can only
     // have moved by a small number of cells; otherwise fall back to a global one.
@@ -824,7 +824,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
-        mypc->doSecondaryEmission(true);
+        mypc->doSecondaryEmission(cur_time, finest_level, true);
         if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
             // If particles are simply absorbed, no need for a full Redistribute.
             // Instead: simply delete the absorbed particles

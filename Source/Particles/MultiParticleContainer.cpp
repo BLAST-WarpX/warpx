@@ -24,7 +24,6 @@
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
-#include "Particles/ParticleBoundaryBuffer.H"
 #include "Particles/ParticleBoundaries_K.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
@@ -100,15 +99,12 @@ namespace
     struct SecondaryEmissionFilter
     {
         amrex::Real m_probability;
-        int m_step_index;
-        int m_step;
 
         template <typename SrcData>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        int operator() (const SrcData& src, int i, amrex::RandomEngine const& engine) const noexcept
+        int operator() (const SrcData& /*src*/, int /*i*/, amrex::RandomEngine const& engine) const noexcept
         {
-            return src.m_runtime_idata[m_step_index][i] == m_step &&
-                amrex::Random(engine) < m_probability;
+            return amrex::Random(engine) < m_probability;
         }
     };
 
@@ -245,6 +241,8 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
 
     // Setup particle collisions
     collisionhandler = std::make_unique<CollisionHandler>(this);
+
+    InitSecondaryEmissionBoundaryBuffer();
 
 }
 
@@ -1169,10 +1167,11 @@ MultiParticleContainer::ContinuousFluxInjection (amrex::Real t, amrex::Real dt) 
 }
 
 void
-MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer (
-    ParticleBoundaryBuffer& particle_boundary_buffer) const
+MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer ()
 {
     if (!m_do_secondary_emission) { return; }
+
+    m_secondary_emission_buffer = std::make_unique<ParticleBoundaryBuffer>();
 
     for (int ispecies = 0; ispecies < nSpecies(); ++ispecies) {
         int const product_species = m_secondary_emission_product_species[ispecies];
@@ -1181,20 +1180,24 @@ MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer (
                 GetParticleContainer(product_species).getMass() > 0.0_prt,
                 "Secondary emission product species '" + species_names[product_species]
                 + "' must have nonzero mass");
-            particle_boundary_buffer.enableForSpecies(ispecies);
+            m_secondary_emission_buffer->enableForSpecies(ispecies);
         }
     }
 }
 
 void
-MultiParticleContainer::doSecondaryEmission (bool const do_eb)
+MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int const finest_level, bool const do_eb)
 {
     if (!m_do_secondary_emission) { return; }
 
-    auto& particle_boundary_buffer = WarpX::GetInstance().GetParticleBoundaryBuffer();
+    auto & warpx = WarpX::GetInstance();
 
-    // Fetch the step number so that it is consistent with what is used in gatherParticlesFromDomainBoundaries
-    const int step = WarpX::GetInstance().getistep(0);
+    if (not do_eb) {
+        m_secondary_emission_buffer->gatherParticlesFromDomainBoundaries(*this, cur_time);
+    } else {
+        m_secondary_emission_buffer->gatherParticlesFromEmbeddedBoundaries(
+            *this, warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+    }
 
 #ifdef AMREX_USE_EB
     int const boundary_start = do_eb ? 2*AMREX_SPACEDIM : 0;
@@ -1207,25 +1210,22 @@ MultiParticleContainer::doSecondaryEmission (bool const do_eb)
 
     std::set<int> product_species_to_redistribute;
     for (int boundary = boundary_start; boundary < boundary_stop; ++boundary) {
-        if (!particle_boundary_buffer.isDefinedForAnySpecies(boundary)) { continue; }
+        if (!m_secondary_emission_buffer->isDefinedForAnySpecies(boundary)) { continue; }
 
         for (int source_species = 0; source_species < nSpecies(); ++source_species) {
             int const product_species = m_secondary_emission_product_species[source_species];
             if (product_species < 0) { continue; }
 
-            auto* source_pc = particle_boundary_buffer.getParticleBufferPointer(
+            auto* source_pc = m_secondary_emission_buffer->getParticleBufferPointer(
                 species_names[source_species], boundary);
             if (source_pc == nullptr || !source_pc->isDefined()) { continue; }
 
             auto& product_pc = GetParticleContainer(product_species);
             const SmartCopyFactory copy_factory(*source_pc, product_pc);
             const auto copy = copy_factory.getSmartCopy();
-            int const step_scraped_index =
-                source_pc->GetIntCompIndex("stepScraped") - WarpXParticleContainer::NArrayInt;
             int const normal_index =
                 source_pc->GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
-            auto const filter = SecondaryEmissionFilter{
-                m_secondary_emission_coefficient[source_species], step_scraped_index, step};
+            auto const filter = SecondaryEmissionFilter{m_secondary_emission_coefficient[source_species]};
             auto const& geom = WarpX::GetInstance().Geom(0);
             auto const uth = static_cast<amrex::ParticleReal>(std::sqrt(
                 PhysConst::q_e*m_secondary_emission_energy_eV[source_species]/product_pc.getMass()) /
@@ -1266,6 +1266,9 @@ MultiParticleContainer::doSecondaryEmission (bool const do_eb)
                 product_species_to_redistribute.insert(product_species);
             }
         }
+
+        m_secondary_emission_buffer->clearParticles(boundary);
+
     }
 
     for (int const product_species : product_species_to_redistribute) {
