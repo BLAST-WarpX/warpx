@@ -37,6 +37,7 @@
 #include "SpeciesPhysicalProperties.H"
 #include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
@@ -114,10 +115,11 @@ namespace
     struct SecondaryEmissionTransform
     {
         int m_boundary;
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_phi;
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> & m_plo;
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> & m_phi;
         int m_normal_index;
         amrex::ParticleReal m_uth;
+        const GetParticlePosition<PIdx> & m_GetPosition;
 
         template <typename DstData, typename SrcData>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -157,6 +159,11 @@ namespace
 #endif
 
                 dst.m_rdata[momentum_index][i_dst] = iside == 0 ? -1._prt : 1._prt;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal r, theta, phi;
+                m_GetPosition.AsStored(i_dst, r, theta, phi);
+                ParticleUtils::transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
+#endif
 #if defined(WARPX_DIM_3D)
                 if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
                 if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uy, uz, ux, m_uth, engine); }
@@ -168,6 +175,9 @@ namespace
                 ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine);
+#endif
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                ParticleUtils::transform_momentum_to_cartesian(ux, uy, uz, theta, phi);
 #endif
             } else {
                 amrex::ParticleReal nx = src.m_runtime_rdata[m_normal_index][i_src];
@@ -1220,8 +1230,6 @@ MultiParticleContainer::doSecondaryEmission (bool const do_eb)
             auto const uth = static_cast<amrex::ParticleReal>(std::sqrt(
                 PhysConst::q_e*m_secondary_emission_energy_eV[source_species]/product_pc.getMass()) /
                 PhysConst::c);
-            auto const transform = SecondaryEmissionTransform{
-                boundary, geom.ProbLoArray(), geom.ProbHiArray(), normal_index, uth};
 
             amrex::MFItInfo info;
             if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
@@ -1241,6 +1249,10 @@ MultiParticleContainer::doSecondaryEmission (bool const do_eb)
                 for (WarpXParIter pti(*source_pc, lev, info); pti.isValid(); ++pti) {
                     auto& src_tile = source_pc->ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     if (src_tile.numParticles() == 0) { continue; }
+
+                    auto GetPosition = GetParticlePosition<PIdx>(pti);
+                    auto const transform = SecondaryEmissionTransform{
+                        boundary, geom.ProbLoArray(), geom.ProbHiArray(), normal_index, uth, GetPosition};
 
                     auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     const auto np_dst = dst_tile.numParticles();

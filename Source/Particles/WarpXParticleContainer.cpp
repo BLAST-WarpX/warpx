@@ -25,6 +25,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Utils/ParticleUtils.H"
 #include "WarpX.H"
 
 #include <ablastr/coarsen/average.H>
@@ -83,51 +84,6 @@
 #include <string>
 
 using namespace amrex;
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-namespace
-{
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void transform_momentum_to_curvilinear (
-        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
-        [[maybe_unused]] amrex::ParticleReal& uz,
-        amrex::ParticleReal const theta,
-        [[maybe_unused]] amrex::ParticleReal const phi)
-    {
-        amrex::ParticleReal const ux_save = ux;
-        amrex::ParticleReal const uy_save = uy;
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        ux = ux_save*std::cos(theta) + uy_save*std::sin(theta);
-        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
-#elif defined(WARPX_DIM_RSPHERE)
-        amrex::ParticleReal const uz_save = uz;
-        ux = +ux_save*std::cos(theta)*std::cos(phi) + uy_save*std::sin(theta)*std::cos(phi) + uz_save*std::sin(phi);
-        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
-        uz = -ux_save*std::cos(theta)*std::sin(phi) - uy_save*std::sin(theta)*std::sin(phi) + uz_save*std::cos(phi);
-#endif
-    }
-
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void transform_momentum_to_cartesian (
-        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
-        [[maybe_unused]] amrex::ParticleReal& uz,
-        amrex::ParticleReal const theta,
-        [[maybe_unused]] amrex::ParticleReal const phi)
-    {
-        amrex::ParticleReal const ux_save = ux;
-        amrex::ParticleReal const uy_save = uy;
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        ux = ux_save*std::cos(theta) - uy_save*std::sin(theta);
-        uy = ux_save*std::sin(theta) + uy_save*std::cos(theta);
-#elif defined(WARPX_DIM_RSPHERE)
-        amrex::ParticleReal const uz_save = uz;
-        ux = +ux_save*std::cos(theta)*std::cos(phi) - uy_save*std::sin(theta) - uz_save*std::cos(theta)*std::sin(phi);
-        uy = +ux_save*std::sin(theta)*std::cos(phi) + uy_save*std::cos(theta) - uz_save*std::sin(theta)*std::sin(phi);
-        uz = +ux_save*std::sin(phi) + uz_save*std::cos(phi);
-#endif
-    }
-}
-#endif
 
 WarpXParIter::WarpXParIter (ContainerType& pc, int level)
     : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
@@ -2083,7 +2039,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
 #endif
                 // transform [ux,uy,uz] to [ur,uth,uz] for RZ/RCYLINDER geometry
                 // or to [ur,uth,uph] for RSPHERE geometry
-                transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
+                ParticleUtils::transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
 #else
                 const amrex::ParticleReal ux = uxp[ip];
                 const amrex::ParticleReal uy = uyp[ip];
@@ -2163,7 +2119,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
 #endif
                 // transform [ux,uy,uz] to [ur,uth,uz] for RZ/RCYLINDER geometry
                 // or to [ur,uth,uph] for RSPHERE geometry
-                transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
+                ParticleUtils::transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
 #else
                 const amrex::ParticleReal ux = uxp[ip];
                 const amrex::ParticleReal uy = uyp[ip];
@@ -2828,7 +2784,7 @@ WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool for
 #else
                         const amrex::ParticleReal phi = 0._prt;
 #endif
-                        transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], theta, phi);
+                        ParticleUtils::transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], theta, phi);
                     }
                 );
 
@@ -2843,7 +2799,7 @@ WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool for
 #else
                         const amrex::ParticleReal phi = 0._prt;
 #endif
-                        transform_momentum_to_cartesian(ux[i], uy[i], uz[i], theta, phi);
+                        ParticleUtils::transform_momentum_to_cartesian(ux[i], uy[i], uz[i], theta, phi);
                     }
                 );
 
@@ -3031,13 +2987,13 @@ WarpXParticleContainer::ApplyBoundaryConditions ()
 
                     if (outside_domain) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                        transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], y, z);
+                        ParticleUtils::transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], y, z);
 #endif
                         ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
                                                                   ux[i], uy[i], uz[i], particle_lost,
                                                                   boundary_conditions, engine);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                        transform_momentum_to_cartesian(ux[i], uy[i], uz[i], y, z);
+                        ParticleUtils::transform_momentum_to_cartesian(ux[i], uy[i], uz[i], y, z);
 #endif
                     }
 
