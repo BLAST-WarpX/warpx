@@ -11,3 +11,6 @@ warpx.n_current_deposition_buffer = 0
 warpx.n_field_gather_buffer = 0
 warpx.pml_ncell = 4
 warpx.pml_delta = 4
+
+# Split the drive across CPU tiles as well as mesh levels.
+fabarray.mfiter_tile_size = 16 8
