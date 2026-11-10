@@ -73,7 +73,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         // Number of virtual photons scales with the square of the primary particle's charge,
         // in units of the elementary charge (e.g. Z^2 for an ion of charge Z*e).
         amrex::Real const charge_ratio = primary.getCharge() / PhysConst::q_e;
-        amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi * charge_ratio * charge_ratio;
+        amrex::Real const alpha_over_pi_Z2 = PhysConst::alpha / MathConst::pi * charge_ratio * charge_ratio;
         amrex::Real constexpr inv_c2 = PhysConst::inv_c2;
         amrex::Real const mass = primary.getMass();
 
@@ -114,7 +114,7 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                     const amrex::ParticleReal y_min = vphoton_min_energy * inv_c2 / (gamma * mass);
                     const amrex::ParticleReal lny = std::log( y_min );
                     // Number of virtual photons per primary particle
-                    const amrex::Real r_photons = alpha_over_pi * lny * lny * sampling_factor;
+                    const amrex::Real r_photons = alpha_over_pi_Z2 * lny * lny * sampling_factor;
 
                     // `n_photons` must be an integer, but must average to `r_photons` over many realizations
                     // This is achieved by adding a random number between 0 and 1, and taking the integer part.
