@@ -34,6 +34,7 @@
 #include <AMReX_MLMG.H>
 
 #include <memory>
+#include <queue>
 #include <string>
 #include <utility>
 #include <vector>
@@ -255,7 +256,7 @@ namespace
         amrex::iMultiFab overset(phi.boxArray(), phi.DistributionMap(), 1, 0);
         amrex::iMultiFab invalid(phi.boxArray(), phi.DistributionMap(), 1, 0);
 
-        amrex::Parser parser = utils::parser::makeParser(selector, {"x", "y", "z"});
+        amrex::Parser const parser = utils::parser::makeParser(selector, {"x", "y", "z"});
         auto const select = parser.compile<3>();
         auto const dx = geom.CellSizeArray();
         amrex::Real const zlo = geom.ProbLo(1);
@@ -333,8 +334,8 @@ namespace
         // electrostatic solver) imposes it on the EB surface instead, so it cannot be
         // reused here. The conductors enter only through the overset mask; the operator
         // is built on a local all-regular EB index space, leaving WarpX's EB untouched.
-        amrex::EB2::AllRegularIF all_regular;
-        amrex::EB2::GeometryShop<amrex::EB2::AllRegularIF> shop(all_regular);
+        amrex::EB2::AllRegularIF const all_regular;
+        amrex::EB2::GeometryShop<amrex::EB2::AllRegularIF> const shop(all_regular);
         // IndexSpaceImp arguments: no required coarsening, coarsen as far as possible
         // for MLMG (same limit as in WarpXInitEB.cpp), one EB ghost cell, build coarse
         // levels by coarsening, no domain-face extension, default coarsening option.
@@ -370,7 +371,7 @@ namespace
 
         // E_k = -grad phi with the electrostatic solver's Yee gradient (beta = 0): curl-free,
         // and zero on frozen edges because both nodes of such an edge have equal phi.
-        ablastr::fields::VectorField efield = warpx.m_fields.get_alldirs(EFieldName(k), lev);
+        ablastr::fields::VectorField const efield = warpx.m_fields.get_alldirs(EFieldName(k), lev);
         for (auto* e : efield) { e->setVal(0._rt); }
         ablastr::fields::MultiLevelVectorField const e_levels{efield};
         ablastr::fields::MultiLevelScalarField const phi_levels{&phi};
@@ -425,17 +426,18 @@ namespace
         // Breadth-first search along frozen edges, starting from all wall nodes: the
         // outer radius, and the z faces unless z is periodic
         std::vector<int> grounded(count, 0);
-        std::vector<int> queue;
+        std::queue<int> queue;
         auto const visit = [&] (int i, int row) {
             int const n = i + nr*row;
-            if (grounded[n] == 0) { grounded[n] = 1; queue.push_back(n); }
+            if (grounded[n] == 0) { grounded[n] = 1; queue.push(n); }
         };
         for (int row = 0; row < nrow; ++row) { visit(nr-1, row); }
         if (!z_periodic) {
             for (int i = 0; i < nr; ++i) { visit(i, 0); visit(i, nrow-1); }
         }
-        for (std::size_t next = 0; next < queue.size(); ++next) {
-            int const n = queue[next];
+        while (!queue.empty()) {
+            int const n = queue.front();
+            queue.pop();
             int const i = n % nr;
             int const row = n / nr;
             int const up = z_periodic ? (row + 1) % nrow : row + 1;
@@ -464,7 +466,7 @@ namespace
     {
         // The divergence stencil reads guard cells; syncing them from valid data
         // keeps the result independent of the domain decomposition.
-        ablastr::fields::VectorField efield = warpx.m_fields.get_alldirs(name, lev);
+        ablastr::fields::VectorField const efield = warpx.m_fields.get_alldirs(name, lev);
         for (auto* e : efield) { e->FillBoundary(warpx.Geom(lev).periodicity()); }
         // The FDTD solver's own nodal divergence, so the observer sees exactly the
         // discrete Gauss law of the field update
