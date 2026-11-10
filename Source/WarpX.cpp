@@ -10,6 +10,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/FieldBoundaries.H"
 #include "BoundaryConditions/PEC_Insulator.H"

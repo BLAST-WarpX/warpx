@@ -7,6 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
@@ -811,6 +812,11 @@ WarpX::UpdateAuxiliaryDataSameType ()
         return;
     }
 #endif
+    if (m_composite_yee_surface) {
+        m_composite_yee_surface->UpdateGatherFields();
+        return;
+    }
+
     // Refined levels add the coarse-patch correction through the same helper for B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {

@@ -7,6 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #include "Fields.H"
@@ -960,6 +961,7 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half,
     if (apply_current_controlled_port) {
         ApplyCompositeCurrentControlledPorts(start_time + a_dt);
     }
+    if (m_composite_yee_surface) { m_composite_yee_surface->RestrictMagnetic(); }
     ExecutePythonCallback("afterBpush");
 }
 
@@ -1018,12 +1020,14 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt,
 void
 WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
+    if (m_composite_yee_surface) { m_composite_yee_surface->RememberElectric(); }
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         EvolveE(lev, a_dt, start_time);
     }
 
     // Allow execution of Python callback after E-field push
+    if (m_composite_yee_surface) { m_composite_yee_surface->AdvanceElectric(a_dt); }
     ExecutePythonCallback("afterEpush");
 }
 
@@ -1225,11 +1229,13 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 void
 WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
+    if (m_composite_yee_surface) { m_composite_yee_surface->RememberElectric(); }
     for (int lev = 0; lev <= finest_level; ++lev ) {
         MacroscopicEvolveE(lev, a_dt, start_time);
     }
 
     // Match the vacuum and Hybrid-PIC electric-field advance callbacks.
+    if (m_composite_yee_surface) { m_composite_yee_surface->AdvanceElectric(a_dt); }
     ExecutePythonCallback("afterEpush");
 }
 

@@ -84,6 +84,8 @@
 #include <variant>
 #include <vector>
 
+class CompositeYeeSurface;
+
 class WARPX_EXPORT WarpX
     : public amrex::AmrCore
 {
@@ -1533,6 +1535,9 @@ private:
 
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
+
+    bool m_use_composite_yee_surface = false;
+    std::unique_ptr<CompositeYeeSurface> m_composite_yee_surface;
 
     // Independent waveform-driven paired terminal constraints
     std::vector<std::unique_ptr<CurrentControlledPort>>

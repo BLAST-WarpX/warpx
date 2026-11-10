@@ -9,6 +9,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include <fstream>
 #include <sstream>
@@ -819,6 +820,33 @@ WarpX::InitData ()
 
     Print() << utils::logo::get_logo();
 
+    amrex::ParmParse("warpx").query("composite_yee_surface", m_use_composite_yee_surface);
+    if (m_use_composite_yee_surface) {
+#ifndef WARPX_DIM_3D
+        WARPX_ABORT_WITH_MESSAGE("The conforming Yee surface requires a Cartesian 3D build.");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            max_level == 1 && amrex::ParallelDescriptor::NProcs() == 1 &&
+            evolve_scheme == EvolveScheme::Explicit && !m_do_subcycling &&
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+            electrostatic_solver_id == ElectrostaticSolverAlgo::None &&
+            grid_type == ablastr::utils::enums::GridType::Staggered &&
+            field_gathering_algo == GatheringAlgo::EnergyConserving &&
+            !do_moving_window && regrid_int <= 0 && !load_balance_intervals.isActivated() &&
+            restart_chkfile.empty() && !do_dive_cleaning && !do_divb_cleaning &&
+            !do_pml_dive_cleaning && !do_pml_divb_cleaning && !m_do_initial_div_cleaning &&
+            !do_pml_in_domain && !pml_has_particles && !do_current_centering &&
+            !use_fdtd_nci_corr && !fft_do_time_averaging && !use_hybrid_QED &&
+            gamma_boost == 1.0_rt && !do_fluid_species && m_num_mirrors == 0 &&
+            mypc->nLasers() == 0 && mypc->nSpeciesGatherFromMainGrid() == 0 &&
+            mypc->nSpeciesDepositOnMainGrid() == 0 &&
+            m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::default_zero &&
+            m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero &&
+            mypc->m_E_ext_particle_s != "read_from_file" && mypc->m_B_ext_particle_s != "read_from_file",
+            "The experimental conforming surface requires fresh serial explicit staggered Yee, "
+            "one static refinement, no divergence cleaning and energy-conserving gathering.");
+    }
+
     // Diagnostics
     multi_diags = std::make_unique<MultiDiagnostics>();
 
@@ -977,6 +1005,12 @@ WarpX::InitData ()
     }
     else {
         ExecutePythonCallback("afterInitatRestart");
+    }
+
+    if (m_use_composite_yee_surface) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(finest_level == 1, "The conforming Yee surface requires a fine mesh.");
+        m_composite_yee_surface = std::make_unique<CompositeYeeSurface>(*this);
+        m_composite_yee_surface->UpdateGatherFields();
     }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
@@ -1234,6 +1268,12 @@ WarpX::InitPML ()
             // Note: fill_guards_fields and fill_guards_current are both set to
             // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
             // to the PML, for example in the presence of mesh refinement patches)
+            if (m_use_composite_yee_surface) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Geom(lev).Domain().strictly_contains(levelBox),
+                    "The conforming Yee interface must lie inside the physical domain.");
+                do_pml_Lo[lev] = amrex::IntVect(0);
+                do_pml_Hi[lev] = amrex::IntVect(0);
+            }
             pml[lev] = std::make_unique<PML>(
                 lev, boxArray(lev), DistributionMap(lev), do_similar_dm_pml,
                 &Geom(lev), &Geom(lev-1),
