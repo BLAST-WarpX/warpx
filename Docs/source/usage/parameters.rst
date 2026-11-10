@@ -1352,7 +1352,7 @@ Secondary emission
 WarpX includes a simplified secondary emission algorithm where particles can be emitted from a domain or embedded boundary after the impact of a particle on that boundary.
 The absorbed particles are saved in the particle boundary buffer and used to create particles of the specified product species on the same timestep.
 Each absorbed source macroparticle emits one product macroparticle with the same weight with a probability set by the secondary-emission coefficient.
-The emitted particles are initialized at the impact boundary with a thermal velocity distribution directed back into the domain.
+The emitted particles are initialized at the impact boundary with a thermal velocity distribution with a cosine-law angular distribution, directed back into the domain.
 
 The following parameters are set on the source species. The parameters apply to all boundaries that would absorb particles.
 
