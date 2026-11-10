@@ -28,7 +28,8 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
     endforeach()
     set(crossing_outward "")
     set(crossing_inward "--inward")
-    foreach(direction IN ITEMS outward inward)
+    set(crossing_frozen "--frozen")
+    foreach(direction IN ITEMS outward inward frozen)
         add_warpx_test(
             test_3d_conforming_yee_crossing_${direction}
             3

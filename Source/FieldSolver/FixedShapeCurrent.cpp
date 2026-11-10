@@ -94,7 +94,7 @@ for_tiles (WarpX& w, F const& f) {
     auto& pcs = w.GetPartContainer();
     for (int s = 0; s < pcs.nSpecies(); ++s) {
         auto& pc = pcs.GetParticleContainer(s);
-        if (pc.do_not_deposit || pc.getCharge() == 0._rt) {
+        if (!pc.isPushed() || pc.do_not_deposit || pc.getCharge() == 0._rt) {
             continue;
         }
         for (int lev = 0; lev <= 1; ++lev)

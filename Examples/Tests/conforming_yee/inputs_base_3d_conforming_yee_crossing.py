@@ -10,12 +10,13 @@ from pywarpx.particle_containers import ParticleContainerWrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--inward", action="store_true")
+parser.add_argument("--frozen", action="store_true")
 args = parser.parse_args()
 n = 32
 length = 0.1
 ratio = np.array([2, 2, 1])
 dt = 0.4 * length / (2 * n * 299792458.0)
-steps = 100
+steps = 4 if args.frozen else 100
 shape = 3 if args.inward else 1
 geometry.dims = 3
 settings = [
@@ -60,6 +61,7 @@ for name, species, speed in (
     settings.extend(
         [
             f"{name}.species_type={species}",
+            f"{name}.do_not_push={int(args.frozen and name == 'electrons')}",
             f"{name}.injection_style=Nuniformpercell",
             f"{name}.num_particles_per_cell_each_dim=4 4 2",
             f"{name}.profile=parse_density_function",
@@ -72,6 +74,9 @@ libwarpx.initialize(settings)
 fields = libwarpx.warpx.multifab_register()
 blocks, boxes, covered = mesh_fields(fields, n, ratio)
 species = [ParticleContainerWrapper(name) for name in ("electrons", "protons")]
+if args.frozen:
+    # Exercise both a frozen input species and the live particle-container switch.
+    species[1].particle_container.set_do_not_push(True)
 # A coarse piecewise-linear test function is representable on both grids.
 coarse_nodes = np.linspace(0, length, n + 1)
 coarse_phi = length / (2 * np.pi) * np.sin(2 * np.pi * coarse_nodes / length)
@@ -125,8 +130,18 @@ for _ in range(4):
     libwarpx.warpx.evolve(steps // 4)
     charge, electric, counts = sample()
     np.testing.assert_array_equal(counts.sum(axis=1), original.sum(axis=1))
-    assert abs(charge - q0) > 1e-19
-    np.testing.assert_allclose(electric - e0, -(charge - q0), rtol=2e-10, atol=0)
-destination = 1 if args.inward else 0
-assert np.all(counts[:, destination] > original[:, destination])
+    if args.frozen:
+        np.testing.assert_array_equal(counts, original)
+        assert charge == q0 and electric == e0
+        for group in blocks.values():
+            for _, _, view in group:
+                assert not np.any(host(view)), (
+                    "Frozen particles produced an electromagnetic field"
+                )
+    else:
+        assert abs(charge - q0) > 1e-19
+        np.testing.assert_allclose(electric - e0, -(charge - q0), rtol=2e-10, atol=0)
+if not args.frozen:
+    destination = 1 if args.inward else 0
+    assert np.all(counts[:, destination] > original[:, destination])
 libwarpx.finalize()
