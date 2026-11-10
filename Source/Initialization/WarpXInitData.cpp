@@ -821,6 +821,9 @@ WarpX::InitData ()
     Print() << utils::logo::get_logo();
 
     amrex::ParmParse("warpx").query("composite_yee_surface", m_use_composite_yee_surface);
+    if (!restart_chkfile.empty()) {
+        CompositeYeeSurface::CheckRestartIdentity(*this, restart_chkfile, m_use_composite_yee_surface);
+    }
     if (m_use_composite_yee_surface) {
 #ifndef WARPX_DIM_3D
         WARPX_ABORT_WITH_MESSAGE("The conforming Yee surface requires a Cartesian 3D build.");
@@ -833,7 +836,7 @@ WarpX::InitData ()
             grid_type == ablastr::utils::enums::GridType::Staggered &&
             field_gathering_algo == GatheringAlgo::EnergyConserving &&
             !do_moving_window && regrid_int <= 0 && !load_balance_intervals.isActivated() &&
-            restart_chkfile.empty() && !do_dive_cleaning && !do_divb_cleaning &&
+            !do_dive_cleaning && !do_divb_cleaning &&
             !do_pml_dive_cleaning && !do_pml_divb_cleaning && !m_do_initial_div_cleaning &&
             !do_pml_in_domain && !pml_has_particles && !do_current_centering &&
             !use_fdtd_nci_corr && !fft_do_time_averaging && !use_hybrid_QED &&
@@ -845,7 +848,7 @@ WarpX::InitData ()
             (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero ||
              m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::constant) &&
             mypc->m_E_ext_particle_s != "read_from_file" && mypc->m_B_ext_particle_s != "read_from_file",
-            "The experimental conforming surface requires fresh serial explicit staggered Yee, "
+            "The experimental conforming surface requires serial explicit staggered Yee, "
             "one static refinement, no divergence cleaning and energy-conserving gathering.");
     }
 

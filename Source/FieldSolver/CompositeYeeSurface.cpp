@@ -20,13 +20,68 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <map>
+#include <sstream>
 #include <vector>
 
 using namespace amrex::literals;
 using amrex::Real;
 using warpx::fields::FieldType;
+
+namespace {
+std::string
+checkpoint_identity (WarpX& w) {
+    bool fixed = false, gather = false;
+    amrex::ParmParse pp("warpx");
+    pp.query("composite_yee_fixed_shape_current", fixed);
+    pp.query("composite_yee_fixed_shape_gather", gather);
+    std::ostringstream out;
+    out << "WarpX conforming Yee surface 1\n"
+        << w.refRatio(0) << ' ' << fixed << ' ' << gather << ' ' << WarpX::nox
+        << ' ' << static_cast<int>(WarpX::current_deposition_algo) << ' '
+        << WarpX::use_filter << ' ' << WarpX::filter_npass_each_dir << '\n';
+    return out.str();
+}
+} // namespace
+
+void
+CompositeYeeSurface::WriteCheckpointIdentity (WarpX& w,
+                                              std::string const& directory) {
+    bool enabled = false;
+    amrex::ParmParse("warpx").query("composite_yee_surface", enabled);
+    if (enabled) {
+        std::ofstream marker(std::filesystem::path(directory) /
+                             "CompositeYeeSurface");
+        marker << checkpoint_identity(w);
+        marker.close();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            marker.good(),
+            "Could not save conforming surface checkpoint identity.");
+    }
+}
+
+void
+CompositeYeeSurface::CheckRestartIdentity (WarpX& w,
+                                           std::string const& directory,
+                                           bool enabled) {
+    auto const file = std::filesystem::path(directory) / "CompositeYeeSurface";
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::filesystem::exists(file) == enabled,
+        "A conforming Yee checkpoint must be restarted with the same interface "
+        "solver.");
+    if (enabled) {
+        std::ifstream marker(file);
+        std::ostringstream text;
+        text << marker.rdbuf();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            text.str() == checkpoint_identity(w),
+            "The conforming Yee checkpoint has a different interface or "
+            "particle coupling.");
+    }
+}
 
 #ifdef WARPX_DIM_3D
 namespace {

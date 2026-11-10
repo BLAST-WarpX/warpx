@@ -6,6 +6,7 @@
 
 #include <AMReX_REAL.H>
 #include <memory>
+#include <string>
 
 class WarpX;
 
@@ -15,6 +16,10 @@ class CompositeYeeSurface {
   public:
     explicit CompositeYeeSurface (WarpX& warpx);
     ~CompositeYeeSurface ();
+    static void WriteCheckpointIdentity (WarpX& w,
+                                         std::string const& directory);
+    static void CheckRestartIdentity (WarpX& w, std::string const& directory,
+                                      bool enabled);
     void RememberElectric ();
     void AdvanceElectric (amrex::Real dt);
     void RestrictMagnetic ();
