@@ -3,7 +3,8 @@
 # --- 3D Darwin solver test: noise-seeded low-frequency EM waves in a periodic
 # --- box with B0 along (1,1,1)/sqrt(3), oblique to every grid axis, so all nine
 # --- 3D mass-matrix blocks carry a full stencil. Runs with ES off, using global
-# --- particle shape 3 but particle shape 1 for the MS part of the solve.
+# --- particle shape 3 but particle shape 1 for the MS part of the solve, and
+# --- with the grad-div penalty term in the Darwin field operator.
 # ---
 # --- Each step, the dB = B - B0 Fourier amplitudes are recorded at two groups of
 # --- wave vectors that are physically equivalent under axis permutation:
@@ -71,13 +72,15 @@ class ObliqueModes(object):
     NPPC = 4  # seed macroparticles/cell/species before symmetrization (x3 after)
     SHAPE = 3  # particle shape for the electrostatic part of the solve
     MS_SHAPE = 1  # particle shape for the magnetostatic part of the solve
+    GRADDIV_FACTOR = 1.0  # grad-div penalty factor of the Darwin field operator
     GMRES_TOL = 1e-5
     DT_WCI = 0.04  # dt * Omega_ci
     TOTAL_STEPS = 130
 
-    def __init__(self, test, seed):
+    def __init__(self, test, seed, graddiv_factor):
         self.test = test
         self.seed = seed
+        self.graddiv_factor = graddiv_factor
         self.nprocs = comm.size
 
         b = np.array([1.0, 1.0, 1.0])
@@ -149,6 +152,7 @@ class ObliqueModes(object):
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
             magnetostatic_particle_shape=self.MS_SHAPE,
+            graddiv_factor=self.graddiv_factor,
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=self.GMRES_TOL,
                 max_iterations=2048,
@@ -285,10 +289,13 @@ class ObliqueModes(object):
 
 test = "--test" in sys.argv or "-t" in sys.argv
 seed = 1
+graddiv_factor = ObliqueModes.GRADDIV_FACTOR
 for i, a in enumerate(sys.argv):
     if a == "--seed" and i + 1 < len(sys.argv):
         seed = int(sys.argv[i + 1])
+    if a == "--graddiv_factor" and i + 1 < len(sys.argv):
+        graddiv_factor = float(sys.argv[i + 1])
 sys.argv = [sys.argv[0]]
 
-run = ObliqueModes(test=test, seed=seed)
+run = ObliqueModes(test=test, seed=seed, graddiv_factor=graddiv_factor)
 simulation.step()
