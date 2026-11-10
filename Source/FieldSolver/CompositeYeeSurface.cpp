@@ -2,6 +2,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "CompositeYeeSurface.H"
+#include "FixedShapeCurrent.H"
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
@@ -468,6 +469,7 @@ struct CompositeYeeSurface::Implementation {
     int ne[2]{};
     Real volume[2]{};
     int iterations = 0;
+    std::unique_ptr<FixedShapeCurrent> fixed_shape_current;
     std::array<std::array<std::unique_ptr<amrex::MultiFab>, 3>, 2> gather_patch;
 
     explicit Implementation (WarpX& warpx) : w(warpx), ratio(w.refRatio(0)) {
@@ -486,6 +488,12 @@ struct CompositeYeeSurface::Implementation {
                 "positive refinement ratios.");
         }
         check_vacuum_patch(w);
+        bool use_fixed_shape = false;
+        amrex::ParmParse("warpx").query("composite_yee_fixed_shape_current",
+                                        use_fixed_shape);
+        if (use_fixed_shape) {
+            fixed_shape_current = std::make_unique<FixedShapeCurrent>(w);
+        }
         Coverage const covered(w);
         auto const boundary = covered.faces();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -574,8 +582,19 @@ struct CompositeYeeSurface::Implementation {
                 for (int k = 0; k < ba.size(); ++k) {
                     auto const domain =
                         amrex::convert(w.Geom(0).Domain(), a.ixType());
+                    auto const buf_type =
+                        s ? FieldType::Bfield_cax : FieldType::Efield_cax;
+                    auto const width =
+                        fields.has_vector(buf_type, 1)
+                            ? amrex::elemwiseMax(
+                                  pad,
+                                  fields
+                                      .get(buf_type,
+                                           ablastr::fields::Direction{d}, 1)
+                                      ->nGrowVect())
+                            : pad;
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        domain.contains(amrex::grow(ba[k], pad)),
+                        domain.contains(amrex::grow(ba[k], width)),
                         "The gather stencil needs a physical coarse collar "
                         "around each fine box.");
                 }
@@ -668,6 +687,13 @@ CompositeYeeSurface::AdvanceElectric (Real dt) {
 }
 
 void
+CompositeYeeSurface::AssembleParticleCurrent (Real dt) {
+    if (m_impl->fixed_shape_current) {
+        m_impl->fixed_shape_current->Assemble(dt);
+    }
+}
+
+void
 CompositeYeeSurface::UpdateGatherFields () {
     auto& g = *m_impl;
     auto& fields = g.w.m_fields;
@@ -683,6 +709,17 @@ CompositeYeeSurface::UpdateGatherFields () {
             scratch.ParallelCopy(*coarse[d], 0, 0, 1, amrex::IntVect(0),
                                  scratch.nGrowVect(),
                                  g.w.Geom(0).periodicity());
+            auto const cax_type =
+                s ? FieldType::Bfield_cax : FieldType::Efield_cax;
+            if (fields.has_vector(cax_type, 1)) {
+                auto* buffered =
+                    fields.get(cax_type, ablastr::fields::Direction{d}, 1);
+                // Buffered fine particles gather from the physical parent,
+                // including guards.
+                buffered->ParallelCopy(*coarse[d], 0, 0, 1, amrex::IntVect(0),
+                                       buffered->nGrowVect(),
+                                       g.w.Geom(0).periodicity());
+            }
             auto const nodal = aux[d]->ixType().toIntVect();
             // Valid fine values and neighboring fine boxes take precedence over
             // this Whitney extension. Keep exterior coarse fields in the force
@@ -738,6 +775,8 @@ void
 CompositeYeeSurface::AdvanceElectric (Real) {}
 void
 CompositeYeeSurface::RestrictMagnetic () {}
+void
+CompositeYeeSurface::AssembleParticleCurrent (Real) {}
 void
 CompositeYeeSurface::UpdateGatherFields () {}
 #endif

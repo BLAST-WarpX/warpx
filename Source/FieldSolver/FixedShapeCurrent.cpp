@@ -1,0 +1,265 @@
+/* Copyright 2026 The WarpX Community
+ * License: BSD-3-Clause-LBNL
+ */
+#include "FixedShapeCurrent.H"
+
+#ifdef WARPX_DIM_3D
+#include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
+#include "Particles/Deposition/CurrentDeposition.H"
+#include "Particles/MultiParticleContainer.H"
+#include "Particles/PhysicalParticleContainer.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
+#include "Utils/TextMsg.H"
+#include "WarpX.H"
+
+#include <AMReX_GpuMemory.H>
+#include <AMReX_ParmParse.H>
+#include <cmath>
+#include <typeinfo>
+
+using namespace amrex::literals;
+using amrex::IntVect;
+using amrex::Real;
+using warpx::fields::FieldType;
+
+namespace {
+// Restrict the source experiment to free-particle paths. Erode the vacuum
+// cells by a full step, shape support, and any current filter. Physical wall
+// charge, periodic images, and cut-cell deposition need separate operators.
+void
+initialize_centers (WarpX& w, amrex::iMultiFab& centers) {
+    auto const box = w.Geom(0).Domain();
+    auto const map = centers.DistributionMap();
+    amrex::iMultiFab vacuum(amrex::BoxArray(box), map, 1, 0);
+    auto const good = vacuum.array(0);
+    auto* mat = w.get_pointer_MacroscopicProperties(0);
+    bool const has_eb = EB::enabled(), has_mat = (mat != nullptr);
+    auto const e = w.m_fields.get_alldirs(FieldType::Efield_fp, 0);
+    for (amrex::MFIter it(*e[0]); it.isValid(); ++it) {
+        amrex::GpuArray<amrex::Array4<int const>, 3> ef{}, bf{};
+        amrex::Array4<Real const> sigma, mu, eps;
+        if (has_eb) {
+            for (int d = 0; d < 3; d++) {
+                ef[d] = w.GetEBUpdateEFlag()[0][d]->const_array(it);
+                bf[d] = w.GetEBUpdateBFlag()[0][d]->const_array(it);
+            }
+        }
+        if (has_mat) {
+            sigma = mat->getsigma_mf().const_array(it);
+            mu = mat->getmu_mf().const_array(it);
+            eps = mat->getepsilon_mf().const_array(it);
+        }
+        amrex::ParallelFor(
+            amrex::enclosedCells(it.validbox()),
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                IntVect const p{i, j, k};
+                bool ok =
+                    !has_mat || (sigma(p) == 0._rt && mu(p) == PhysConst::mu0 &&
+                                 eps(p) == PhysConst::epsilon_0);
+                if (has_eb) {
+                    for (int d = 0; d < 3; ++d) {
+                        auto const u = IntVect::TheDimensionVector((d + 1) % 3);
+                        auto const v = IntVect::TheDimensionVector((d + 2) % 3);
+                        ok = ok && ef[d](p) && ef[d](p + u) && ef[d](p + v) &&
+                             ef[d](p + u + v) && bf[d](p) &&
+                             bf[d](p + IntVect::TheDimensionVector(d));
+                    }
+                }
+                good(p) = int(ok);
+            });
+    }
+    auto const filter =
+        WarpX::use_filter ? WarpX::filter_npass_each_dir : IntVect(0);
+    auto const ratio = w.refRatio(0);
+    // Round the fine stencil radius up in each parent direction.
+    auto const reach = amrex::coarsen(
+        IntVect((WarpX::nox + 1) / 2 + 1) + filter + ratio - IntVect(1), ratio);
+    auto const valid = centers.array(0);
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+        IntVect const p{i, j, k};
+        bool ok = box.contains(p - reach) && box.contains(p + reach);
+        for (int z = -reach[2]; ok && z <= reach[2]; ++z)
+            for (int y = -reach[1]; ok && y <= reach[1]; ++y)
+                for (int x = -reach[0]; ok && x <= reach[0]; ++x)
+                    ok = good(i + x, j + y, k + z) != 0;
+        valid(p) = int(ok);
+    });
+    amrex::Gpu::streamSynchronize();
+}
+
+template <typename F>
+void
+for_tiles (WarpX& w, F const& f) {
+    auto& pcs = w.GetPartContainer();
+    for (int s = 0; s < pcs.nSpecies(); ++s) {
+        auto& pc = pcs.GetParticleContainer(s);
+        if (pc.do_not_deposit || pc.getCharge() == 0._rt) {
+            continue;
+        }
+        for (int lev = 0; lev <= 1; ++lev)
+            for (WarpXParIter it(pc, lev); it.isValid(); ++it)
+                f(it, pc.getCharge());
+    }
+}
+
+template <int order>
+void
+deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
+         amrex::XDim3 const& dinv, amrex::XDim3 const& lower,
+         std::array<amrex::Array4<Real>, 3> const& j) {
+    auto const pos = GetParticlePosition<PIdx>(it);
+    auto const* weight = it.GetAttribs(PIdx::w).dataPtr();
+    auto const* ux = it.GetAttribs(PIdx::ux).dataPtr();
+    auto const* uy = it.GetAttribs(PIdx::uy).dataPtr();
+    auto const* uz = it.GetAttribs(PIdx::uz).dataPtr();
+    auto const n = it.numParticles();
+    if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
+        doEsirkepovDepositionShapeN<order>(
+            pos, weight, ux, uy, uz, nullptr, j[0], j[1], j[2], n, dt,
+            -.5_rt * dt, dinv, lower, amrex::lbound(box), q, 1,
+            amrex::Array4<int const>{}, false);
+    } else {
+        amrex::GpuArray<amrex::GpuArray<double, 2>, 3> bounds{};
+        for (int d = 0; d < 3; ++d) {
+            bounds[d][1] = box.length(d);
+        }
+        amrex::GpuArray<amrex::GpuArray<bool, 2>, 3> crop{};
+        doVillasenorDepositionShapeNExplicit<order>(
+            pos, weight, ux, uy, uz, nullptr, j[0], j[1], j[2], n, dt,
+            -.5_rt * dt, dinv, lower, bounds, crop, amrex::lbound(box), q, 1);
+    }
+}
+} // namespace
+
+FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
+    auto& pcs = w.GetPartContainer();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        pcs.nContainers() == pcs.nSpecies() &&
+            (WarpX::nox == 1 || WarpX::nox == 3) && WarpX::nox == WarpX::noy &&
+            WarpX::nox == WarpX::noz &&
+            (WarpX::current_deposition_algo ==
+                 CurrentDepositionAlgo::Esirkepov ||
+             WarpX::current_deposition_algo ==
+                 CurrentDepositionAlgo::Villasenor),
+        "The fixed-shape current control requires ordinary kinetic species and "
+        "linear or cubic charge-conserving deposition.");
+    for (int s = 0; s < pcs.nSpecies(); ++s) {
+        auto& pc = pcs.GetParticleContainer(s);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            typeid(pc) == typeid(PhysicalParticleContainer) &&
+                !pc.doContinuousInjection() && !pc.DoFieldIonization() &&
+                !pc.do_splitting,
+            "The fixed-shape current control requires ordinary physical "
+            "particles with fixed species charge.");
+    }
+    auto const domain = w.Geom(1).Domain();
+    amrex::DistributionMapping dm(amrex::Vector<int>{0});
+    valid_centers.define(amrex::BoxArray(w.Geom(0).Domain()), dm, 1, 0);
+    initialize_centers(w, valid_centers);
+    auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
+    for (int d = 0; d < 3; ++d) {
+        amrex::BoxArray const ba(amrex::convert(domain, fine[d]->ixType()));
+        raw[d] = std::make_unique<amrex::MultiFab>(ba, dm, 1, 0);
+        if (WarpX::use_filter) {
+            filtered[d] = std::make_unique<amrex::MultiFab>(ba, dm, 1, 0);
+        }
+        fine_owns[d] = std::make_unique<amrex::iMultiFab>(ba, dm, 1, 0);
+        fine_owns[d]->setVal(0);
+        for (int k = 0; k < fine[d]->boxArray().size(); ++k) {
+            fine_owns[d]->setVal(1, fine[d]->boxArray()[k], 0, 1);
+        }
+    }
+}
+
+void
+FixedShapeCurrent::Assemble (Real dt) {
+    auto const box = w.Geom(1).Domain(), cbox = w.Geom(0).Domain();
+    auto const dinv = WarpX::InvCellSize(1),
+               lower = WarpX::LowerCorner(box, 1, .5_rt * dt);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dt * PhysConst::c * amrex::max(dinv.x, amrex::max(dinv.y, dinv.z)) <=
+            1._rt,
+        "The virtual current stencil requires displacement within one fine "
+        "cell per step.");
+    auto const clo = w.Geom(0).ProbLoArray(),
+               cdi = w.Geom(0).InvCellSizeArray();
+    auto const safe = valid_centers.const_array(0);
+    amrex::Gpu::DeviceScalar<int> invalid(0);
+    int* flag = invalid.dataPtr();
+    for_tiles(w, [&] (WarpXParIter const& it, Real) {
+        auto const pos = GetParticlePosition<PIdx>(it);
+        amrex::ParallelFor(
+            it.numParticles(), [=] AMREX_GPU_DEVICE(int n) noexcept {
+                amrex::ParticleReal x, y, z;
+                pos(n, x, y, z);
+                IntVect p{int(amrex::Math::floor((x - clo[0]) * cdi[0])),
+                          int(amrex::Math::floor((y - clo[1]) * cdi[1])),
+                          int(amrex::Math::floor((z - clo[2]) * cdi[2]))};
+                if (!cbox.contains(p) || !safe(p)) {
+                    amrex::Gpu::Atomic::Exch(flag, 1);
+                }
+            });
+    });
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !invalid.dataValue(), "A fixed-shape particle source stencil reached a "
+                              "material or physical boundary.");
+    std::array<amrex::Array4<Real>, 3> j;
+    for (int d = 0; d < 3; ++d) {
+        raw[d]->setVal(0._rt);
+        j[d] = raw[d]->array(0);
+    }
+    for_tiles(w, [&] (WarpXParIter const& it, Real q) {
+        if (WarpX::nox == 3) {
+            deposit<3>(it, q, dt, box, dinv, lower, j);
+        } else {
+            deposit<1>(it, q, dt, box, dinv, lower, j);
+        }
+    });
+    auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
+    auto const coarse = w.m_fields.get_alldirs(FieldType::current_fp, 0);
+    auto const cp = w.m_fields.get_alldirs(FieldType::current_cp, 1);
+    auto const r = w.refRatio(0);
+    Real const density_scale = 1._rt / (r[0] * r[1] * r[2]);
+    for (int d = 0; d < 3; ++d) {
+        if (filtered[d]) {
+            w.bilinear_filter.ApplyStencil(*filtered[d], *raw[d], 1);
+        }
+        auto const& source = filtered[d] ? *filtered[d] : *raw[d];
+        fine[d]->ParallelCopy(source, 0, 0, 1, 0, 0);
+        auto const arr = source.const_array(0);
+        auto const mask = fine_owns[d]->const_array(0);
+        auto const dom = source.boxArray()[0];
+        auto const u = (d + 1) % 3, v = (d + 2) % 3;
+        for (amrex::MFIter it(*coarse[d]); it.isValid(); ++it) {
+            auto const dest = coarse[d]->array(it);
+            // Volume adjoint of exterior Whitney prolongation. Never deposit
+            // the fine-owned trace again: its weak source enters the surface
+            // solve.
+            amrex::ParallelFor(
+                it.validbox(),
+                [=] AMREX_GPU_DEVICE(int i, int j_, int k) noexcept {
+                    IntVect const base = IntVect(i, j_, k) * r;
+                    Real sum = 0._rt;
+                    for (int a = 0; a < r[d]; ++a) {
+                        for (int b = 1 - r[u]; b < r[u]; ++b) {
+                            for (int c = 1 - r[v]; c < r[v]; ++c) {
+                                IntVect p = base;
+                                p[d] += a;
+                                p[u] += b;
+                                p[v] += c;
+                                if (dom.contains(p) && !mask(p)) {
+                                    sum += (1._rt - Real(std::abs(b)) / r[u]) *
+                                           (1._rt - Real(std::abs(c)) / r[v]) *
+                                           arr(p);
+                                }
+                            }
+                        }
+                    }
+                    dest(i, j_, k) = density_scale * sum;
+                });
+        }
+        cp[d]->setVal(0._rt);
+    }
+}
+#endif

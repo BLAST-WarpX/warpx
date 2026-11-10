@@ -4,6 +4,7 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         CompositeCurrentControlledPort.cpp
         CompositeYeeSurface.cpp
+        FixedShapeCurrent.cpp
         CurrentControlledPort.cpp
         WarpXPushFieldsEM.cpp
         WarpXPushFieldsHybridPIC.cpp

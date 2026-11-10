@@ -9,6 +9,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
@@ -605,6 +606,8 @@ WarpX::OneStep_nosub (
     if (current_deposition_algo != CurrentDepositionAlgo::Vay) {
         FinalizeJ(); // Apply boundary conditions and inverse volume scaling to J
     }
+
+    if (m_composite_yee_surface) { m_composite_yee_surface->AssembleParticleCurrent(a_dt); }
 
     // At this point, J is up-to-date inside the domain except with Vay deposition,
     // and E and B are up-to-date including enough guard cells for the first

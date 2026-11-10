@@ -19,6 +19,7 @@ class CompositeYeeSurface {
     void AdvanceElectric (amrex::Real dt);
     void RestrictMagnetic ();
     void UpdateGatherFields ();
+    void AssembleParticleCurrent (amrex::Real dt);
 
   private:
     struct Implementation;
