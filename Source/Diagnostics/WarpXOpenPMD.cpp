@@ -11,9 +11,11 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FieldIO.H"
 #include "Particles/Filter/FilterFunctors.H"
+#include "Utils/Algorithms/IsIn.H"
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 
@@ -49,8 +51,10 @@
 #include <regex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace detail
 {
@@ -342,11 +346,61 @@ namespace detail
         }
     }
 
+    /** \brief Check if a field name is a per-species field of the form <prefix><species>
+     *
+     * @param[in] field_name    name of the field, without mesh-refinement level suffix
+     * @param[in] prefix        expected prefix, e.g., "T_"
+     * @param[in] species_names names of all particle species in the simulation
+     * @return true if field_name is prefix followed by the name of a species
+     */
+    inline bool
+    isPerSpeciesField ( std::string const & field_name,
+                        std::string const & prefix,
+                        std::vector<std::string> const & species_names )
+    {
+        return field_name.starts_with(prefix) &&
+            utils::algorithms::is_in(species_names, field_name.substr(prefix.size()));
+    }
+
+    /** \brief Check if a field name is a per-direction species temperature T<dir>_<species>
+     *
+     * These are deposited for the hybrid-PIC solver. The direction labels are
+     * those of FullDiagnostics: x,y,z in Cartesian, r,t,z in RZ/RCYLINDER, r,t,p in RSPHERE.
+     *
+     * @param[in] field_name    name of the field, without mesh-refinement level suffix
+     * @param[in] species_names names of all particle species in the simulation
+     * @return true if field_name is T<dir>_<species>
+     */
+    inline bool
+    isPerDirectionTemperature ( std::string const & field_name,
+                                std::vector<std::string> const & species_names )
+    {
+        constexpr std::string_view directions = "xyzrtp";
+        return std::any_of(directions.begin(), directions.end(),
+            [&](char const dir) {
+                return isPerSpeciesField(field_name, std::string{'T', dir, '_'}, species_names);
+            });
+    }
+
     /** \brief For a given field that is to be written to an openPMD file,
      * set the metadata that indicates the physical unit.
+     *
+     * Temperatures are matched by exact name (prefix plus species name), not by
+     * a "T" prefix alone, so that other fields starting with "T" are not tagged.
+     * Fields are only identified by name: a user-defined particle field named
+     * like a temperature output (e.g., "T", written as "T_<species>") will be
+     * tagged as a temperature, too.
+     *
+     * @param[in] mesh          openPMD mesh record of the field
+     * @param[in] mesh_comp     openPMD mesh record component of the field
+     * @param[in] field_name    name of the field, without mesh-refinement level suffix
+     * @param[in] species_names names of all particle species in the simulation
      */
     inline void
-    setOpenPMDUnit ( openPMD::Mesh mesh, const std::string& field_name )
+    setOpenPMDUnit ( openPMD::Mesh mesh,
+                     openPMD::MeshRecordComponent mesh_comp,
+                     std::string const & field_name,
+                     std::vector<std::string> const & species_names )
     {
         if (field_name[0] == 'E'){  // Electric field
             mesh.setUnitDimension({
@@ -372,6 +426,13 @@ namespace detail
                                           {openPMD::UnitDimension::I,  1},
                                           {openPMD::UnitDimension::T,  1},
                                   });
+        } else if (isPerSpeciesField(field_name, "T_", species_names)){
+            // species temperature T_<species>, stored in eV: readers multiply by unitSI to get K
+            mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
+            mesh_comp.setUnitSI(PhysConst::q_e_v<double> / PhysConst::kb_v<double>);
+        } else if (field_name == "Te" || isPerDirectionTemperature(field_name, species_names)){
+            // hybrid-PIC electron temperature Te and per-direction temperatures, stored in K
+            mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
         }
     }
 #endif // WARPX_USE_OPENPMD
@@ -1342,12 +1403,15 @@ WarpXOpenPMDPlot::SetupFields ( openPMD::Container< openPMD::Mesh >& meshes,
  * @param [in]: mesh          a mesh field
  * @param [in]: full_geom     geometry for the mesh
  * @param [in]: mesh_comp     a component for the mesh
+ * @param [in]: field_name    name of the mesh, including the "_lvl<N>" suffix for meshLevel > 0
+ * @param [in]: meshLevel     mesh-refinement level of the field
  */
 void
 WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
                                  amrex::Geometry const& full_geom,
                                  std::string const& comp_name,
                                  std::string const& field_name,
+                                 int meshLevel,
                                  amrex::MultiFab const& mf,
                                  bool var_in_theta_mode) const
 {
@@ -1380,21 +1444,18 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     mesh.setAttribute("fieldSmoothing", "none");
     mesh_comp.resetDataset(dataset);
 
-    ::detail::setOpenPMDUnit( mesh, field_name );
-    // Temperatures: match exact names (not a prefix) so that user-defined
-    // particle fields such as "T_par_<species>" are not tagged by mistake
-    std::string const base_name = field_name.substr(0, field_name.rfind("_lvl")); // strip MR level
-    bool is_species_temperature = false; // T_<species>, stored in eV
-    for (auto const& species : WarpX::GetInstance().GetPartContainer().GetSpeciesNames()) {
-        if (base_name == "T_" + species) { is_species_temperature = true; }
+    // The physical unit does not depend on the mesh-refinement level: remove the
+    // exact "_lvl<N>" suffix that GetMeshCompNames appended, so that a species
+    // name that itself contains "_lvl" is not truncated
+    std::string unit_field_name = field_name;
+    if (meshLevel > 0) {
+        std::string const level_suffix = std::string("_lvl").append(std::to_string(meshLevel));
+        if (unit_field_name.ends_with(level_suffix)) {
+            unit_field_name.resize(unit_field_name.size() - level_suffix.size());
+        }
     }
-    if (is_species_temperature || base_name == "Te") { // Te (hybrid-PIC) is stored in K
-        mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
-    }
-    if (is_species_temperature) {
-        // Readers multiply by unitSI to get K
-        mesh_comp.setUnitSI(PhysConst::q_e / PhysConst::kb);
-    }
+    ::detail::setOpenPMDUnit( mesh, mesh_comp, unit_field_name,
+                              WarpX::GetInstance().GetPartContainer().GetSpeciesNames() );
     auto relative_cell_pos = ablastr::utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
     std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
@@ -1550,6 +1611,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                                         full_geom,
                                         comp_name,
                                         field_name,
+                                        lev,
                                         mf[lev],
                                         var_in_theta_mode );
                     }
@@ -1560,6 +1622,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                                         full_geom,
                                         comp_name,
                                         field_name,
+                                        lev,
                                         mf[lev],
                                         var_in_theta_mode );
                     }
