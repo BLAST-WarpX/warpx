@@ -274,6 +274,8 @@ namespace
      * \param[in] is_nodal     staggering of the field data being updated.
      * \param[in] fbndry_lo    Field boundary type at the lower boundaries
      * \param[in] fbndry_hi    Field boundary type at the upper boundaries
+     * \param[in] rmin         physical radius at the lower domain boundary
+     * \param[in] dr           radial cell size for this patch
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void SetBfieldOnPEC (const int icomp, const amrex::IntVect & dom_lo,
@@ -283,7 +285,9 @@ namespace
                            const amrex::IntVect & is_nodal,
                            amrex::GpuArray<FieldBoundaryType, 3> const& fbndry_lo,
                            amrex::GpuArray<FieldBoundaryType, 3> const& fbndry_hi,
-                           FieldBoundaryType bc_type)
+                           FieldBoundaryType bc_type,
+                           [[maybe_unused]] amrex::Real const rmin,
+                           [[maybe_unused]] amrex::Real const dr)
     {
         amrex::IntVect ijk_mirror = ijk_vec;
         bool OnPECBoundary = false;
@@ -340,6 +344,15 @@ namespace
         } else if (GuardCell) {
             // Bnormal and Btangential is set opposite and equal to the value
             // in the mirror location, respectively.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            if (bc_type == FieldBoundaryType::PEC && icomp == 1 && ijk_mirror[0] != ijk_vec[0]) {
+                // Reflect r*Btheta evenly across radial PEC boundaries.
+                amrex::Real const shift = is_nodal[0] ? 0._rt : 0.5_rt;
+                amrex::Real const r = rmin + (ijk_vec[0] - dom_lo[0] + shift)*dr;
+                amrex::Real const r_mirror = rmin + (ijk_mirror[0] - dom_lo[0] + shift)*dr;
+                sign *= r_mirror/r;
+            }
+#endif
             Bfield(ijk_vec,n) = sign * Bfield(ijk_mirror,n);
         }
     }
@@ -606,8 +619,11 @@ PEC::ApplyPECtoBfield (
     const bool split_pml_field)
 {
     amrex::Box domain_box = geom.Domain();
+    amrex::Real const rmin = geom.ProbLo(0);
+    amrex::Real dr = geom.CellSize(0);
     if (patch_type == PatchType::coarse && (lev > 0)) {
         domain_box.coarsen(ref_ratios[lev-1]);
+        dr *= ref_ratios[lev-1][0];
     }
     const amrex::IntVect domain_lo = domain_box.smallEnd();
     const amrex::IntVect domain_hi = domain_box.bigEnd();
@@ -650,7 +666,7 @@ PEC::ApplyPECtoBfield (
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 const int icomp = 0;
                 ::SetBfieldOnPEC(icomp, domain_lo, domain_hi, iv, n,
-                                     Bx, Bx_nodal, fbndry_lo, fbndry_hi, bc_type);
+                                     Bx, Bx_nodal, fbndry_lo, fbndry_hi, bc_type, rmin, dr);
             },
             tby, nComp_y,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -658,7 +674,7 @@ PEC::ApplyPECtoBfield (
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 const int icomp = 1;
                 ::SetBfieldOnPEC(icomp, domain_lo, domain_hi, iv, n,
-                                     By, By_nodal, fbndry_lo, fbndry_hi, bc_type);
+                                     By, By_nodal, fbndry_lo, fbndry_hi, bc_type, rmin, dr);
             },
             tbz, nComp_z,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -666,7 +682,7 @@ PEC::ApplyPECtoBfield (
                 const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
                 const int icomp = 2;
                 ::SetBfieldOnPEC(icomp, domain_lo, domain_hi, iv, n,
-                                     Bz, Bz_nodal, fbndry_lo, fbndry_hi, bc_type);
+                                     Bz, Bz_nodal, fbndry_lo, fbndry_hi, bc_type, rmin, dr);
             }
         );
     }

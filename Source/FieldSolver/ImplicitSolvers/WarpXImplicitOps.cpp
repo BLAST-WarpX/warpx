@@ -308,15 +308,19 @@ WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_op
     ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
 
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        // RSPHERE only deposits the radial (xx) mass matrix.
+        bool initialized = implicit_options.ncomp_xx[dir] > 0;
+#if !defined(WARPX_DIM_RSPHERE)
 #if defined(WARPX_EM_TEY)
         const bool valid_ncomp_yy = implicit_options.ncomp_yy[dir] == 0;
 #else
         const bool valid_ncomp_yy = implicit_options.ncomp_yy[dir] > 0;
 #endif
+        initialized = initialized && valid_ncomp_yy
+                                  && implicit_options.ncomp_zz[dir] > 0;
+#endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            implicit_options.ncomp_xx[dir] > 0 &&
-            valid_ncomp_yy &&
-            implicit_options.ncomp_zz[dir] > 0,
+            initialized,
             "DepositMassMatrices requires initialized mass-matrix component counts. "
             "Call InitData before depositing mass matrices.");
     }
