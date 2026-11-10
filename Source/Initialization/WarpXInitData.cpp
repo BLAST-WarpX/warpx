@@ -1086,6 +1086,28 @@ WarpX::InitFromScratch ()
 void
 WarpX::InitPML ()
 {
+#ifdef WARPX_DIM_RZ
+    amrex::ParmParse("warpx").query("conforming_radial_interface", m_conforming_radial_interface);
+    if (m_conforming_radial_interface) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            finest_level == 1 && max_level == 1 && boxArray(0).size() == 1 &&
+            boxArray(1).size() == 1 && ParallelDescriptor::NProcs() == 1 &&
+            refRatio(0) == IntVect(2,1) && n_rz_azimuthal_modes == 1 &&
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+            Geom(0).ProbLo(0) == 0._rt && !m_do_subcycling && !EB::enabled() &&
+            !do_dive_cleaning && !do_divb_cleaning && !do_moving_window &&
+            m_em_solver_medium == MediumForEM::Vacuum && n_field_gather_buffer == 0 &&
+            n_current_deposition_buffer == 0,
+            "The conforming radial interface requires two single-box axisymmetric Yee grids, "
+            "a (2,1) ratio, a single rank, zero buffers and a vacuum collar.");
+        auto const& fb = boxArray(1)[0];
+        auto const& domain = Geom(1).Domain();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            fb.smallEnd(0) == 0 && fb.bigEnd(0) < domain.bigEnd(0)-4 &&
+            fb.smallEnd(1) == domain.smallEnd(1) && fb.bigEnd(1) == domain.bigEnd(1),
+            "The refined bore must include the axis and span the full axial domain.");
+    }
+#endif
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         if (WarpX::field_boundary_lo[idim] == FieldBoundaryType::PML) {
             do_pml = 1;
@@ -1168,6 +1190,7 @@ WarpX::InitPML ()
             }
 
 #ifdef WARPX_DIM_RZ
+            if (m_conforming_radial_interface) { do_pml_Hi[lev][0] = 0; }
             //In cylindrical geometry, if the edge of the patch is at r=0, do not add PML
             if ((max_level > 0) && (fine_tag_lo[0]==0.)) {
                 do_pml_Lo[lev][0] = 0;

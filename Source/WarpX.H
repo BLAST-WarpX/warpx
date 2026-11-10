@@ -711,6 +711,11 @@ public:
     void UpdateAuxiliaryData ();
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
+#ifdef WARPX_DIM_RZ
+    bool m_conforming_radial_interface = false;
+    void ShareRadialInterface (bool electric);
+    void CheckRadialInterfaceCurrent ();
+#endif
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);

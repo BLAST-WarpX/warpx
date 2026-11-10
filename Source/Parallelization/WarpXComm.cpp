@@ -797,6 +797,19 @@ WarpX::UpdateAuxiliaryDataSameType ()
     CopyLevelZeroAuxiliaryData(m_fields, Efield_aux, Efield_fp, FieldType::Efield_avg_fp, ng_src);
     CopyLevelZeroAuxiliaryData(m_fields, Bfield_aux, Bfield_fp, FieldType::Bfield_avg_fp, ng_src);
 
+#ifdef WARPX_DIM_RZ
+    if (m_conforming_radial_interface) {
+        // The physical fine patch already carries the exterior field through
+        // the shared Yee edge. Its current-free interface is outside the particle stencil.
+        for (int d = 0; d < 3; ++d) {
+            MultiFab::Copy(*Efield_aux[1][d], *Efield_fp[1][d], 0, 0, 1,
+                           Efield_aux[1][d]->nGrowVect());
+            MultiFab::Copy(*Bfield_aux[1][d], *Bfield_fp[1][d], 0, 0, 1,
+                           Bfield_aux[1][d]->nGrowVect());
+        }
+        return;
+    }
+#endif
     // Refined levels add the coarse-patch correction through the same helper for B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {
