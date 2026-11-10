@@ -129,9 +129,15 @@ namespace
             if (m_boundary < 2*AMREX_SPACEDIM) {
                 int const idim = m_boundary / 2;
                 int const iside = m_boundary % 2;
-                amrex::ParticleReal const x = static_cast<amrex::ParticleReal>(
-                    iside == 0 ? m_plo[idim] :
-                    m_phi[idim] - 1.0e-12_rt*(m_phi[idim] - m_plo[idim]));
+
+                // This maybe overkill, but it ensures that the particle position will be just below
+                // the upper bound independent of the size of Real and ParticleReal
+                using smaller_real = std::conditional_t<(sizeof(amrex::Real) < sizeof(amrex::ParticleReal)),
+                                                        amrex::Real, amrex::ParticleReal>;
+
+                smaller_real const plo_real = m_plo[idim];
+                smaller_real const phi_real = m_phi[idim];
+                amrex::ParticleReal const x = iside == 0 ? m_plo[idim]: std::nextafter(phi_real, plo_real);
 
 #if defined(WARPX_DIM_3D)
                 if (idim == 0) { dst.m_rdata[PIdx::x][i_dst] = x; }
