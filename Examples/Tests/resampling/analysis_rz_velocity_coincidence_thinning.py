@@ -11,9 +11,7 @@
 ## In this test, a cold ring of particles rotating about the z-axis is resampled with
 ## velocity coincidence thinning in RZ geometry. In the local cylindrical frame all
 ## particles have the same velocity, so each cell must be merged into exactly two
-## particles, and the merged particles must still move purely azimuthally. Merging the
-## Cartesian velocities of particles at different azimuthal angles instead gives
-## many more remaining particles, with spurious u_r and u_z.
+## particles, and the merged particles must still move purely azimuthally.
 
 import sys
 
