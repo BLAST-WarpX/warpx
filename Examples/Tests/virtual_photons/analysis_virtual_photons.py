@@ -22,7 +22,7 @@ parser.add_argument(
     type=float,
     default=1.0,
 )
-args, unknown = parser.parse_known_args()
+args = parser.parse_args()
 
 ###########################
 ### ENERGY AND SPECTRUM ###
