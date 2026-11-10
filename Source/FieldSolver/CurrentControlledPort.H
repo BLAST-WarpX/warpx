@@ -69,6 +69,8 @@ class CurrentControlledPort {
     uses_composite () const {
         return m_composite != nullptr;
     }
+    [[nodiscard]] bool has_refined_contour () const { return m_leaf_patch != nullptr; }
+    void ApplyRefinedContour (amrex::Real time);
     void ApplyComposite (amrex::Real time);
     void UpdateCompositeStatus ();
 
@@ -88,6 +90,8 @@ class CurrentControlledPort {
     PatchType m_patch_type = PatchType::fine;
     std::vector<std::unique_ptr<CurrentControlledPort>> m_refined_patches;
     std::unique_ptr<CompositeCurrentControlledPort> m_composite;
+    // Non-owning pointer into m_refined_patches, whose pointees have stable addresses.
+    CurrentControlledPort* m_leaf_patch = nullptr;
     [[nodiscard]] amrex::Geometry const& Geometry () const;
     [[nodiscard]] amrex::Array4<amrex::Real const> Permeability (amrex::MFIter const& mfi) const;
     [[nodiscard]] bool PatchContainsPort (ablastr::fields::VectorField const& Bfield) const;
@@ -109,19 +113,22 @@ class CurrentControlledPort {
     void Apply3D (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-        amrex::Real target_axis_current);
+        amrex::Real target_axis_current,
+        ablastr::fields::VectorField const* native_field = nullptr);
 #endif
 #ifdef WARPX_DIM_XZ
     void ApplyXZ (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-        amrex::Real target_axis_current);
+        amrex::Real target_axis_current,
+        ablastr::fields::VectorField const* native_field = nullptr);
 #endif
 #ifdef WARPX_DIM_RZ
     void ApplyRZ (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-        amrex::Real target_axis_current);
+        amrex::Real target_axis_current,
+        ablastr::fields::VectorField const* native_field = nullptr);
 #endif
 
 #ifdef WARPX_DIM_3D

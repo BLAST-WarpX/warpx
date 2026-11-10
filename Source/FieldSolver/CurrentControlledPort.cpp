@@ -460,6 +460,16 @@ CurrentControlledPort::InitData (
     if (lev != m_level || patch_type != m_patch_type) {
         auto patch = std::make_unique<CurrentControlledPort>(m_parameter_prefix, lev, patch_type);
         patch->InitData(Bfield, eb_update_B, time, lev, patch_type);
+        if (lev > 0 && patch_type == PatchType::fine && patch->m_initialized &&
+            (!m_leaf_patch || m_leaf_patch->m_level < lev)) {
+            auto const aux = WarpX::GetInstance().m_fields.get_alldirs(
+                warpx::fields::FieldType::Bfield_aux, lev);
+            bool same_staggering = true;
+            for (int d = 0; d < 3; ++d) {
+                same_staggering = same_staggering && aux[d]->ixType() == Bfield[d]->ixType();
+            }
+            if (same_staggering) { m_leaf_patch = patch.get(); }
+        }
         m_refined_patches.push_back(std::move(patch));
         return;
     }
@@ -1253,7 +1263,8 @@ void
 CurrentControlledPort::Apply3D (
     ablastr::fields::VectorField const& Bfield,
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-    amrex::Real const target_axis_current) {
+    amrex::Real const target_axis_current,
+    ablastr::fields::VectorField const* native_field) {
     auto const edges = Edges();
     amrex::MultiFab const& reference_field = *Bfield[edges[0].component];
     int const plane_0 =
@@ -1291,6 +1302,9 @@ CurrentControlledPort::Apply3D (
         scales[offset] = (desired_circulation - circulation) / basis_response;
     }
     AddScaledCurlBasisBatched(Bfield, first_plane, scales);
+    if (native_field) {
+        AddScaledCurlBasisBatched(*native_field, first_plane, scales);
+    }
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureContourLocal(Bfield, eb_update_B, plane_0),
         MeasureContourLocal(Bfield, eb_update_B, plane_1)};
@@ -1307,7 +1321,8 @@ void
 CurrentControlledPort::ApplyXZ (
     ablastr::fields::VectorField const& Bfield,
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-    amrex::Real const target_axis_current) {
+    amrex::Real const target_axis_current,
+    ablastr::fields::VectorField const* native_field) {
     amrex::MultiFab& by = *Bfield[1];
     int const axial_mesh_direction = m_direction == 0 ? 0 : 1;
     int const plane_0 =
@@ -1335,6 +1350,9 @@ CurrentControlledPort::ApplyXZ (
                          (target_axis_current - measured_current) / contour[1];
     }
     CorrectXZContoursBatched(by, eb_update_B[1].get(), first_plane, scales);
+    if (native_field) {
+        CorrectXZContoursBatched(*(*native_field)[1], eb_update_B[1].get(), first_plane, scales);
+    }
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureXZContourLocal(by, *m_owner_mask[1], eb_update_B[1].get(),
                               plane_0)[0],
@@ -1353,7 +1371,8 @@ void
 CurrentControlledPort::ApplyRZ (
     ablastr::fields::VectorField const& Bfield,
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-    amrex::Real const target_axis_current) {
+    amrex::Real const target_axis_current,
+    ablastr::fields::VectorField const* native_field) {
     amrex::MultiFab& btheta = *Bfield[1];
     int const terminal_mesh_direction = m_direction == 0 ? 0 : 1;
     int const plane_0 =
@@ -1382,6 +1401,9 @@ CurrentControlledPort::ApplyRZ (
                          (target_axis_current - measured_current) / contour[1];
     }
     CorrectRZContoursBatched(btheta, eb_update_B[1].get(), first_plane, scales);
+    if (native_field) {
+        CorrectRZContoursBatched(*(*native_field)[1], eb_update_B[1].get(), first_plane, scales);
+    }
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureRZContourLocal(btheta, *m_owner_mask[1], eb_update_B[1].get(),
                               plane_0)[0],
@@ -1433,6 +1455,31 @@ CurrentControlledPort::ApplyBfield (
 }
 
 void
+CurrentControlledPort::ApplyRefinedContour (amrex::Real time)
+{
+    auto& leaf = *m_leaf_patch;
+    auto& warpx = WarpX::GetInstance();
+    auto aux = warpx.m_fields.get_alldirs(warpx::fields::FieldType::Bfield_aux, leaf.m_level);
+    auto native = warpx.m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp, leaf.m_level);
+    auto const& flags = warpx.GetEBUpdateBFlag(PatchType::fine)[leaf.m_level];
+    m_last_target = m_current_scale * m_waveform.value(time);
+    // For a contained port the physical Yee field is B_fp + P(B_parent - B_cp).
+    // A correction to B_fp enters that field with unit coefficient. Carry the
+    // same discrete curl into the stored field and its current auxiliary copy.
+    auto const target = m_axis_sign * m_last_target;
+#ifdef WARPX_DIM_3D
+    leaf.Apply3D(aux, flags, target, &native);
+#elif defined(WARPX_DIM_XZ)
+    leaf.ApplyXZ(aux, flags, target, &native);
+#elif defined(WARPX_DIM_RZ)
+    leaf.ApplyRZ(aux, flags, target, &native);
+#else
+    amrex::ignore_unused(aux, native, flags, target);
+#endif
+    m_last_terminal_current = leaf.m_last_terminal_current;
+}
+
+void
 CurrentControlledPort::ApplyComposite (amrex::Real time)
 {
     m_last_target = m_current_scale * m_waveform.value(time);
@@ -1453,7 +1500,7 @@ WarpX::ApplyCompositeCurrentControlledPorts (amrex::Real time)
 {
     if (std::none_of(m_current_controlled_ports.begin(),
                      m_current_controlled_ports.end(), [] (auto const& port) {
-                         return port->uses_composite();
+                         return port->uses_composite() || port->has_refined_contour();
                      })) {
         return;
     }
@@ -1461,6 +1508,7 @@ WarpX::ApplyCompositeCurrentControlledPorts (amrex::Real time)
     UpdateAuxiliaryData();
     FillBoundaryAux(guard_cells.ng_UpdateAux);
     FillBoundaryAux(finest_level, guard_cells.ng_UpdateAux);
+    bool updated_leaf = false;
     for (auto& port : m_current_controlled_ports) {
         if (port->uses_composite()) {
             port->ApplyComposite(time);
@@ -1469,7 +1517,15 @@ WarpX::ApplyCompositeCurrentControlledPorts (amrex::Real time)
             FillBoundaryAux(guard_cells.ng_UpdateAux);
             FillBoundaryAux(finest_level, guard_cells.ng_UpdateAux);
             port->UpdateCompositeStatus();
+        } else if (port->has_refined_contour()) {
+            port->ApplyRefinedContour(time);
+            updated_leaf = true;
         }
+    }
+    if (updated_leaf) {
+        FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+        FillBoundaryAux(guard_cells.ng_UpdateAux);
+        FillBoundaryAux(finest_level, guard_cells.ng_UpdateAux);
     }
 }
 

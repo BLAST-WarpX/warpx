@@ -19,6 +19,7 @@ parser.add_argument(
     "--method", choices=("backwardeuler", "laxwendroff"), default="backwardeuler"
 )
 parser.add_argument("--restart")
+parser.add_argument("--incident-field", action="store_true")
 parser.add_argument("--eb", action="store_true")
 parser.add_argument("--annular", action="store_true")
 parser.add_argument("--implicit", action="store_true")
@@ -207,6 +208,19 @@ simulation.add_diagnostic(
 simulation.add_diagnostic(
     picmi.Checkpoint(name="chk", period=1, write_dir="diags", warpx_file_prefix="chk")
 )
+if args.incident_field:
+    assert (args.dims, args.source, args.placement) == ("3", "port", "inside")
+    simulation.initialize_inputs()
+    simulation.initialize_warpx()
+    # An incoming parent-scale By(x) has zero divergence. It gives the fine
+    # patch a nonzero auxiliary correction even when all native ports are driven.
+    by = simulation.fields.get("Bfield_fp", dir="y", level=0)
+    values = np.asarray(by[...]).copy()
+    x = lower[0] + (np.arange(values.shape[0]) + 0.5) / 32
+    profile = 0.01 * np.exp(-(((x - 0.125) / 0.05) ** 2))
+    values += profile.reshape((-1,) + (1,) * (values.ndim - 1))
+    by[...] = values
+
 independent_rho_before = None
 if is_rz and args.eb and not args.restart:
     simulation.initialize_inputs()
@@ -341,6 +355,10 @@ if args.source == "port":
 
     # Measure native B independently of the status API on every represented patch.
     for level, patch in ((0, "fp"), (1, "fp"), (1, "cp"), (1, "aux")):
+        if args.incident_field and (level, patch) == (1, "fp"):
+            # The local Maxwell field and the reconstructed field have different
+            # circulations when the incoming parent wave contributes to the port.
+            continue
         if level == 1 and args.placement == "outside":
             continue
         dx = np.array(upper) - lower
@@ -369,6 +387,8 @@ if args.source == "port":
             )
 
         planes = [index(z, ndim - 1) for z in (-0.125, 0, 0.125)]
+        if args.incident_field:
+            planes = list(range(planes[0], planes[-1] + 1))
         if args.dims == "3":
             bx, by = field("x"), field("y")
             # Yee curl contours surround the vector-potential top hat.

@@ -206,6 +206,16 @@ foreach(method IN ITEMS backwardeuler laxwendroff)
 endforeach()
 
 add_warpx_test(
+    test_3d_current_port_smr_incoming_picmi
+    3
+    1
+    "inputs_test_smr_picmi.py --dims 3 --source port --incident-field"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
     test_3d_current_port_smr_outside_picmi
     3
     1

@@ -4336,7 +4336,10 @@ radial RZ current.  Coordinates are represented on the nearest compatible field 
 Multiple ports are supported when their correction regions are separated by more than one
 grid cell, as in separate coil gaps. Cartesian SMR supports staircase embedded boundaries and
 ports crossing transverse or axial refinement boundaries.
-Ports with two coarse cells of clearance use independent fine- and coarse-patch contours.
+Ports with two coarse cells of clearance use the contours of each containing patch.
+When the auxiliary and Maxwell fields have the same staggering, the finest containing grid
+also constrains the reconstructed magnetic field used by particles. Incoming parent-grid
+fields therefore contribute to the measured terminal current.
 Crossing ports use a fixed physical contour, interpolating :math:`H=B/\mu` from the
 finest available grid at each quadrature point. A coupled discrete-curl correction
 enforces the requested circulation at the terminals and at the finest axial cell planes
