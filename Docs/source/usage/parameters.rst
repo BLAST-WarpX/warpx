@@ -339,6 +339,14 @@ Overall simulation parameters
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
           In 3D, this option is currently only implemented for ``algo.current_deposition = direct``.
 
+          - ``implicit_evolve.update_mass_matrices_newton_interval`` (``integer``, default: 1).
+            With ``implicit_evolve.use_mass_matrices_jacobian = true``, controls how often the Jacobian mass matrices are refreshed within each nonlinear solve.
+            Must be non-negative. A value of 1 refreshes them every Newton iteration;
+            a value of N > 1 refreshes them at iterations 0, N, 2N, and so on;
+            0 refreshes them only at iteration 0.
+            When ``implicit_evolve.use_mass_matrices_pc = true``, a preconditioner update also refreshes the shared mass matrices, even if this interval would skip the Jacobian refresh.
+            Applies to both the native Newton solver and PETSc SNES.
+
           - ``implicit_evolve.skip_particle_picard_init`` (``bool``, default: false).
             When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
             This can enhance the overall efficiency of the Newton solver.
