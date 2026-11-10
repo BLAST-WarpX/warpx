@@ -1,0 +1,6 @@
+FILE = inputs_test_2d_prescribed_current_injection
+
+# The thin drive is wholly inside a cell and misses its center.
+warpx.current_injection.pair_0.drive.zlo = 0.015625
+warpx.current_injection.pair_0.drive.zhi = 0.046875
+warpx.current_injection.pair_0.drive.A = 0.03125

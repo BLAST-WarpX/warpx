@@ -1,0 +1,6 @@
+FILE = inputs_base_3d_prescribed_current_injection
+
+# Keep the same axial length and physical current while narrowing the cross section.
+warpx.current_injection.pair_0.drive.ylo = 0.015625
+warpx.current_injection.pair_0.drive.yhi = 0.046875
+warpx.current_injection.pair_0.drive.A = 0.015625
