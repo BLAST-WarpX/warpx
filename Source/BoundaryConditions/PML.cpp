@@ -546,9 +546,9 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
 
         if (direct_faces.size() > 1)
         {
-            // A PML box can span multiple regular boxes on the same boundary plane.
-            // These faces define the same one-dimensional damping profile. Keep
-            // rejecting distinct boundary planes and opposing faces.
+            // Sigma is a one-dimensional array in each direction. Coplanar
+            // faces use one profile. Distinct faces can share a long PML box
+            // if the indices they write are disjoint, including its high node.
             auto const boundary_plane = [&] (int const gid)
             {
                 amrex::Box const& grid_box = grids[gid];
@@ -556,13 +556,27 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
                 return std::make_pair(is_low, is_low ? grid_box.smallEnd(idim)
                                                     : grid_box.bigEnd(idim) + 1);
             };
-            auto const plane = boundary_plane(direct_faces.front());
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                std::all_of(direct_faces.begin(), direct_faces.end(),
-                            [&] (int const gid) { return boundary_plane(gid) == plane; }),
+            std::sort(direct_faces.begin(), direct_faces.end(), [&] (int a, int b) {
+                return boundary_plane(a) < boundary_plane(b);
+            });
+            direct_faces.erase(std::unique(direct_faces.begin(), direct_faces.end(),
+                [&] (int a, int b) { return boundary_plane(a) == boundary_plane(b); }),
+                direct_faces.end());
+
+            amrex::Vector<std::pair<int,int>> intervals;
+            for (auto gid : direct_faces) {
+                auto const [is_low, plane] = boundary_plane(gid);
+                int const first = is_low ? plane - ncell[idim] : plane;
+                int const last = is_low ? plane - 1 : plane + ncell[idim] - 1;
+                intervals.emplace_back(std::max(box.smallEnd(idim), first),
+                                       std::min(box.bigEnd(idim), last) + 1);
+            }
+            std::sort(intervals.begin(), intervals.end());
+            auto const overlap = std::adjacent_find(intervals.begin(), intervals.end(),
+                [] (auto const& a, auto const& b) { return a.second >= b.first; });
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(overlap == intervals.end(),
                 "SigmaBox::SigmaBox(): incompatible direct-face damping profiles. "
                 "Box gaps not wide enough?");
-            direct_faces.resize(1);
         }
 
         for (auto gid : direct_faces)
@@ -594,10 +608,6 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
 
         }
 
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            direct_faces.size() <= 1,
-            "SigmaBox::SigmaBox(): direct_faces.size() > 1, Box gaps not wide enough?"
-        );
     }
 
     amrex::Gpu::streamSynchronize();

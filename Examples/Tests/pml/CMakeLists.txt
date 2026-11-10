@@ -79,6 +79,16 @@ foreach(size IN ITEMS 24 96)
     )
 endforeach()
 
+add_warpx_test(
+    test_3d_pml_separated_faces
+    3
+    1
+    "inputs_base_3d_pml_coincident_faces.py --max-grid-size 192 --frame"
+    OFF  # analysis in the script
+    OFF
+    OFF
+)
+
 if(3 IN_LIST WarpX_DIMS AND WarpX_APP)
     # The refined patch spans the periodic y direction, including the stepped
     # case where the active x/z absorbers extend into the patch's bounding box.
