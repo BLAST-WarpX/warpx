@@ -128,8 +128,10 @@ public:
         return field_boundary_hi;
     }
 
-    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
-                                               int  bdry_side ) const;
+    [[nodiscard]] int GetPECInsulator_IsESet (int bdry_dir,
+                                              int bdry_side) const;
+
+    void ApplyPECInsulatorToPCMasks (int lev);
 
     void InitData ();
     void InitMacroscopicProperties ();
