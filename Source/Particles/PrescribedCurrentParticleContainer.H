@@ -80,6 +80,12 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
 
     void PostRestart () final;
 
+    [[nodiscard]] bool DeferTrajectoryCurrent () final
+    {
+        m_defer_trajectory_current = true;
+        return true;
+    }
+
     /** Whether the impressed-current antenna is enabled in the inputs. */
     static bool is_enabled ();
 
@@ -99,6 +105,7 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
 
     amrex::Real m_vel_coeff = 0.; //!< C such that speed = C * I(t) [m/s/A]
     bool m_enabled = true;
+    bool m_defer_trajectory_current = false;
 
     //! Set the velocity scale from the largest waveform sample.
     void compute_velocity_scale ();

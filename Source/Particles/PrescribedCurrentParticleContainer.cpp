@@ -534,7 +534,7 @@ PrescribedCurrentParticleContainer::Evolve (
             SetPosition(ip, x, y, z);
         });
 
-        if (!skip_deposition) {
+        if (!skip_deposition && !m_defer_trajectory_current) {
             const Real relative_time = -0.5_rt * dt;
             int const* const ion_lev = nullptr;
             amrex::MultiFab* jx =

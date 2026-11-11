@@ -10,6 +10,7 @@ from pywarpx import geometry, libwarpx
 parser = argparse.ArgumentParser()
 parser.add_argument("--slab", nargs=2, type=int, metavar=("RX", "RZ"))
 parser.add_argument("--no-plasma", action="store_true")
+parser.add_argument("--across-interface", action="store_true")
 args = parser.parse_args()
 
 rx, rz = args.slab or (1, 1)
@@ -66,8 +67,14 @@ if not args.no_plasma:
         "ions.single_particle_weight=1e9",
     ]
 # Each box drives one ampere per metre across an 8 mm transverse aperture.
-# The two sources have opposite signs and occupy different active meshes.
-for index, (xlo, xhi, sign) in enumerate(((0.010, 0.018, 1), (0.044, 0.052, -1))):
+# The two sources have opposite signs. Move each across a different slab face
+# to exercise partial support on both leaf meshes.
+drives = (
+    ((0.028, 0.036, 1), (0.060, 0.068, -1))
+    if args.across_interface
+    else ((0.010, 0.018, 1), (0.044, 0.052, -1))
+)
+for index, (xlo, xhi, sign) in enumerate(drives):
     prefix = f"warpx.current_injection.pair_{index}.drive."
     settings += [
         f"{prefix}xlo={xlo}",
@@ -95,16 +102,27 @@ def integral(family, direction, level, lower, upper):
     return values[rows, : round(0.032 / dz)].sum() * dx * dz
 
 
-active = int(bool(args.slab))
+def leaf_integral(family, direction, lower, upper):
+    if not args.slab:
+        return integral(family, direction, 0, lower, upper)
+    return sum(
+        integral(family, direction, level, max(lower, left), min(upper, right))
+        for level, left, right in ((0, 0.0, 0.032), (1, 0.032, 0.064), (0, 0.064, 0.096))
+        if max(lower, left) < min(upper, right)
+    )
+
+
+positive = (0.012, 0.044) if args.across_interface else (0.002, 0.028)
+negative = (0.050, 0.082) if args.across_interface else (0.034, 0.062)
 proton_current = 1.602176634e-19 * 1e9 * 299792458.0 * 0.02 / np.sqrt(1 + 0.02**2)
-for direction, level, lower, upper, expected in (
-    ("x", 0, 0.002, 0.028, 0.008),
-    ("x", active, 0.034, 0.062, -0.008),
-    ("y", active, 0.034, 0.062, 0.0 if args.no_plasma else proton_current),
+for direction, (lower, upper), expected in (
+    ("x", positive, 0.008),
+    ("x", negative, -0.008),
+    ("y", (0.034, 0.062), 0.0 if args.no_plasma else proton_current),
 ):
-    current = integral("current_fp", direction, level, lower, upper)
+    current = leaf_integral("current_fp", direction, lower, upper)
     np.testing.assert_allclose(current, expected, rtol=2e-9, atol=1e-14)
-    electric = integral("Efield_fp", direction, level, lower, upper)
+    electric = leaf_integral("Efield_fp", direction, lower, upper)
     np.testing.assert_allclose(
         electric, -dt * expected / 8.8541878188e-12, rtol=2e-9, atol=1e-14
     )
