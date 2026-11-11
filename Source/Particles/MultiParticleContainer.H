@@ -465,7 +465,7 @@ protected:
 
     bool m_do_secondary_emission = false;
     std::vector<int> m_secondary_emission_product_species;
-    std::vector<amrex::Real> m_secondary_emission_coefficient;
+    std::vector<amrex::Real> m_secondary_emission_yield;
     std::vector<amrex::Real> m_secondary_emission_energy_eV;
     std::unique_ptr<ParticleBoundaryBuffer> m_secondary_emission_buffer;
 

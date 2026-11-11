@@ -37,7 +37,7 @@ ions.multiple_particles_uz    =   0.0027  0.0024  -0.0021  0.0019 0.00067 -0.003
 ions.multiple_particles_weight =  1.0     1.0      1.0     1.0    1.0      1.0     1.0
 #ions.save_particles_at_eb = 1
 ions.secondary_emission_product_species = electrons
-ions.secondary_emission_coefficient = 1.0
+ions.secondary_emission_yield = 1.0
 ions.secondary_emission_energy_eV = 0.0259
 
 electrons.species_type = electron

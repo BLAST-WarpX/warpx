@@ -422,7 +422,7 @@ MultiParticleContainer::ReadParameters ()
 
             species_types.resize(nspecies, PCTypes::Physical);
             m_secondary_emission_product_species.resize(nspecies, -1);
-            m_secondary_emission_coefficient.resize(nspecies, 0.0_rt);
+            m_secondary_emission_yield.resize(nspecies, 0.0_rt);
             m_secondary_emission_energy_eV.resize(nspecies, 0.0_rt);
 
             // Get rigid-injected species
@@ -473,16 +473,16 @@ MultiParticleContainer::ReadParameters ()
                     m_secondary_emission_product_species[spec_index] = getSpeciesID(
                         secondary_emission_product_name);
                     pp_species.get(
-                        "secondary_emission_coefficient",
-                        m_secondary_emission_coefficient[spec_index]);
+                        "secondary_emission_yield",
+                        m_secondary_emission_yield[spec_index]);
                     utils::parser::getWithParser(
                         pp_species,
                         "secondary_emission_energy_eV",
                         m_secondary_emission_energy_eV[spec_index]);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        m_secondary_emission_coefficient[spec_index] >= 0.0_rt &&
-                        m_secondary_emission_coefficient[spec_index] <= 1.0_rt,
-                        name + ".secondary_emission_coefficient must be between 0 and 1");
+                        m_secondary_emission_yield[spec_index] >= 0.0_rt &&
+                        m_secondary_emission_yield[spec_index] <= 1.0_rt,
+                        name + ".secondary_emission_yield must be between 0 and 1");
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         m_secondary_emission_energy_eV[spec_index] >= 0.0_rt,
                         name + ".secondary_emission_energy_eV must be non-negative");
@@ -1226,7 +1226,7 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int con
             const auto copy = copy_factory.getSmartCopy();
             int const normal_index =
                 source_pc->GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
-            auto const filter = SecondaryEmissionFilter{m_secondary_emission_coefficient[source_species]};
+            auto const filter = SecondaryEmissionFilter{m_secondary_emission_yield[source_species]};
             auto const& geom = WarpX::GetInstance().Geom(0);
             auto const uth = static_cast<amrex::ParticleReal>(std::sqrt(
                 PhysConst::q_e*m_secondary_emission_energy_eV[source_species]/product_pc.getMass()) /
