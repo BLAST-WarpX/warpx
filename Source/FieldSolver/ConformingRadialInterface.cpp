@@ -26,16 +26,16 @@ namespace
         int const coarse_node = fine_node / 2;
         bool const nodal = trace == Trace::nodal;
         int const components = fine.nComp();
-        amrex::Real const radius = static_cast<amrex::Real>(fine_node); // in units of dr_f
+        auto const radius = static_cast<amrex::Real>(fine_node); // in units of dr_f
         amrex::Real const inner_radius = radius - 0.5_rt;
         amrex::Real const outer_radius = radius + 1._rt;
         amrex::Real const dual_area =
             0.5_rt * (outer_radius * outer_radius - inner_radius * inner_radius);
 
-        for (int fi : fine.IndexArray()) {
+        for (int const fi : fine.IndexArray()) {
             auto const& fine_box = fine.boxArray()[fi];
             if (fine_box.bigEnd(0) != fine_node - (nodal ? 0 : 1)) { continue; }
-            for (int ci : parent.IndexArray()) {
+            for (int const ci : parent.IndexArray()) {
                 auto const& parent_box = parent.boxArray()[ci];
                 if (parent_box.smallEnd(0) > coarse_node || parent_box.bigEnd(0) < coarse_node ||
                     parent_box.bigEnd(1) < fine_box.smallEnd(1) ||
