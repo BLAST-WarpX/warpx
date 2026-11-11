@@ -131,7 +131,7 @@ def measure():
                     np.diff(electric[v], axis=u) / h[u]
                     - np.diff(electric[u], axis=v) / h[v]
                 )
-                # The invariant for the split Yee advance uses B(-dt/2)·B(+dt/2).
+                # The split Yee invariant uses the dot product of B(-dt/2) and B(+dt/2).
                 density += cell_average(electric[d] ** 2, shape)
                 density += c**2 * cell_average(
                     magnetic**2 - (0.5 * dt * curl) ** 2, shape
