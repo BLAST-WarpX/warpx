@@ -55,9 +55,9 @@ N_eb = 4
 
 t_impact = np.zeros(len(ion_x0))
 
-a_q = vx0[:N_eb]**2 + vz0[:N_eb]**2
+a_q = vx0[:N_eb] ** 2 + vz0[:N_eb] ** 2
 b_q = 2.0 * (ion_x0[:N_eb] * vx0[:N_eb] + ion_z0[:N_eb] * vz0[:N_eb])
-c_q = ion_x0[:N_eb]**2 + ion_z0[:N_eb]**2 - R**2
+c_q = ion_x0[:N_eb] ** 2 + ion_z0[:N_eb] ** 2 - R**2
 t_impact[:N_eb] = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 
 # For ions hitting the domain boundary, the position of the electron will
@@ -71,8 +71,8 @@ z_impact = ion_z0 + vz0 * t_impact
 
 # Put the boundary normal position on the boundary
 x_impact[N_eb] = rmax  # Upper radial boundary
-z_impact[N_eb+1] = zmin  # Lower z boundary
-z_impact[N_eb+2] = zmax  # Upper z boundary
+z_impact[N_eb + 1] = zmin  # Lower z boundary
+z_impact[N_eb + 2] = zmax  # Upper z boundary
 
 tolerance = 0.02
 
