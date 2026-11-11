@@ -113,6 +113,8 @@ namespace
         int m_boundary;
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_phi;
+        amrex::GpuArray<amrex::ParticleReal, AMREX_SPACEDIM> m_rlo;
+        amrex::GpuArray<amrex::ParticleReal, AMREX_SPACEDIM> m_rhi;
         int m_normal_index;
         amrex::ParticleReal m_uth;
         GetParticlePosition<PIdx> m_GetPosition;
@@ -130,14 +132,7 @@ namespace
                 int const idim = m_boundary / 2;
                 int const iside = m_boundary % 2;
 
-                // This maybe overkill, but it ensures that the particle position will be just below
-                // the upper bound independent of the size of Real and ParticleReal
-                using smaller_real = std::conditional_t<(sizeof(amrex::Real) < sizeof(amrex::ParticleReal)),
-                                                        amrex::Real, amrex::ParticleReal>;
-
-                smaller_real const plo_real = m_plo[idim];
-                smaller_real const phi_real = m_phi[idim];
-                amrex::ParticleReal const x = iside == 0 ? m_plo[idim]: std::nextafter(phi_real, plo_real);
+                amrex::ParticleReal const x = iside == 0 ? m_rlo[idim]: m_rhi[idim];
 
 #if defined(WARPX_DIM_3D)
                 if (idim == 0) { dst.m_rdata[PIdx::x][i_dst] = x; }
@@ -160,12 +155,12 @@ namespace
                 int const momentum_index = PIdx::ux;
 #endif
 
-                dst.m_rdata[momentum_index][i_dst] = iside == 0 ? -1._prt : 1._prt;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal r, theta, phi;
-                m_GetPosition.AsStored(i_dst, r, theta, phi);
+                m_GetPosition.AsStored(i_src, r, theta, phi);
                 ParticleUtils::transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
 #endif
+                dst.m_rdata[momentum_index][i_dst] = iside == 0 ? -1._prt : 1._prt;
 #if defined(WARPX_DIM_3D)
                 if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
                 if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uy, uz, ux, m_uth, engine); }
@@ -1258,7 +1253,9 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int con
 
                     auto GetPosition = GetParticlePosition<PIdx>(pti);
                     auto const transform = SecondaryEmissionTransform{
-                        boundary, geom.ProbLoArray(), geom.ProbHiArray(), normal_index, uth, GetPosition};
+                        boundary, geom.ProbLoArray(), geom.ProbHiArray(),
+                        geom.RoundOffLo(), geom.RoundOffHi(),
+                        normal_index, uth, GetPosition};
 
                     auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     const auto np_dst = dst_tile.numParticles();
