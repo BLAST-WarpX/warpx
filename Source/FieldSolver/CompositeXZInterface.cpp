@@ -44,7 +44,13 @@ namespace
     {
         std::ostringstream stream;
         stream << "CompositeXZSlab-V1 " << warpx.refRatio(0) << ' '
-               << warpx.boxArray(1).minimalBox() << ' ' << WarpX::nox << '\n';
+               << warpx.boxArray(1).minimalBox() << ' ' << WarpX::nox;
+        // Preserve existing unfiltered checkpoints. A change in the effective
+        // filter would change the particle charge represented by the saved field.
+        if (WarpX::use_filter && WarpX::filter_npass_each_dir != amrex::IntVect(0)) {
+            stream << " filter " << WarpX::filter_npass_each_dir;
+        }
+        stream << '\n';
         return stream.str();
     }
 
@@ -92,7 +98,7 @@ void WarpX::CheckCompositeXZCheckpoint (std::string const& directory) const
     amrex::ParallelDescriptor::Bcast(&compatible, 1, amrex::ParallelDescriptor::IOProcessorNumber());
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(compatible != 0,
         "The checkpoint and current input must use the same Cartesian XZ slab interface, "
-        "patch, refinement ratio and particle shape.");
+        "patch, refinement ratio, particle shape and current filter.");
 #else
     amrex::ignore_unused(directory);
 #endif
@@ -117,7 +123,7 @@ void WarpX::InitCompositeXZInterface ()
         !do_dive_cleaning && !do_divb_cleaning && !do_pml_dive_cleaning &&
         !do_pml_divb_cleaning && !m_do_initial_div_cleaning &&
         !do_pml_in_domain && !pml_has_particles && !do_current_centering &&
-        !use_filter && !use_fdtd_nci_corr && !fft_do_time_averaging && !use_hybrid_QED &&
+        !use_fdtd_nci_corr && !fft_do_time_averaging && !use_hybrid_QED &&
         gamma_boost == 1.0_rt && n_current_deposition_buffer == 0 &&
         n_field_gather_buffer == 0 && mypc->nSpeciesDepositOnMainGrid() == 0 &&
         mypc->nSpeciesGatherFromMainGrid() == 0 && mypc->nLasers() == 0 &&
@@ -126,7 +132,7 @@ void WarpX::InitCompositeXZInterface ()
         m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::default_zero,
         "composite_xz_interface requires a serial explicit Yee vacuum simulation "
         "with shape orders 1-3, energy-conserving gather and zero handoff "
-        "buffers. Cleaning, filtering, materials, EB, moving grids, "
+        "buffers. Cleaning, materials, EB, moving grids, "
         "lasers, fluids, main-grid particle overrides and other feedback controls "
         "are unsupported.");
     auto const fine = boxArray(1).minimalBox();
@@ -214,6 +220,11 @@ void WarpX::CheckCompositeXZParticles ()
     auto const h = Geom(1).CellSize(0);
     auto const left = Geom(1).ProbLo(0) + fine.smallEnd(0) * h;
     auto const right = Geom(1).ProbLo(0) + (fine.bigEnd(0) + 1) * h;
+    // A normal binomial pass extends the current by one cell. Restricted fine
+    // current also passes through the parent filter. Keep its full stencil and
+    // one coarse cell for restriction clear of the interface on both meshes.
+    int const passes = use_filter ? filter_npass_each_dir[0] : 0;
+    auto const filter_margin = passes > 0 ? (passes + 1) * Geom(0).CellSize(0) : 0.0_rt;
     amrex::ReduceOps<amrex::ReduceOpMax> operation;
     amrex::ReduceData<int> data(operation);
     using Tuple = typename decltype(data)::Type;
@@ -223,7 +234,7 @@ void WarpX::CheckCompositeXZParticles ()
             // One extra cell beyond B-spline half-width, plus the entire next
             // physical-c particle trajectory. Never substitute a reduced wave c.
             auto const margin = 0.5_rt * (nox + 3) * Geom(lev).CellSize(0) +
-                PhysConst::c * dt[0];
+                PhysConst::c * dt[0] + filter_margin;
             for (WarpXParIter pti(*species, lev); pti.isValid(); ++pti) {
                 auto const position = GetParticlePosition(pti);
                 operation.eval(pti.numParticles(), data,

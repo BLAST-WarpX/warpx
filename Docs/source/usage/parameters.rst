@@ -972,9 +972,12 @@ Setting up the field mesh
     with zero gather and current buffers. A run may contain kinetic
     particles with shape orders one through three on either mesh. Their full
     deposition and gather stencils must remain outside the interface collar.
-    The solver checks this condition as particles advance. Checkpoint restarts
-    preserve the interface, refinement ratio and particle shape. Materials,
-    divergence cleaning and current filtering require additional interface operators.
+    The solver checks this condition as particles advance. The usual binomial
+    current filter is supported on each mesh. Passes in x extend the required
+    clearance by the parent filter radius and one coarse cell for restriction.
+    Passes in periodic z leave the clearance unchanged. Checkpoint restarts
+    preserve the interface, refinement ratio, particle shape and filter passes. Materials and
+    divergence cleaning require additional interface operators.
 
 
 .. pp:param:: warpx.ref_patch_function(x,y,z)

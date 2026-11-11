@@ -33,6 +33,48 @@ if(2 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
             endforeach()
         endforeach()
     endforeach()
+    add_warpx_test(
+        test_2d_xz_slab_filtered_charge_picmi
+        2
+        1
+        inputs_test_2d_conforming_xz_filter_picmi.py
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_2d_xz_slab_filter_collar_picmi
+        2
+        1
+        "inputs_test_2d_conforming_xz_filter_picmi.py --near-interface"
+        OFF
+        OFF
+        OFF
+    )
+    set_tests_properties(test_2d_xz_slab_filter_collar_picmi.run PROPERTIES
+        PASS_REGULAR_EXPRESSION "A particle entered the unsupported physical-interface")
+    set(filtered test_2d_xz_slab_filtered_charge_picmi)
+    set(filtered_restart "inputs_test_2d_conforming_xz_filter_picmi.py --restart ../${filtered}/diags/chk000002")
+    add_warpx_test(
+        test_2d_xz_slab_filtered_picmi_restart
+        2
+        1
+        "${filtered_restart}"
+        OFF
+        OFF
+        ${filtered}
+    )
+    add_warpx_test(
+        test_2d_xz_slab_changed_filter_picmi_restart
+        2
+        1
+        "${filtered_restart} --change-filter"
+        OFF
+        OFF
+        ${filtered}
+    )
+    set_tests_properties(test_2d_xz_slab_changed_filter_picmi_restart.run PROPERTIES
+        PASS_REGULAR_EXPRESSION "The checkpoint and current input must use the same")
     set(parent test_2d_xz_slab_2x2_te_oblique_picmi)
     set(uniform test_2d_xz_slab_uniform_te_oblique_picmi)
     set(pulse "--ratio 2 2 --polarization te --oblique")
