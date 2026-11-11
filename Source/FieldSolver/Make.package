@@ -1,5 +1,10 @@
 CEXE_sources += CurrentControlledPort.cpp
 CEXE_sources += CompositeCurrentControlledPort.cpp
+CEXE_sources += CompositeYeeSurface.cpp
+CEXE_sources += FixedShapeCurrent.cpp
+ifeq ($(USE_RZ),TRUE)
+  CEXE_sources += ConformingRadialInterface.cpp
+endif
 CEXE_sources += WarpXPushFieldsEM.cpp
 CEXE_sources += WarpXPushFieldsHybridPIC.cpp
 CEXE_sources += ElectrostaticSolver.cpp
