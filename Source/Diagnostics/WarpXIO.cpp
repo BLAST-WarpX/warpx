@@ -308,6 +308,10 @@ WarpX::InitFromCheckpoint ()
         }
     }
 
+    // The checkpoint header has restored the meshes. Reject an incompatible
+    // slab before trying to read fields or PML files for a different solver.
+    bool const check_xz_particles = CheckCompositeXZCheckpoint(restart_chkfile);
+
     const int nlevs = finestLevel()+1;
 
     // Initialize the field data
@@ -449,6 +453,7 @@ WarpX::InitFromCheckpoint ()
 
     // Initialize particles
     mypc->Restart(restart_chkfile);
+    if (check_xz_particles) { CheckCompositeXZParticles(true); }
 
     if (m_implicit_solver) {
         m_implicit_solver->Define(this, /*from_restart=*/true);

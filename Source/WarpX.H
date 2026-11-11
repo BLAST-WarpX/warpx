@@ -689,7 +689,8 @@ public:
 
     // Two-sided Yee update for a full-length XZ refinement slab.
     void WriteCompositeXZCheckpoint (std::string const& directory) const;
-    void CheckCompositeXZCheckpoint (std::string const& directory);
+    //! Validate the field layout and return whether the restored particles need a fine-stencil check.
+    [[nodiscard]] bool CheckCompositeXZCheckpoint (std::string const& directory);
     void InitCompositeXZInterface ();
     void PrepareCompositeXZInterface ();
     void ApplyCompositeXZInterface (amrex::Real a_dt);

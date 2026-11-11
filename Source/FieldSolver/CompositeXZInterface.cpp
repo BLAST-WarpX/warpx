@@ -81,7 +81,7 @@ void WarpX::WriteCompositeXZCheckpoint (std::string const& directory) const
 #endif
 }
 
-void WarpX::CheckCompositeXZCheckpoint (std::string const& directory)
+bool WarpX::CheckCompositeXZCheckpoint (std::string const& directory)
 {
 #ifdef WARPX_DIM_XZ
     int compatible = 0;
@@ -101,12 +101,13 @@ void WarpX::CheckCompositeXZCheckpoint (std::string const& directory)
         }
     }
     amrex::ParallelDescriptor::Bcast(&compatible, 1, amrex::ParallelDescriptor::IOProcessorNumber());
-    if (compatible == 2) { CheckCompositeXZParticles(true); }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(compatible != 0,
         "The checkpoint and current input must use the same Cartesian XZ slab interface, "
         "patch, refinement ratio, particle shape and current filter.");
+    return compatible == 2;
 #else
     amrex::ignore_unused(directory);
+    return false;
 #endif
 }
 

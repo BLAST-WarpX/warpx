@@ -849,7 +849,6 @@ WarpX::InitData ()
     else
     {
         InitFromCheckpoint();
-        CheckCompositeXZCheckpoint(restart_chkfile);
         InitCompositeXZInterface();
         ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
