@@ -677,10 +677,6 @@ public:
     void SplitParticlesAndDepositRemappingCurrent (int timestep, amrex::Real dt,
                                                    bool deposit_virtual_j = true);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    /** Apply radial inverse-volume scaling after particle current and charge deposition. */
-    void ApplyInverseVolumeScalingToDepositedFields (int lev, bool scale_current);
-#endif
     /** Perform essential particle house keeping at boundaries
      *
      * Inject, communicate, scrape and sort particles.

@@ -1959,6 +1959,7 @@ void PhysicalParticleContainer::splitAndDepositRemappingCurrent (
                            J[lev][0], J[lev][1], J[lev][2],
                            old_np, num_new, thread_num,
                            lev, lev, dt, amrex::Real(0.0), PushType::Explicit,
+                           WarpX::nox,
                            /*use_stored_old_position=*/true);
         }
     }

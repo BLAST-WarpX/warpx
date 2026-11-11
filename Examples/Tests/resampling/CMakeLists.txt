@@ -57,6 +57,7 @@ add_warpx_test(
     inputs_test_rsphere_particle_splitting  # inputs
     "analysis_particle_splitting.py diags/diag1"  # analysis
     "analysis_default_regression.py --path diags/diag1"  # checksum
+    OFF  # dependency
 )
 
 add_warpx_test(

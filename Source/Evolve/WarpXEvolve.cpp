@@ -601,17 +601,12 @@ WarpX::OneStep_nosub (
     }
 
     if (mypc->hasParticleSplitting()) {
+        // Remapping current and post-split charge must remain unscaled until
+        // synchronization and finalization below.
         SplitParticlesAndDepositRemappingCurrent(a_step + 1, a_dt);
         if (do_dive_cleaning) {
             mypc->DepositChargeComponent(m_fields, /*rho_comp=*/1);
         }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
-        // Normal particle deposits, remapping J, and post-split rho_new are all
-        // still unscaled. Apply the radial normalization once to their sum.
-        for (int lev = 0; lev <= finest_level; ++lev) {
-            ApplyInverseVolumeScalingToDepositedFields(lev, /*scale_current=*/true);
-        }
-#endif
     }
 
     ExecutePythonCallback("afterdeposition");
@@ -1507,38 +1502,6 @@ WarpX::doQEDEvents ()
             *m_fields.get(FieldType::Bfield_aux, Direction{1}, lev),
             *m_fields.get(FieldType::Bfield_aux, Direction{2}, lev)
         );
-    }
-}
-#endif
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-void
-WarpX::ApplyInverseVolumeScalingToDepositedFields (int lev, bool scale_current)
-{
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
-    if (scale_current) {
-        ApplyInverseVolumeScalingToCurrentDensity(
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            lev);
-        if (m_fields.has_vector(FieldType::current_buf, lev)) {
-            ApplyInverseVolumeScalingToCurrentDensity(
-                m_fields.get(FieldType::current_buf, Direction{0}, lev),
-                m_fields.get(FieldType::current_buf, Direction{1}, lev),
-                m_fields.get(FieldType::current_buf, Direction{2}, lev),
-                lev-1);
-        }
-    }
-
-    if (m_fields.has(FieldType::rho_fp, lev)) {
-        ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_fp, lev), lev);
-        if (m_fields.has(FieldType::rho_buf, lev)) {
-            ApplyInverseVolumeScalingToChargeDensity(
-                m_fields.get(FieldType::rho_buf, lev), lev-1);
-        }
     }
 }
 #endif
