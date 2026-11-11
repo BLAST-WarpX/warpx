@@ -4346,7 +4346,11 @@ The antenna supports static mesh refinement (SMR) in 2D XZ and 3D with explicit 
 field evolution and no moving window. Antenna regions may span refinement boundaries.
 Each leaf cell intersecting the drive seeds a pair at its center. The weights use the
 physical overlap of the drive with that cell, including fractional cells and the
-annular volume in RZ. This preserves the integrated source of a subcell drive.
+annular volume in RZ. This preserves the integrated source of a subcell drive
+in active cells. Embedded particle boundaries remove antenna pairs seeded inside
+a solid. For a drive box that overlaps an embedded electrode, measure the
+deposited current on the active Yee edges to determine how much current reaches
+the aperture.
 The particle shape distributes the cell-averaged source across neighboring grid points. The displacement
 limit uses the finest cell spacing. On restart, all levels are reconstructed from the
 waveform integral at the checkpoint time. RZ supports explicit Yee SMR; its
