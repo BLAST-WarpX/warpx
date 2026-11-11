@@ -1200,7 +1200,8 @@ moving-window simulations.
 
 If dielectric materials overlap, the material listed latest in
 :pp:param:`dielectrics.names` takes precedence for the permittivity field and the
-diagnostic material-id mask. WarpX also builds a signed-distance field for the
+diagnostic material-id mask. Similarly, if a dielectric material overlaps with a
+conductor, the conductor takes precedence. WarpX also builds a signed-distance field for the
 union of all dielectric materials. The diagnostic fields ``dielectric_epsilon``,
 ``dielectric_signed_distance``, and ``dielectric_mask`` can be added explicitly
 to :pp:param:`<diag_name>.fields_to_plot`.
