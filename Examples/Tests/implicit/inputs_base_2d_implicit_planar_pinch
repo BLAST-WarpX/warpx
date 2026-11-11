@@ -73,8 +73,6 @@ newton.absolute_tolerance = 0.0
 newton.require_convergence = false
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
 newton.diagnostic_interval = 10
-newton.pc_update_newton_interval = 0
-newton.pc_update_time_step_interval = 2
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
@@ -82,7 +80,6 @@ gmres.relative_tolerance = 1.0e-4
 gmres.absolute_tolerance = 0.0
 
 implicit_evolve.use_mass_matrices_jacobian = true
-implicit_evolve.update_mass_matrices_newton_interval = 4
 implicit_evolve.skip_particle_picard_init = true
 implicit_evolve.use_mass_matrices_pc = true
 implicit_evolve.mass_matrices_pc_width = 1

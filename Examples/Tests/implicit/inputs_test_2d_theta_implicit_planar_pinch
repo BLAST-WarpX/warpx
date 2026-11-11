@@ -11,4 +11,8 @@ precon_mat.verbose = true
 pc_petsc.type = asm
 pc_petsc.asm_overlap = 4
 pc_petsc.sub_type = lu
+implicit_evolve.update_mass_matrices_newton_interval = 4
 implicit_evolve.petsc_reinit_interval = 7
+newton.pc_update_newton_interval = 0
+newton.pc_update_time_step_interval = 2
+
