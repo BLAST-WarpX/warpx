@@ -155,7 +155,13 @@ PetscErrorCode JacobianFunction( SNES a_solver,
 
     if (update_pc) {
         dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
+        context->setPCInitialized();
+    }
 
+    // After PETSc reinitialization, assemble from the retained WarpX PC even when
+    // its physical update is not due. Match the native Newton/KSP path.
+    const bool setup_pc = update_pc || context->needsPETScPCSetup();
+    if (setup_pc) {
         KSP lin_solver;
         SNESGetKSP(a_solver, &lin_solver);
         PC pc;
@@ -168,11 +174,11 @@ PetscErrorCode JacobianFunction( SNES a_solver,
             auto err = context->assemblePCMatrix(context->m_linop.get());
             AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
         }
-        context->setPCInitialized();
+        context->setPETScPCReady();
     }
 
     // Rebuild or reuse the PETSc preconditioner in the linear solve that follows
-    SNESSetLagPreconditioner(a_solver, update_pc ? 1 : -1);
+    SNESSetLagPreconditioner(a_solver, setup_pc ? 1 : -1);
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -496,7 +502,7 @@ int PETScSolver_impl::assemblePCMatrix(LinOpType* const a_linop)
         PetscCall(MatAssembled(m_P->obj, &assembled));
         if (!assembled) {
             MPI_Comm comm = PetscObjectComm(reinterpret_cast<PetscObject>(m_P->obj));
-            const PetscInt nloc = static_cast<PetscInt>(m_ndofs_l);
+            PetscInt nloc = static_cast<PetscInt>(m_ndofs_l);
             PetscInt start = 0;
             PetscCallMPI(MPI_Exscan(&nloc, &start, 1, MPIU_INT, MPI_SUM, comm));
             PetscMPIInt rank = 0;
@@ -776,8 +782,8 @@ void SNES_impl::destroyObjects ()
 {
     PETScSolver_impl::destroyObjects();
     m_snes = std::make_unique<SNESObj>();
-    // Only the PETSc preconditioner lost its state (the matrix); the native ones keep it
-    if (this->m_pc_type == PreconditionerType::pc_petsc) { m_pc_initialized = false; }
+    // The WarpX PC is retained. Only PETSc storage and factors must be rebuilt.
+    m_petsc_pc_needs_setup = true;
 }
 
 void SNES_impl::printParams () const

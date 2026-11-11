@@ -259,6 +259,12 @@ class SNES_impl : public PETScSolver_impl
         //! Record that the PC has been set up
         void setPCInitialized() const { m_pc_initialized = true; }
 
+        //! Whether newly created PETSc objects still need their PC assembled and set up.
+        [[nodiscard]] bool needsPETScPCSetup() const { return m_petsc_pc_needs_setup; }
+
+        //! Record that the PETSc PC is ready for the next linear solve.
+        void setPETScPCReady() { m_petsc_pc_needs_setup = false; }
+
         //! Require a PC update before the next linear solve.
         void invalidatePreconditioner() { m_pc_initialized = false; }
 
@@ -329,8 +335,10 @@ class SNES_impl : public PETScSolver_impl
         //! Input parameters of the Newton-type solvers
         const NewtonSolverParams& m_newton_params;
 
-        //! Ensure the first linear solve initializes the PC, including after restart.
+        //! Whether the retained WarpX PC has been initialized; survives PETSc reinitialization.
         mutable bool m_pc_initialized = false;
+        //! Rebuild PETSc storage and factors without changing the WarpX PC update schedule.
+        bool m_petsc_pc_needs_setup = true;
         //! PC update decision for the current nonlinear iteration.
         mutable bool m_update_pc = true;
         //! Override the normal PC update decision until disabled by the owner.
