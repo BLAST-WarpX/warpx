@@ -196,8 +196,8 @@ void WarpX::InitCompositeXZInterface ()
         amrex::Vector<amrex::Real> inverse(nz);
         for (int distance = 0; distance < nz; ++distance) {
             int const nearest = std::min(distance, nz - distance);
-            inverse[distance] = (std::pow(root, nearest) + std::pow(root, nz - nearest)) /
-                normalization;
+            inverse[distance] = static_cast<amrex::Real>(
+                (std::pow(root, nearest) + std::pow(root, nz - nearest)) / normalization);
         }
         m_composite_xz_inverse_y.resize(nz);
         amrex::Gpu::copy(amrex::Gpu::hostToDevice, inverse.begin(), inverse.end(),
