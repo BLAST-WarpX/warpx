@@ -32,6 +32,12 @@ class StaircaseBiasCorrector:
     tolerance, max_iterations : optional
         Relative tolerance and iteration cap of the unit-potential solves (MLMG). They
         set how exactly the capacitance matrix and the voltage readback agree.
+        The multigrid depth and bottom solver follow the ``warpx.self_fields_*``
+        options, shared with the electrostatic solver. Unless
+        ``warpx.self_fields_max_coarsening_level`` is set, these solves coarsen only
+        once: deeper coarsening loses thin conductors and the solve fails to converge.
+        They run once, at setup, so this favors robustness over speed; a deeper cap or
+        another bottom solver can be faster for thick conductors.
 
     Call ``setup_after_init()`` after ``sim.initialize_warpx()``, then
     ``initialize_vacuum_bias()`` for a new run or ``resume_from_checkpoint()`` on a

@@ -38,6 +38,13 @@ namespace warpx::embedded_boundary::voltage_clamp
 
     /** Solve for the unit potential and field of conductor k.
      *
+     * The multigrid hierarchy and bottom solve follow the warpx.self_fields_* MLMG
+     * options, shared with the electrostatic solver. Unless
+     * warpx.self_fields_max_coarsening_level is set, the clamp coarsens only once (AMReX
+     * default: 30), because deeper coarsening loses thin conductors and the solve fails
+     * to converge. This is robust but not optimized: a deeper cap or another bottom
+     * solver can be faster for thick conductors.
+     *
      * \param[in] k        conductor index, starting at 0
      * \param[in] selector parser expression in (x, y, z), 1 on the fixed nodes of
      *                     conductor k and 0 on all other fixed nodes
@@ -52,6 +59,8 @@ namespace warpx::embedded_boundary::voltage_clamp
      *
      * Reading the result with GaussCharge gives the charge the plasma induces on
      * the conductors, an independent check of the reciprocity value -psi_k^T q.
+     *
+     * Same MLMG settings as SolveUnitPotential.
      *
      * \param[in] rtol     relative tolerance of the MLMG solve
      * \param[in] max_iter maximum number of MLMG iterations
