@@ -12,6 +12,7 @@
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Reduce.H>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -58,7 +59,8 @@ check_guarded_restart (WarpX& w) {
                 op.eval(it.numParticles(), data,
                         [=] AMREX_GPU_DEVICE(int i) noexcept -> Result {
                             return {static_cast<int>(
-                                lev == 0 || !(r[i] >= 0._rt && r[i] < limit))};
+                                lev == 0 || !std::isfinite(r[i]) ||
+                                r[i] < 0._rt || r[i] >= limit)};
                         });
             }
         }
@@ -103,7 +105,7 @@ initialize (WarpX& w, std::string const& restart) {
             !stored || requested,
             "The checkpoint and requested radial particle coupling differ.");
         if (stored) {
-            std::ifstream file(path);
+            std::ifstream const file(path);
             std::ostringstream bytes;
             bytes << file.rdbuf();
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -246,6 +248,9 @@ deposit (WarpX& w, Real dt) {
                     deposit_tile<3>(it, pc.getCharge(), dt, box, dinv, lower,
                                     current);
                     break;
+                default:
+                    WARPX_ABORT_WITH_MESSAGE(
+                        "Unknown RZ fixed-shape deposition order.");
                 }
             }
         }
@@ -300,9 +305,9 @@ add_current (WarpX& w, ablastr::fields::VectorField const& current) {
                                    0.5_rt * (R + 1._rt) * raw(a + 1, j, 0)) /
                                   mass;
                 } else {
-                    Real right = a < outer
-                                     ? 0.5_rt * (a + 1._rt) * raw(a + 1, j, 0)
-                                     : 0._rt;
+                    Real const right =
+                        a < outer ? 0.5_rt * (a + 1._rt) * raw(a + 1, j, 0)
+                                  : 0._rt;
                     c(i, j, 0) += (0.5_rt * (a - 1._rt) * raw(a - 1, j, 0) +
                                    a * raw(a, j, 0) + right) /
                                   (2._rt * a);

@@ -962,6 +962,9 @@ WarpX::InitData ()
     if (m_implicit_solver) {
         m_implicit_solver->PrintParameters();
     }
+#ifdef WARPX_DIM_RZ
+    warpx::radial_particles::initialize(*this, restart_chkfile);
+#endif
     ::WriteUsedInputsFile();
 
     // Run div cleaner here on loaded external fields (fresh starts only: on
@@ -1030,7 +1033,6 @@ WarpX::InitData ()
     }
 
 #ifdef WARPX_DIM_RZ
-    warpx::radial_particles::initialize(*this, restart_chkfile);
     warpx::radial_particles::update_gather(*this);
 #endif
     if (m_use_composite_yee_surface) {
