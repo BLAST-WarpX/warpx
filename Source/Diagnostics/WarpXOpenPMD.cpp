@@ -442,6 +442,12 @@ namespace detail
         } else if (field_name == "Te" || isPerDirectionTemperature(field_name, species_names)){
             // hybrid-PIC electron temperature Te and per-direction temperatures, stored in K
             mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
+        } else if (field_name == "Pe"){ // hybrid-PIC electron pressure, stored in Pa
+            mesh.setUnitDimension({
+                                          {openPMD::UnitDimension::L, -1},
+                                          {openPMD::UnitDimension::M,  1},
+                                          {openPMD::UnitDimension::T, -2},
+                                  });
         }
     }
 #endif // WARPX_USE_OPENPMD
