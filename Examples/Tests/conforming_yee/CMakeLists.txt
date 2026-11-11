@@ -30,7 +30,7 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
         )
         set(antenna_reference test_3d_conforming_yee_uniform_enclosed_antenna)
         add_warpx_test(
-            ${antenna_reference}
+            test_3d_conforming_yee_uniform_enclosed_antenna
             3
             1
             "inputs_base_3d_conforming_enclosed_port.py --uniform --impressed-current"
