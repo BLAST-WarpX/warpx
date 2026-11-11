@@ -54,12 +54,12 @@ if(2 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
     set_tests_properties(test_2d_xz_slab_filter_collar_picmi.run PROPERTIES
         PASS_REGULAR_EXPRESSION "A particle entered the unsupported physical-interface")
     set(filtered test_2d_xz_slab_filtered_charge_picmi)
-    set(filtered_restart "inputs_test_2d_conforming_xz_filter_picmi.py --restart ../${filtered}/diags/chk000002")
+    set(filtered_checkpoint "../${filtered}/diags/chk000002")
     add_warpx_test(
         test_2d_xz_slab_filtered_picmi_restart
         2
         1
-        "${filtered_restart}"
+        "inputs_test_2d_conforming_xz_filter_picmi.py --restart ${filtered_checkpoint}"
         OFF
         OFF
         ${filtered}
@@ -68,7 +68,7 @@ if(2 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
         test_2d_xz_slab_changed_filter_picmi_restart
         2
         1
-        "${filtered_restart} --change-filter"
+        "inputs_test_2d_conforming_xz_filter_picmi.py --restart ${filtered_checkpoint} --change-filter"
         OFF
         OFF
         ${filtered}
