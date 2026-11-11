@@ -30,11 +30,10 @@ FixedShapeGather get_fixed_shape_gather (
 class FixedShapeCurrent {
   public:
     explicit FixedShapeCurrent (WarpX& warpx);
-    void Assemble (amrex::Real dt);
-    void UpdateGather ();
+    void Assemble (WarpX& warpx, amrex::Real dt);
+    void UpdateGather (WarpX& warpx);
 
   private:
-    WarpX& w;
     std::array<std::unique_ptr<amrex::MultiFab>, 3> raw, filtered;
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> fine_owns;
     amrex::iMultiFab valid_centers;

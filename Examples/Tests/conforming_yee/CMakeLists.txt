@@ -29,7 +29,8 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
     set(crossing_outward "")
     set(crossing_inward "--inward")
     set(crossing_frozen "--frozen")
-    foreach(direction IN ITEMS outward inward frozen)
+    set(crossing_boundary "--boundary")
+    foreach(direction IN ITEMS outward inward frozen boundary)
         add_warpx_test(
             test_3d_conforming_yee_crossing_${direction}
             3
@@ -40,6 +41,8 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
             OFF
         )
     endforeach()
+    set_tests_properties(test_3d_conforming_yee_crossing_boundary.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "A fixed-shape particle source stencil reached")
     add_warpx_test(
         test_3d_conforming_yee_stepped_absorber
         3

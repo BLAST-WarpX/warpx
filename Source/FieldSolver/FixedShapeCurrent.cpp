@@ -13,8 +13,8 @@
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <AMReX_GpuMemory.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Reduce.H>
 #include <cmath>
 #include <typeinfo>
 
@@ -79,10 +79,13 @@ initialize_centers (WarpX& w, amrex::iMultiFab& centers) {
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         IntVect const p{i, j, k};
         bool ok = box.contains(p - reach) && box.contains(p + reach);
-        for (int z = -reach[2]; ok && z <= reach[2]; ++z)
-            for (int y = -reach[1]; ok && y <= reach[1]; ++y)
-                for (int x = -reach[0]; ok && x <= reach[0]; ++x)
+        for (int z = -reach[2]; ok && z <= reach[2]; ++z) {
+            for (int y = -reach[1]; ok && y <= reach[1]; ++y) {
+                for (int x = -reach[0]; ok && x <= reach[0]; ++x) {
                     ok = good(i + x, j + y, k + z) != 0;
+                }
+            }
+        }
         valid(p) = int(ok);
     });
     amrex::Gpu::streamSynchronize();
@@ -97,9 +100,11 @@ for_tiles (WarpX& w, F const& f) {
         if (!pc.isPushed() || pc.do_not_deposit || pc.getCharge() == 0._rt) {
             continue;
         }
-        for (int lev = 0; lev <= 1; ++lev)
-            for (WarpXParIter it(pc, lev); it.isValid(); ++it)
+        for (int lev = 0; lev <= 1; ++lev) {
+            for (WarpXParIter it(pc, lev); it.isValid(); ++it) {
                 f(it, pc.getCharge());
+            }
+        }
     }
 }
 
@@ -124,7 +129,7 @@ deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
         for (int d = 0; d < 3; ++d) {
             bounds[d][1] = box.length(d);
         }
-        amrex::GpuArray<amrex::GpuArray<bool, 2>, 3> crop{};
+        amrex::GpuArray<amrex::GpuArray<bool, 2>, 3> const crop{};
         doVillasenorDepositionShapeNExplicit<order>(
             pos, weight, ux, uy, uz, nullptr, j[0], j[1], j[2], n, dt,
             -.5_rt * dt, dinv, lower, bounds, crop, amrex::lbound(box), q, 1);
@@ -132,7 +137,7 @@ deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
 }
 } // namespace
 
-FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
+FixedShapeCurrent::FixedShapeCurrent (WarpX& w) {
     auto& pcs = w.GetPartContainer();
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         pcs.nContainers() == pcs.nSpecies() &&
@@ -157,7 +162,7 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
     amrex::ParmParse("warpx").query("composite_yee_fixed_shape_gather",
                                     use_gather);
     auto const domain = w.Geom(1).Domain();
-    amrex::DistributionMapping dm(amrex::Vector<int>{0});
+    amrex::DistributionMapping const dm(amrex::Vector<int>{0});
     valid_centers.define(amrex::BoxArray(w.Geom(0).Domain()), dm, 1, 0);
     initialize_centers(w, valid_centers);
     auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
@@ -194,7 +199,7 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& warpx) : w(warpx) {
 }
 
 void
-FixedShapeCurrent::Assemble (Real dt) {
+FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
     auto const box = w.Geom(1).Domain(), cbox = w.Geom(0).Domain();
     auto const dinv = WarpX::InvCellSize(1),
                lower = WarpX::LowerCorner(box, 1, .5_rt * dt);
@@ -206,25 +211,24 @@ FixedShapeCurrent::Assemble (Real dt) {
     auto const clo = w.Geom(0).ProbLoArray(),
                cdi = w.Geom(0).InvCellSizeArray();
     auto const safe = valid_centers.const_array(0);
-    amrex::Gpu::DeviceScalar<int> invalid(0);
-    int* flag = invalid.dataPtr();
+    amrex::ReduceOps<amrex::ReduceOpLogicalOr> reduction;
+    amrex::ReduceData<int> outside(reduction);
+    using Result = decltype(outside)::Type;
     for_tiles(w, [&] (WarpXParIter const& it, Real) {
         auto const pos = GetParticlePosition<PIdx>(it);
-        amrex::ParallelFor(
-            it.numParticles(), [=] AMREX_GPU_DEVICE(int n) noexcept {
+        reduction.eval(
+            it.numParticles(), outside, [=] AMREX_GPU_DEVICE(int n) noexcept -> Result {
                 amrex::ParticleReal x, y, z;
                 pos(n, x, y, z);
-                IntVect p{int(amrex::Math::floor((x - clo[0]) * cdi[0])),
-                          int(amrex::Math::floor((y - clo[1]) * cdi[1])),
-                          int(amrex::Math::floor((z - clo[2]) * cdi[2]))};
-                if (!cbox.contains(p) || !safe(p)) {
-                    amrex::Gpu::Atomic::Exch(flag, 1);
-                }
+                IntVect const p{int(amrex::Math::floor((x - clo[0]) * cdi[0])),
+                                int(amrex::Math::floor((y - clo[1]) * cdi[1])),
+                                int(amrex::Math::floor((z - clo[2]) * cdi[2]))};
+                return {static_cast<int>(!cbox.contains(p) || !safe(p))};
             });
     });
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !invalid.dataValue(), "A fixed-shape particle source stencil reached a "
-                              "material or physical boundary.");
+        amrex::get<0>(outside.value()) == 0,
+        "A fixed-shape particle source stencil reached a material or physical boundary.");
     std::array<amrex::Array4<Real>, 3> j;
     for (int d = 0; d < 3; ++d) {
         raw[d]->setVal(0._rt);
@@ -285,7 +289,7 @@ FixedShapeCurrent::Assemble (Real dt) {
 }
 
 void
-FixedShapeCurrent::UpdateGather () {
+FixedShapeCurrent::UpdateGather (WarpX& w) {
     if (!force[0][0]) {
         return;
     }
@@ -315,13 +319,16 @@ FixedShapeCurrent::UpdateGather () {
                         hi[a] = int(rem != 0);
                     }
                     Real sum = 0._rt;
-                    for (int z = 0; z <= hi[2]; ++z)
-                        for (int y = 0; y <= hi[1]; ++y)
-                            for (int x = 0; x <= hi[0]; ++x)
+                    for (int z = 0; z <= hi[2]; ++z) {
+                        for (int y = 0; y <= hi[1]; ++y) {
+                            for (int x = 0; x <= hi[0]; ++x) {
                                 sum += (x ? frac[0] : 1._rt - frac[0]) *
                                        (y ? frac[1] : 1._rt - frac[1]) *
                                        (z ? frac[2] : 1._rt - frac[2]) *
                                        src(p + IntVect(x, y, z));
+                            }
+                        }
+                    }
                     dst(q) = sum;
                 });
             target.ParallelCopy(*fine[d]);

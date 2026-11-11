@@ -35,7 +35,7 @@ namespace {
 std::string
 checkpoint_identity (WarpX& w) {
     bool fixed = false, gather = false;
-    amrex::ParmParse pp("warpx");
+    amrex::ParmParse const pp("warpx");
     pp.query("composite_yee_fixed_shape_current", fixed);
     pp.query("composite_yee_fixed_shape_gather", gather);
     std::ostringstream out;
@@ -76,7 +76,7 @@ CompositeYeeSurface::CheckRestartIdentity (WarpX& w,
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !std::filesystem::exists(std::filesystem::path(directory) / "Level_1" / "pml_Bx_fp_H"),
             "This checkpoint evolved an interior absorber on its stepped Yee interface.");
-        std::ifstream marker(file);
+        std::ifstream const marker(file);
         std::ostringstream text;
         text << marker.rdbuf();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -142,7 +142,7 @@ struct Coverage {
             }
         }
     }
-    std::size_t
+    [[nodiscard]] std::size_t
     index (Point const& p) const {
         return p[0] + static_cast<std::size_t>(n[0]) *
                           (p[1] + static_cast<std::size_t>(n[1]) * p[2]);
@@ -151,7 +151,7 @@ struct Coverage {
     operator()(Point const& p) const {
         return values[index(p)] != 0;
     }
-    std::vector<Site>
+    [[nodiscard]] std::vector<Site>
     faces () const {
         std::vector<Site> out;
         for (int z = 1; z < n[2] - 1; ++z) {
@@ -211,7 +211,7 @@ check_vacuum_patch (WarpX& w) {
         auto const fb = w.boxArray(1)[k];
         auto const cb = amrex::grow(amrex::coarsen(fb, w.refRatio(0)), 2);
         auto const& geom = w.Geom(0);
-        amrex::RealBox physical(cb, geom.CellSize(), geom.ProbLo());
+        amrex::RealBox const physical(cb, geom.CellSize(), geom.ProbLo());
         for (auto const& port : ports) {
             bool overlaps = true;
             for (int d = 0; d < 3; ++d) {
@@ -309,10 +309,10 @@ struct Leaf {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 count > 0 && count < 4, "Invalid Yee surface edge ownership.");
             mass.push_back(volume * 0.25_rt * count);
-            for (int d : {u, v}) {
+            for (int const d : {u, v}) {
                 int const b = 3 - a - d;
                 Real const sign = (b + 1) % 3 == d ? 1._rt : -1._rt;
-                for (int offset : {0, -1}) {
+                for (int const offset : {0, -1}) {
                     auto const q = shift(p, d, offset);
                     Real const fraction =
                         0.5_rt * (active(q) + active(shift(q, b, -1)));
@@ -391,7 +391,7 @@ struct Matrix {
             return sum;
         }
     };
-    View
+    [[nodiscard]] View
     view () const {
         return {offsets.data(), columns.data(), values.data()};
     }
@@ -518,7 +518,7 @@ check_normal_flux (WarpX& w, std::vector<Site> const& boundary,
 
 #ifdef WARPX_DIM_3D
 struct CompositeYeeSurface::Implementation {
-    WarpX& w;
+    WarpX* m_warpx;
     amrex::IntVect ratio;
     Bound edges[2], faces[2], currents[2], coarse_patch_current;
     Vector electric[2], magnetic[2], current[2], patch_current, rhs[2], base,
@@ -530,7 +530,7 @@ struct CompositeYeeSurface::Implementation {
     std::unique_ptr<FixedShapeCurrent> fixed_shape_current;
     std::array<std::array<std::unique_ptr<amrex::MultiFab>, 3>, 2> gather_patch;
 
-    explicit Implementation (WarpX& warpx) : w(warpx), ratio(w.refRatio(0)) {
+    explicit Implementation (WarpX& w) : m_warpx(&w), ratio(w.refRatio(0)) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             sizeof(Real) == sizeof(double),
             "The conforming Yee interface requires double precision.");
@@ -680,8 +680,8 @@ void
 CompositeYeeSurface::RestrictMagnetic () {
     auto& g = *m_impl;
     g.faces[0].read(g.magnetic[0]);
-    auto const f = g.w.m_fields.get_alldirs(FieldType::Bfield_fp, 1);
-    auto const c = g.w.m_fields.get_alldirs(FieldType::Bfield_fp, 0);
+    auto const f = g.m_warpx->m_fields.get_alldirs(FieldType::Bfield_fp, 1);
+    auto const c = g.m_warpx->m_fields.get_alldirs(FieldType::Bfield_fp, 0);
     for (int d = 0; d < 3; ++d) {
         amrex::average_down_faces(*f[d], *c[d], g.ratio);
     }
@@ -735,8 +735,8 @@ CompositeYeeSurface::AdvanceElectric (Real dt) {
     amrex::ParallelFor(g.ne[1], [=] AMREX_GPU_DEVICE(int i) noexcept {
         ef[i] = p.apply(i, ec);
     });
-    auto const fine = g.w.m_fields.get_alldirs(FieldType::Efield_fp, 1);
-    auto const coarse = g.w.m_fields.get_alldirs(FieldType::Efield_fp, 0);
+    auto const fine = g.m_warpx->m_fields.get_alldirs(FieldType::Efield_fp, 1);
+    auto const coarse = g.m_warpx->m_fields.get_alldirs(FieldType::Efield_fp, 0);
     for (int d = 0; d < 3; ++d) {
         amrex::average_down_edges(*fine[d], *coarse[d], g.ratio);
     }
@@ -747,14 +747,14 @@ CompositeYeeSurface::AdvanceElectric (Real dt) {
 void
 CompositeYeeSurface::AssembleParticleCurrent (Real dt) {
     if (m_impl->fixed_shape_current) {
-        m_impl->fixed_shape_current->Assemble(dt);
+        m_impl->fixed_shape_current->Assemble(*m_impl->m_warpx, dt);
     }
 }
 
 void
 CompositeYeeSurface::UpdateGatherFields () {
     auto& g = *m_impl;
-    auto& fields = g.w.m_fields;
+    auto& fields = g.m_warpx->m_fields;
     auto const ratio = g.ratio;
     for (int s = 0; s < 2; ++s) {
         auto const type = s ? FieldType::Bfield_fp : FieldType::Efield_fp;
@@ -766,7 +766,7 @@ CompositeYeeSurface::UpdateGatherFields () {
             auto& scratch = *g.gather_patch[s][d];
             scratch.ParallelCopy(*coarse[d], 0, 0, 1, amrex::IntVect(0),
                                  scratch.nGrowVect(),
-                                 g.w.Geom(0).periodicity());
+                                 g.m_warpx->Geom(0).periodicity());
             auto const cax_type =
                 s ? FieldType::Bfield_cax : FieldType::Efield_cax;
             if (fields.has_vector(cax_type, 1)) {
@@ -776,7 +776,7 @@ CompositeYeeSurface::UpdateGatherFields () {
                 // including guards.
                 buffered->ParallelCopy(*coarse[d], 0, 0, 1, amrex::IntVect(0),
                                        buffered->nGrowVect(),
-                                       g.w.Geom(0).periodicity());
+                                       g.m_warpx->Geom(0).periodicity());
             }
             auto const nodal = aux[d]->ixType().toIntVect();
             // Valid fine values and neighboring fine boxes take precedence over
@@ -817,11 +817,11 @@ CompositeYeeSurface::UpdateGatherFields () {
             }
             aux[d]->ParallelCopy(*fine[d], 0, 0, 1, amrex::IntVect(0),
                                  aux[d]->nGrowVect(),
-                                 g.w.Geom(1).periodicity());
+                                 g.m_warpx->Geom(1).periodicity());
         }
     }
     if (g.fixed_shape_current) {
-        g.fixed_shape_current->UpdateGather();
+        g.fixed_shape_current->UpdateGather(*g.m_warpx);
     }
 }
 #else

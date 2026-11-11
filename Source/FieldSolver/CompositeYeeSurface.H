@@ -16,6 +16,10 @@ class CompositeYeeSurface {
   public:
     explicit CompositeYeeSurface (WarpX& warpx);
     ~CompositeYeeSurface ();
+    CompositeYeeSurface (CompositeYeeSurface const&) = delete;
+    CompositeYeeSurface& operator= (CompositeYeeSurface const&) = delete;
+    CompositeYeeSurface (CompositeYeeSurface&&) = delete;
+    CompositeYeeSurface& operator= (CompositeYeeSurface&&) = delete;
     static void WriteCheckpointIdentity (WarpX& w,
                                          std::string const& directory);
     static void CheckRestartIdentity (WarpX& w, std::string const& directory,

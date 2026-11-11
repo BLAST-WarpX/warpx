@@ -11,6 +11,7 @@ from pywarpx.particle_containers import ParticleContainerWrapper
 parser = argparse.ArgumentParser()
 parser.add_argument("--inward", action="store_true")
 parser.add_argument("--frozen", action="store_true")
+parser.add_argument("--boundary", action="store_true")
 args = parser.parse_args()
 n = 32
 length = 0.1
@@ -53,6 +54,8 @@ settings = [
     "amrex.the_arena_init_size=0",
 ]
 centre = 0.032 if args.inward else 0.012
+if args.boundary:
+    centre = 0.0475
 sign = -1 if args.inward else 1
 for name, species, speed in (
     ("electrons", "electron", 0.32),
@@ -71,6 +74,9 @@ for name, species, speed in (
         ]
     )
 libwarpx.initialize(settings)
+if args.boundary:
+    libwarpx.warpx.evolve(1)
+    raise AssertionError("Active current deposition reached the physical boundary unchecked")
 fields = libwarpx.warpx.multifab_register()
 blocks, boxes, covered = mesh_fields(fields, n, ratio)
 species = [ParticleContainerWrapper(name) for name in ("electrons", "protons")]

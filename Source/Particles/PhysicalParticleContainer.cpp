@@ -1567,7 +1567,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
 #else
-    int qed_runtime_flag = no_qed;
+    const int qed_runtime_flag = no_qed;
 #endif
 
     // Loop over the particles and update their momentum.
