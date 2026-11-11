@@ -377,12 +377,12 @@ assert gamma_fit >= gamma_theory * (1.0 - GAMMA_RTOL_LOWER), (
 fig, ax = plt.subplots()
 ax.semilogy(t, Bx_2, label=r"$\sum B_x^2$")
 ax.semilogy(t, By_2, label=r"$\sum B_y^2$")
-ax.semilogy(t, Bz_2, label=r"$\sum B_z^2$ (fitted)")
+ax.semilogy(t, Bz_2, label=r"$\sum B_z^2$")
 ax.semilogy(
     t,
     np.exp(theory_ln),
     "--",
-    label=r"cold asymptotic slope, amplitude matched",
+    label=r"$\propto e^{2 \beta \omega_p t}$",
 )
 ax.semilogy(t, np.exp(fit_ln), ":", label=r"fit to $\sum B_z^2$")
 ax.axvspan(
