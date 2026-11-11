@@ -504,8 +504,7 @@ namespace ParticleUtils {
         int pair_offset = 0;
         T_index i1 = cell_start + pair_offset;
         bool correction_failed = false;
-        bool deltaE_is_zero = false;
-        while (!deltaE_is_zero) {
+        while (true) {
 
             T_index i2 = i1 + 1;
             if (i2 == cell_stop) {
@@ -583,14 +582,13 @@ namespace ParticleUtils {
                     uyp[ indices[i2] ] -= ratio2*uy;
                     uzp[ indices[i2] ] -= ratio2*uz;
 
-                    // Update energy violation.
                     if (deltaE_finishes) {
                         deltaE = 0.0_prt;
-                        deltaE_is_zero = true;
+                        break;
                     }
-                    else {
-                        deltaE -= deltaEpair;
-                    }
+
+                    // Update energy violation.
+                    deltaE -= deltaEpair;
 
                 }
 
