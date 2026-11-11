@@ -76,7 +76,9 @@ for name, species, speed in (
 libwarpx.initialize(settings)
 if args.boundary:
     libwarpx.warpx.evolve(1)
-    raise AssertionError("Active current deposition reached the physical boundary unchecked")
+    raise AssertionError(
+        "Active current deposition reached the physical boundary unchecked"
+    )
 fields = libwarpx.warpx.multifab_register()
 blocks, boxes, covered = mesh_fields(fields, n, ratio)
 species = [ParticleContainerWrapper(name) for name in ("electrons", "protons")]
