@@ -31,11 +31,11 @@
 #include <sstream>
 #include <string>
 
+#ifdef WARPX_DIM_XZ
 using namespace amrex::literals;
 using ablastr::fields::Direction;
 using warpx::fields::FieldType;
 
-#ifdef WARPX_DIM_XZ
 namespace
 {
     constexpr char checkpoint_marker[] = "/CompositeXZSlab";
@@ -106,10 +106,8 @@ void WarpX::CheckCompositeXZCheckpoint (std::string const& directory) const
 
 void WarpX::InitCompositeXZInterface ()
 {
+#ifdef WARPX_DIM_XZ
     if (!m_composite_xz_interface) { return; }
-#ifndef WARPX_DIM_XZ
-    WARPX_ABORT_WITH_MESSAGE("composite_xz_interface requires Cartesian XZ.");
-#else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         max_level == 1 && finest_level == 1 && amrex::ParallelDescriptor::NProcs() == 1 &&
         evolve_scheme == EvolveScheme::Explicit && !m_do_subcycling &&
@@ -214,8 +212,8 @@ void WarpX::InitCompositeXZInterface ()
 
 void WarpX::CheckCompositeXZParticles ()
 {
-    if (!m_composite_xz_interface) { return; }
 #ifdef WARPX_DIM_XZ
+    if (!m_composite_xz_interface) { return; }
     auto const fine = boxArray(1).minimalBox();
     auto const h = Geom(1).CellSize(0);
     auto const left = Geom(1).ProbLo(0) + fine.smallEnd(0) * h;
@@ -258,8 +256,8 @@ void WarpX::CheckCompositeXZParticles ()
 
 void WarpX::MaskCompositeXZCoveredFields ()
 {
-    if (!m_composite_xz_interface) { return; }
 #ifdef WARPX_DIM_XZ
+    if (!m_composite_xz_interface) { return; }
     auto const fine = boxArray(1).minimalBox();
     int const rx = refRatio(0)[0];
     int const left = fine.smallEnd(0) / rx;
@@ -283,8 +281,8 @@ void WarpX::MaskCompositeXZCoveredFields ()
 
 void WarpX::SynchronizeCompositeXZMagneticTrace ()
 {
-    if (!m_composite_xz_interface) { return; }
 #ifdef WARPX_DIM_XZ
+    if (!m_composite_xz_interface) { return; }
     // There is one independent normal-B trace. Linear interpolation of Ey
     // makes both fine z differences equal to the coarse difference in exact
     // arithmetic. Repeating those subtractions on each mesh accumulates
@@ -313,8 +311,8 @@ void WarpX::SynchronizeCompositeXZMagneticTrace ()
 
 void WarpX::PrepareCompositeXZInterface ()
 {
-    if (!m_composite_xz_interface) { return; }
 #ifdef WARPX_DIM_XZ
+    if (!m_composite_xz_interface) { return; }
     MaskCompositeXZCoveredFields();
     auto const fine = boxArray(1).minimalBox();
     auto const nz = Geom(0).Domain().length(1);
@@ -364,10 +362,10 @@ void WarpX::PrepareCompositeXZInterface ()
 
 void WarpX::ApplyCompositeXZInterface (amrex::Real const a_dt)
 {
-    if (!m_composite_xz_interface) { return; }
 #ifndef WARPX_DIM_XZ
     amrex::ignore_unused(a_dt);
 #else
+    if (!m_composite_xz_interface) { return; }
     auto const fine = boxArray(1).minimalBox();
     int const fl = fine.smallEnd(0);
     int const fr = fine.bigEnd(0) + 1;

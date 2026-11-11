@@ -799,6 +799,10 @@ WarpX::InitData ()
 {
     ABLASTR_PROFILE("WarpX::InitData()");
     amrex::ParmParse("warpx").query("composite_xz_interface", m_composite_xz_interface);
+#ifndef WARPX_DIM_XZ
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_composite_xz_interface,
+        "composite_xz_interface requires Cartesian XZ.");
+#endif
 
 
     using ablastr::fields::Direction;
