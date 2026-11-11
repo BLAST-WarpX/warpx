@@ -10,6 +10,7 @@ from pywarpx import geometry, libwarpx
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--uniform", action="store_true")
+parser.add_argument("--expand-aperture", action="store_true")
 parser.add_argument("--reference", type=Path)
 parser.add_argument("--touch", choices=("material", "eb", "port"))
 args = parser.parse_args()
@@ -27,6 +28,10 @@ eb = f"max({ring},{near_join})" if args.touch == "eb" else ring
 material = f"max({ring},{near_join})" if args.touch == "material" else ring
 # The normal contour encloses the copper footprint in the gap at negative y.
 port_lo, port_hi = (-0.035, -0.0225) if args.touch == "port" else (-0.01875, -0.00625)
+# A subcell expansion leaves the same Yee nodes in an inclusive aperture.
+pad = h * 1.0e-6 if args.expand_aperture else 0.0
+port_lo, port_hi = port_lo - pad, port_hi + pad
+z_bound = 0.00625 + pad
 settings = [
     "enclosed-port",
     "geometry.dims=3",
@@ -56,10 +61,10 @@ settings = [
     "warpx.current_controlled_port=1",
     "warpx.current_controlled_port.file=coil_waveform.txt",
     "warpx.current_controlled_port.direction=0",
-    f"warpx.current_controlled_port.terminal_0.lower_bound=-0.003125 {port_lo} -0.00625",
-    f"warpx.current_controlled_port.terminal_0.upper_bound=-0.003125 {port_hi} 0.00625",
-    f"warpx.current_controlled_port.terminal_1.lower_bound=0.003125 {port_lo} -0.00625",
-    f"warpx.current_controlled_port.terminal_1.upper_bound=0.003125 {port_hi} 0.00625",
+    f"warpx.current_controlled_port.terminal_0.lower_bound=-0.003125 {port_lo} {-z_bound}",
+    f"warpx.current_controlled_port.terminal_0.upper_bound=-0.003125 {port_hi} {z_bound}",
+    f"warpx.current_controlled_port.terminal_1.lower_bound=0.003125 {port_lo} {-z_bound}",
+    f"warpx.current_controlled_port.terminal_1.upper_bound=0.003125 {port_hi} {z_bound}",
     f"warpx.const_dt={dt:.17g}",
     "max_step=6",
     "warpx.verbose=0",

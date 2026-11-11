@@ -614,40 +614,19 @@ CurrentControlledPort::BuildCurlBasis (
 
     amrex::MultiFab& axial_potential = *potential[m_direction];
     amrex::Geometry const& geometry = Geometry();
-    auto const prob_lo = geometry.ProbLoArray();
-    auto const cell_size = geometry.CellSizeArray();
-    amrex::IntVect const domain_lo = geometry.Domain().smallEnd();
-    amrex::GpuArray<amrex::Real, 3> const transverse_lo{
-        m_terminal_0.lo[0], m_terminal_0.lo[1], m_terminal_0.lo[2]};
-    amrex::GpuArray<amrex::Real, 3> const transverse_hi{
-        m_terminal_0.hi[0], m_terminal_0.hi[1], m_terminal_0.hi[2]};
-    amrex::IntVect const index_type = axial_potential.ixType().toIntVect();
-    int const axis = m_direction;
-
-    for (amrex::MFIter mfi(axial_potential); mfi.isValid(); ++mfi) {
-        amrex::Box const& box = mfi.validbox();
-        auto const values = axial_potential.array(mfi);
-        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-            int const index[3] = {i, j, k};
-            bool inside = true;
-            for (int direction = 0; direction < 3; ++direction) {
-                if (direction == axis) {
-                    continue;
-                }
-                amrex::Real const offset =
-                    index_type[direction] == 1 ? 0.0_rt : 0.5_rt;
-                amrex::Real const coordinate =
-                    prob_lo[direction] +
-                    (index[direction] - domain_lo[direction] + offset) *
-                        cell_size[direction];
-                inside = inside && coordinate >= transverse_lo[direction] &&
-                         coordinate <= transverse_hi[direction];
-            }
-            if (inside) {
-                values(i, j, k) = 1.0_rt;
-            }
-        });
+    // Build the support from the same inclusive Yee indices as the measured
+    // contour. Reconstructing physical coordinates in the device kernel can
+    // include or omit an exactly aligned node depending on multiply-add rounding.
+    auto aperture = amrex::convert(geometry.Domain(), axial_potential.ixType());
+    for (int direction = 0; direction < 3; ++direction) {
+        if (direction != m_direction) {
+            auto const range = index_range(geometry, axial_potential, direction,
+                                           m_terminal_0.lo[direction], m_terminal_0.hi[direction]);
+            aperture.setSmall(direction, range[0]);
+            aperture.setBig(direction, range[1]);
+        }
     }
+    axial_potential.setVal(1.0_rt, aperture, 0);
     for (auto& component : potential) {
         component->FillBoundary(geometry.periodicity());
     }
