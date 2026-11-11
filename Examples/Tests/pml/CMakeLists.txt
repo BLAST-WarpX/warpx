@@ -325,6 +325,24 @@ add_warpx_test(
 )
 
 if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
+    add_warpx_test(
+        test_rz_radial_fixed_shape_vacuum_picmi
+        RZ
+        1
+        "inputs_test_rz_radial_interface_picmi.py --polarization bz --direction out --fixed-vacuum"
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_rz_radial_fixed_shape_vacuum_picmi_restart
+        RZ
+        1
+        "inputs_test_rz_radial_interface_picmi.py --polarization bz --direction out --fixed-vacuum --restart ../test_rz_radial_fixed_shape_vacuum_picmi/diags/chk000144 --reference ../test_rz_radial_fixed_shape_vacuum_picmi/radial_fields.npz"
+        OFF
+        OFF
+        test_rz_radial_fixed_shape_vacuum_picmi
+    )
     foreach(shape IN ITEMS 1 2 3)
         set(crossing_options "")
         if(shape EQUAL 3)

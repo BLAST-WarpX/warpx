@@ -2,6 +2,7 @@
 """Send an axisymmetric vacuum pulse across a full-length radial Yee join."""
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 
@@ -13,6 +14,7 @@ parser.add_argument("--polarization", choices=("bz", "bt"), required=True)
 parser.add_argument("--restart")
 parser.add_argument("--reference")
 parser.add_argument("--ordinary-restart", action="store_true")
+parser.add_argument("--fixed-vacuum", action="store_true")
 parser.add_argument("--particle-at-interface", action="store_true")
 args = parser.parse_args()
 c = picmi.constants.c
@@ -41,6 +43,7 @@ sim = picmi.Simulation(
         grid=grid,
         method="Yee",
         warpx_conforming_radial_interface=not args.ordinary_restart,
+        warpx_conforming_radial_fixed_shape=args.fixed_vacuum,
     ),
     max_steps=steps,
     time_step_size=dt,
@@ -99,6 +102,8 @@ if not args.restart:
             values[...] = initial(r, kind).reshape((-1,) + (1,) * (values.ndim - 1))
             mf[...] = values
 sim.step(steps // 2 if args.restart else steps)
+if args.fixed_vacuum:
+    assert Path(f"diags/chk{steps:06d}/RadialFixedShape").is_file()
 
 # Independent radial Yee solve on a globally fine mesh. The sampled region and
 # flight time keep the pulse clear of the radial conducting reference boundary.

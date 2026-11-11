@@ -192,7 +192,8 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& w) {
     auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
     for (int d = 0; d < 3; ++d) {
         amrex::BoxArray const ba(amrex::convert(domain, fine[d]->ixType()));
-        raw[d] = std::make_unique<amrex::MultiFab>(ba, dm, 1, source_halo);
+        raw[d] = w.m_fields.alloc_init(raw_name, ablastr::fields::Direction{d}, 1,
+                                      ba, dm, 1, source_halo, 0._rt, false, false, false);
         if (WarpX::use_filter) {
             filtered[d] = std::make_unique<amrex::MultiFab>(ba, dm, 1, source_halo);
         }
@@ -283,7 +284,6 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
     });
     auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
     auto const coarse = w.m_fields.get_alldirs(FieldType::current_fp, 0);
-    auto const cp = w.m_fields.get_alldirs(FieldType::current_cp, 1);
     auto const r = w.refRatio(0);
     Real const density_scale = 1._rt / (r[0] * r[1] * r[2]);
     for (int d = 0; d < 3; ++d) {
@@ -291,7 +291,9 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
             w.bilinear_filter.ApplyStencil(*filtered[d], *raw[d], 1);
         }
         auto const& source = filtered[d] ? *filtered[d] : *raw[d];
-        fine[d]->ParallelCopy(source, 0, 0, 1, 0, 0);
+        // Native sources have already been synchronized and filtered. Add the
+        // kinetic contribution on each leaf after projecting the virtual current.
+        fine[d]->ParallelAdd(source);
         auto const arr = source.const_array(0);
         auto const mask = fine_owns[d]->const_array(0);
         auto const dom = source[0].box();
@@ -323,10 +325,9 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
                             }
                         }
                     }
-                    dest(i, j_, k) = density_scale * sum;
+                    dest(i, j_, k) += density_scale * sum;
                 });
         }
-        cp[d]->setVal(0._rt);
     }
 }
 

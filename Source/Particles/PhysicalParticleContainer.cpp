@@ -8,6 +8,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_3D
+#   include "FieldSolver/FixedShapeCurrent.H"
+#endif
 #ifdef WARPX_DIM_RZ
 #   include "FieldSolver/RadialParticleCoupling.H"
 #endif
@@ -557,6 +560,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         !do_not_deposit
     );
     bool const deposit_current = (
+#ifdef WARPX_DIM_3D
+        !fields.has_vector(FixedShapeCurrent::raw_name, 1) &&
+#endif
 #ifdef WARPX_DIM_RZ
         !warpx::radial_particles::enabled(fields) &&
 #endif

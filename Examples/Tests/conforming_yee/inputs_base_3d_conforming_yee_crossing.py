@@ -3,15 +3,16 @@
 import argparse
 
 import numpy as np
-from native_yee_mesh import host, mesh_fields
+from native_yee_mesh import host, mesh_fields, native_blocks
 
-from pywarpx import geometry, libwarpx
+from pywarpx import callbacks, geometry, libwarpx
 from pywarpx.particle_containers import ParticleContainerWrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--inward", action="store_true")
 parser.add_argument("--frozen", action="store_true")
 parser.add_argument("--boundary", action="store_true")
+parser.add_argument("--native-source", action="store_true")
 args = parser.parse_args()
 n = 32
 length = 0.1
@@ -80,6 +81,31 @@ if args.boundary:
         "Active current deposition reached the physical boundary unchecked"
     )
 fields = libwarpx.warpx.multifab_register()
+if args.native_source:
+    # Both sample points are away from the moving charges and grid-box faces.
+    # A native callback can supply additional physical current on either leaf.
+    samples = ((0, (4, 5, 6), 0.125), (1, (33, 31, 17), 0.25))
+
+    def source_entry(level, index):
+        found = []
+        for lo, hi, values in native_blocks(fields, level, "j", 1):
+            if np.all(lo <= index) and np.all(index <= hi):
+                found.append((values, tuple(index - lo)))
+        assert len(found) == 1
+        return found[0]
+
+    def add_source():
+        for lev, index, amplitude in samples:
+            view, i = source_entry(lev, index)
+            view[i] += amplitude
+
+    callbacks.installafterdeposition(add_source)
+    libwarpx.warpx.evolve(1)
+    for lev, index, amplitude in samples:
+        view, i = source_entry(lev, index)
+        np.testing.assert_allclose(host(view)[i], amplitude, rtol=1.0e-13, atol=0)
+    libwarpx.finalize()
+    raise SystemExit(0)
 blocks, boxes, covered = mesh_fields(fields, n, ratio)
 species = [ParticleContainerWrapper(name) for name in ("electrons", "protons")]
 if args.frozen:

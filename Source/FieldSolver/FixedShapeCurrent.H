@@ -16,12 +16,14 @@ class WarpX;
 // finest-spacing lattice. The electromagnetic solve remains on the two leaves.
 class FixedShapeCurrent {
   public:
+    static constexpr char const* raw_name = "composite_yee_fixed_J";
     explicit FixedShapeCurrent (WarpX& warpx);
     void Assemble (WarpX& warpx, amrex::Real dt);
     void UpdateGather (WarpX& warpx);
 
   private:
-    std::array<std::unique_ptr<amrex::MultiFab>, 3> raw, filtered;
+    std::array<amrex::MultiFab*, 3> raw{};
+    std::array<std::unique_ptr<amrex::MultiFab>, 3> filtered;
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> fine_owns;
     amrex::iMultiFab valid_centers;
     std::array<std::array<std::unique_ptr<amrex::MultiFab>, 3>, 2>

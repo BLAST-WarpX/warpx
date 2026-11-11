@@ -107,6 +107,15 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
             OFF
         )
     endforeach()
+    add_warpx_test(
+        test_3d_conforming_yee_fixed_vacuum
+        3
+        1
+        "inputs_base_3d_conforming_yee.py --layout box --fixed-vacuum"
+        OFF
+        OFF
+        OFF
+    )
     set(invalid_gather "gathering requires the matching fixed-shape current")
     set(invalid_current "current requires the 3D conforming Yee interface")
     set(invalid_cleaning "disabled divergence cleaning")
@@ -126,8 +135,9 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
     set(crossing_outward "")
     set(crossing_inward "--inward")
     set(crossing_frozen "--frozen")
+    set(crossing_native_source "--native-source")
     set(crossing_boundary "--boundary")
-    foreach(direction IN ITEMS outward inward frozen boundary)
+    foreach(direction IN ITEMS outward inward frozen boundary native_source)
         add_warpx_test(
             test_3d_conforming_yee_crossing_${direction}
             3

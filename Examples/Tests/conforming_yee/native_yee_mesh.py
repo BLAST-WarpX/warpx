@@ -4,7 +4,8 @@ import numpy as np
 
 
 def native_blocks(fields, level, family, direction):
-    field = fields.get(f"{family}field_fp", dir="xyz"[direction], level=level)
+    name = "current_fp" if family == "j" else f"{family}field_fp"
+    field = fields.get(name, dir="xyz"[direction], level=level)
     blocks = []
     for mfi in field:
         box = mfi.validbox()

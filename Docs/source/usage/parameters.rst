@@ -990,8 +990,10 @@ Setting up the field mesh
     extends into guard cells on its last push. Other outer boundaries require
     the particle stencil to remain inside the domain. Esirkepov deposition
     requires clearance from both material and physical boundaries.
-    This implementation allocates temporary arrays at the fine spacing across
-    the domain.
+    With kinetic species, temporary current arrays span the domain at the
+    fine spacing. WarpX adds the projected kinetic current to independent
+    native sources, including current supplied by an ``afterdeposition``
+    callback. A species-free vacuum run skips the kinetic allocation.
 
 .. pp:param:: warpx.composite_yee_fixed_shape_gather
     :type: bool

@@ -11,6 +11,7 @@ from pywarpx import geometry, libwarpx
 parser = argparse.ArgumentParser()
 parser.add_argument("--layout", choices=("box", "stepped"), required=True)
 parser.add_argument("--absorber", action="store_true")
+parser.add_argument("--fixed-vacuum", action="store_true")
 parser.add_argument("--restart", type=Path)
 parser.add_argument("--invalid", choices=("gather", "current", "cleaning"))
 args = parser.parse_args()
@@ -70,6 +71,13 @@ if args.absorber:
             "chk.format=checkpoint",
             "chk.file_prefix=diags/checkpoint",
             "chk.intervals=60,120",
+        ]
+    )
+if args.fixed_vacuum:
+    settings.extend(
+        [
+            "warpx.composite_yee_fixed_shape_current=1",
+            "warpx.composite_yee_fixed_shape_gather=1",
         ]
     )
 if args.restart:

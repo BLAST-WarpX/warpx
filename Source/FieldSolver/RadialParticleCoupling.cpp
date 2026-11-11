@@ -116,22 +116,23 @@ initialize (WarpX& w, std::string const& restart) {
     if (!requested) {
         return;
     }
+    auto& populations = w.GetPartContainer();
+    bool const kinetic = populations.nSpecies() != 0;
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         w.usesConformingRadialInterface() &&
             w.field_gathering_algo == GatheringAlgo::EnergyConserving &&
-            WarpX::current_deposition_algo ==
-                CurrentDepositionAlgo::Esirkepov &&
-            WarpX::nox >= 1 && WarpX::nox <= 3 && !w.do_current_centering &&
+            (!kinetic || (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov &&
+                          WarpX::nox >= 1 && WarpX::nox <= 3)) && !w.do_current_centering &&
             (!WarpX::use_filter || WarpX::filter_npass_each_dir[0] == 0) &&
             !w.DoFluidSpecies() && w.GetPartContainer().nLasers() == 0,
         "Radial fixed-shape coupling requires a joined (2,1) Yee bore, "
         "energy-conserving "
         "gather, linear through cubic Esirkepov deposition and at most axial "
         "filtering.");
+    if (!kinetic) { return; }
     if (from_guarded) {
         check_guarded_restart(w);
     }
-    auto& populations = w.GetPartContainer();
     for (int s = 0; s < populations.nSpecies(); ++s) {
         auto& pc = populations.GetParticleContainer(s);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -165,9 +166,9 @@ initialize (WarpX& w, std::string const& restart) {
 
 void
 write_identity (WarpX& w, std::string const& directory) {
-    if (!enabled(w.m_fields)) {
-        return;
-    }
+    bool requested = false;
+    amrex::ParmParse("warpx").query("conforming_radial_fixed_shape", requested);
+    if (!requested || !w.usesConformingRadialInterface()) { return; }
     std::ofstream file(std::filesystem::path(directory) / identity_file);
     file << identity();
     file.close();

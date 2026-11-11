@@ -6,6 +6,7 @@
 
 #include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
@@ -557,7 +558,7 @@ struct CompositeYeeSurface::Implementation {
         bool use_fixed_shape = false;
         amrex::ParmParse("warpx").query("composite_yee_fixed_shape_current",
                                         use_fixed_shape);
-        if (use_fixed_shape) {
+        if (use_fixed_shape && w.GetPartContainer().nContainers() != 0) {
             fixed_shape_current = std::make_unique<FixedShapeCurrent>(w);
         }
         Coverage const covered(w);
