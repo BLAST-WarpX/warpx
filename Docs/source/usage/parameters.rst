@@ -989,9 +989,10 @@ Setting up the field mesh
     The solver deposits a charge-conserving current on a full-domain finest
     mesh, applies the requested binomial filter there and transfers the source
     to the two physical grids. Field gathering uses the matching interpolation.
-    Independently deposited sources on either native grid are added to the
-    transferred kinetic current. Memory for the temporary kinetic fields scales
-    with the full finest mesh.
+    A prescribed particle trajectory uses the same full-domain deposit, including
+    when its shape overlaps a refinement face. Currents deposited directly onto
+    either native grid by a callback are added to the transferred trajectory
+    current. Memory for the temporary fields scales with the full finest mesh.
 
     This option supports fixed species charge, shape orders one through three,
     and Esirkepov or Villasenor deposition. Particles may cross periodic seams.

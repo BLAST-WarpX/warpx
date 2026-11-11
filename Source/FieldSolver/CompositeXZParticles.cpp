@@ -54,19 +54,25 @@ namespace {
 
 void WarpX::InitCompositeXZParticleCoupling ()
 {
-    // Independent sources deposit on their native grids. Only kinetic species
-    // use the finest-spacing current and gather below.
-    if (mypc->nSpecies() == 0) { return; }
+    if (mypc->nContainers() == 0) { return; }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         nox >= 1 && nox <= 3 &&
         (current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
          current_deposition_algo == CurrentDepositionAlgo::Villasenor),
-        "Fixed-shape XZ coupling requires ordinary kinetic species and charge-conserving deposition.");
+        "Fixed-shape XZ coupling requires shape order one through three and charge-conserving deposition.");
     for (int s = 0; s < mypc->nSpecies(); ++s) {
         auto const& pc = mypc->GetParticleContainer(s);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             typeid(pc) == typeid(PhysicalParticleContainer),
             "Fixed-shape XZ coupling requires ordinary particles with fixed species charge.");
+    }
+    // A prescribed trajectory can span a slab face even if its marker stays on
+    // one leaf. Deposit its entire shape before restricting to the two meshes.
+    for (int s = mypc->nSpecies(); s < mypc->nContainers(); ++s) {
+        auto& pc = mypc->GetParticleContainer(s);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            pc.DeferTrajectoryCurrent(),
+            "Fixed-shape XZ coupling requires an explicit fixed-charge trajectory for this source.");
     }
     auto const domain = Geom(1).Domain();
     auto const pass = use_filter ? filter_npass_each_dir : amrex::IntVect(0);
@@ -108,7 +114,7 @@ void WarpX::AssembleCompositeXZCurrent (amrex::Real a_dt)
         raw[d]->setVal(0._rt);
         current[d] = raw[d]->array(0);
     }
-    for (int s = 0; s < mypc->nSpecies(); ++s) {
+    for (int s = 0; s < mypc->nContainers(); ++s) {
         auto& pc = mypc->GetParticleContainer(s);
         if (!pc.isPushed() || pc.do_not_deposit || pc.getCharge() == 0._rt) { continue; }
         for (int lev = 0; lev <= 1; ++lev) {
@@ -140,7 +146,7 @@ void WarpX::AssembleCompositeXZCurrent (amrex::Real a_dt)
         auto* fine = m_fields.get(FieldType::current_fp, dir, 1);
         auto* coarse = m_fields.get(FieldType::current_fp, dir, 0);
         // Native sources (including afterdeposition callbacks) have already
-        // been synchronized. Add only the kinetic contribution to each leaf.
+        // been synchronized. Add the trajectory contribution to each leaf.
         fine->ParallelAdd(*source);
         auto const jf = source->const_array(0);
         auto const jc = coarse->array(0);
