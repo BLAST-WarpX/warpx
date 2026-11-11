@@ -346,7 +346,7 @@ namespace detail
         }
     }
 
-    /** \brief Check if a field name is a per-species field of the form <prefix><species>
+    /** \brief Check if a field name is a per-species field of the form `<prefix><species>`
      *
      * @param[in] field_name    name of the field, without mesh-refinement level suffix
      * @param[in] prefix        expected prefix, e.g., "T_"
@@ -362,20 +362,27 @@ namespace detail
             utils::algorithms::is_in(species_names, field_name.substr(prefix.size()));
     }
 
-    /** \brief Check if a field name is a per-direction species temperature T<dir>_<species>
+    /** \brief Check if a field name is a per-direction species temperature `T<dir>_<species>`
      *
      * These are deposited for the hybrid-PIC solver. The direction labels are
-     * those of FullDiagnostics: x,y,z in Cartesian, r,t,z in RZ/RCYLINDER, r,t,p in RSPHERE.
+     * those that FullDiagnostics uses for the geometry of this build:
+     * x,y,z in Cartesian, r,t,z in RZ/RCYLINDER, r,t,p in RSPHERE.
      *
      * @param[in] field_name    name of the field, without mesh-refinement level suffix
      * @param[in] species_names names of all particle species in the simulation
-     * @return true if field_name is T<dir>_<species>
+     * @return true if field_name is `T<dir>_<species>`
      */
     inline bool
     isPerDirectionTemperature ( std::string const & field_name,
                                 std::vector<std::string> const & species_names )
     {
-        constexpr std::string_view directions = "xyzrtp";
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        constexpr std::string_view directions = "rtz";
+#elif defined(WARPX_DIM_RSPHERE)
+        constexpr std::string_view directions = "rtp";
+#else
+        constexpr std::string_view directions = "xyz";
+#endif
         return std::any_of(directions.begin(), directions.end(),
             [&](char const dir) {
                 return isPerSpeciesField(field_name, std::string{'T', dir, '_'}, species_names);
@@ -388,8 +395,10 @@ namespace detail
      * Temperatures are matched by exact name (prefix plus species name), not by
      * a "T" prefix alone, so that other fields starting with "T" are not tagged.
      * Fields are only identified by name: a user-defined particle field named
-     * like a temperature output (e.g., "T", written as "T_<species>") will be
-     * tagged as a temperature, too.
+     * like a temperature output (e.g., `T`, written as `T_<species>`) will be
+     * tagged as a temperature, too. For `T_<species>`, this includes the
+     * unitSI of q_e/k_B, so readers that apply unitSI scale the values of such
+     * a user-defined field by about 11604.5.
      *
      * @param[in] mesh          openPMD mesh record of the field
      * @param[in] mesh_comp     openPMD mesh record component of the field
