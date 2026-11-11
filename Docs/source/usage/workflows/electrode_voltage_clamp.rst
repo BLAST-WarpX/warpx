@@ -137,6 +137,9 @@ What it does not do
 * It is available from Python only; there is no inputs-file interface yet.
 * Cartesian geometries (XZ, 3D), PMC and open (absorbing) field boundaries are not supported yet.
 * Each correction costs one charge deposition, one nodal divergence and a few reductions; the unit potentials are solved once, at setup.
+  These setup solves use the multigrid options of the electrostatic solver (:pp:param:`warpx.self_fields_max_coarsening_level` and the bottom-solver options next to it), set from Python before ``initialize_warpx()``, e.g. ``pywarpx.warpx.self_fields_max_coarsening_level = 2``.
+  Unless :pp:param:`warpx.self_fields_max_coarsening_level` is set, they coarsen only once, because deeper multigrid levels lose thin conductors and the solve then fails to converge.
+  This favors a solve that always converges over a fast one; for large grids, a deeper cap or another bottom solver (:pp:param:`warpx.self_fields_bottom_solver`) can be faster.
 
 Examples and tests
 ------------------

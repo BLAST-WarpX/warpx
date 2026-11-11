@@ -16,6 +16,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MLMGOptions.H>
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_GpuLaunch.H>
@@ -352,8 +353,25 @@ namespace
         // and the face and boundary data
         auto const factory = amrex::makeEBFabFactory(&index, geom, warpx.boxArray(lev),
             warpx.DistributionMap(lev), {1, 1, 1}, amrex::EBSupport::full);
+        // Multigrid hierarchy and bottom solve from the warpx.self_fields_* options, which
+        // are shared with the electrostatic solver; the tolerance and iteration cap come
+        // from the caller, and the verbosity stays at the MLMG default. Unless the user sets
+        // warpx.self_fields_max_coarsening_level, coarsen only once: the conductors enter
+        // only through the overset mask, and the solve fails to converge once coarse cells
+        // are wider than a conductor (seen with 3 or more coarsenings of a rod 6.6 cells
+        // in radius). This solve runs once per conductor, so robustness is preferred over speed;
+        // a cap derived from the conductor size, or another bottom solver, may be faster.
+        constexpr int default_max_coarsening_level = 1;
+        auto mlmg_options = warpx.GetElectrostaticSolver().m_mlmg_options;
+        mlmg_options.max_iters = max_iter;
+        mlmg_options.verbosity = 1;
+        if (mlmg_options.max_coarsening_level < 0) {
+            mlmg_options.max_coarsening_level = default_max_coarsening_level;
+        }
+        amrex::LPInfo info;
+        ablastr::fields::applyMLMGOptions(info, mlmg_options);
         amrex::MLEBNodeFDLaplacian linop({geom}, {warpx.boxArray(lev)},
-            {warpx.DistributionMap(lev)}, amrex::LPInfo{}, {factory.get()});
+            {warpx.DistributionMap(lev)}, info, {factory.get()});
         // Vacuum Laplacian in cylindrical coordinates: div(sigma grad phi) with sigma = 1
         linop.setRZ(true);
         linop.setSigma({1._rt, 1._rt});
@@ -365,7 +383,7 @@ namespace
         linop.setDomainBC(bc.lobc, bc.hibc);
         linop.setOversetMask(lev, overset);
         amrex::MLMG mlmg(linop);
-        mlmg.setMaxIter(max_iter);
+        ablastr::fields::applyMLMGOptions(mlmg, mlmg_options);
         amrex::Real const residual = mlmg.solve({&phi}, {&rhs}, rtol, 0._rt);
         phi.FillBoundary(period);
 
