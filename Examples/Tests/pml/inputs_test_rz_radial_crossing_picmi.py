@@ -10,6 +10,7 @@ from pywarpx.particle_containers import ParticleContainerWrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--inward", action="store_true")
+parser.add_argument("--low-seam", action="store_true")
 parser.add_argument("--shape", type=int, choices=(1, 2, 3), default=3)
 parser.add_argument("--filter", action="store_true")
 parser.add_argument("--restart", type=Path)
@@ -19,6 +20,7 @@ geometry.dims = "RZ"
 n, nz, radius, length = 32, 24, 0.08, 0.048
 h, dz = radius / (2 * n), length / nz
 velocity = -0.38 if args.inward else 0.38
+z_direction = -1 if args.low_seam else 1
 dt = 0.45 * h / 299792458.0
 steps = 64
 settings = [
@@ -51,8 +53,8 @@ settings = [
     "particles.species_names=ions",
     "ions.species_type=proton",
     "ions.injection_style=singleparticle",
-    f"ions.single_particle_pos={radius / 2 + (4 if args.inward else -4) * h} 0 {length * 0.41}",
-    f"ions.single_particle_u={velocity} 0.13 0.28",
+    f"ions.single_particle_pos={radius / 2 + (4 if args.inward else -4) * h} 0 {z_direction * length * 0.41}",
+    f"ions.single_particle_u={velocity} 0.13 {z_direction * 0.28}",
     "ions.single_particle_weight=1e7",
     f"warpx.const_dt={dt:.17g}",
     "warpx.verbose=0",

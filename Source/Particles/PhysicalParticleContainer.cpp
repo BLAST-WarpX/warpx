@@ -13,6 +13,7 @@
 #endif
 #include "PhysicalParticleContainer.H"
 
+#include "FieldSolver/FixedShapeGather.H"
 #include "Fields.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/PlasmaInjector.H"
@@ -48,7 +49,6 @@
 #   include "EmbeddedBoundary/ParticleScraper.H"
 #endif
 #include "WarpX.H"
-#include "FieldSolver/FixedShapeCurrent.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -1241,11 +1241,10 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
     if (do_not_push) { return; }
 
-    auto& warpx=WarpX::GetInstance();
-    std::array<amrex::MultiFab const*,6> const requested{&Ex,&Ey,&Ez,&Bx,&By,&Bz};
-    auto const fixed=get_fixed_shape_gather(warpx,lev,&requested);
-    auto const gather_lev=fixed ? 1 : lev;
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    std::array<amrex::MultiFab const*, 6> const requested{&Ex, &Ey, &Ez, &Bx, &By, &Bz};
+    auto const fixed = get_fixed_shape_gather(WarpX::GetInstance(), lev, &requested);
+    int const gather_lev = fixed ? 1 : lev;
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev, 0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -1442,15 +1441,17 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // If no particles, do not do anything
     if (np_to_push == 0) { return; }
 
-    // Get cell size on gather_lev
-    auto& warpx=WarpX::GetInstance();
-    auto const fixed=get_fixed_shape_gather(warpx,lev);
-    const int force_lev=fixed ? 1 : gather_lev;
-    if(fixed) {
-        std::tie(exfab,eyfab,ezfab,bxfab,byfab,bzfab)=std::tie(fixed.fields[0],fixed.fields[1],fixed.fields[2],
-            fixed.fields[3],fixed.fields[4],fixed.fields[5]);
+    auto const fixed = get_fixed_shape_gather(WarpX::GetInstance(), lev);
+    int const force_lev = fixed ? 1 : gather_lev;
+    if (fixed) {
+        exfab = fixed.fields[0];
+        eyfab = fixed.fields[1];
+        ezfab = fixed.fields[2];
+        bxfab = fixed.fields[3];
+        byfab = fixed.fields[4];
+        bzfab = fixed.fields[5];
     }
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(force_lev,0));
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(force_lev, 0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.

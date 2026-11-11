@@ -214,9 +214,7 @@ update_gather (WarpX& w) {
 
 ablastr::fields::MultiLevelVectorField
 deposit (WarpX& w, Real dt) {
-    auto const box = w.Geom(1).Domain();
     auto const dinv = WarpX::InvCellSize(1);
-    auto const lower = WarpX::LowerCorner(box, 1, 0._rt);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         dt * PhysConst::c * amrex::max(dinv.x, dinv.z) <= 1._rt,
         "The radial fixed-shape trajectory must move at most one fine cell per "
@@ -224,6 +222,11 @@ deposit (WarpX& w, Real dt) {
     ablastr::fields::MultiLevelVectorField levels(2);
     auto& current = levels[1];
     current = w.m_fields.get_alldirs(raw_name, 1);
+    // Keep the cylindrical axis at r = 0 and include the axial guards so
+    // deposition through the low axial boundary uses positive local indices.
+    auto box = w.Geom(1).Domain();
+    box.grow(1, current[0]->nGrowVect()[1]);
+    auto const lower = WarpX::LowerCorner(box, 1, 0._rt);
     for (auto* field : current) {
         field->setVal(0._rt);
     }

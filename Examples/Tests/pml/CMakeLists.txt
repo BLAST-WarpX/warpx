@@ -340,6 +340,17 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
             OFF
         )
     endforeach()
+    foreach(shape IN ITEMS 1 3)
+        add_warpx_test(
+            test_rz_radial_low_periodic_${shape}_picmi
+            RZ
+            1
+            "inputs_test_rz_radial_crossing_picmi.py --shape ${shape} --low-seam"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
     add_warpx_test(
         test_rz_radial_fixed_shape_3_picmi_restart
         RZ
