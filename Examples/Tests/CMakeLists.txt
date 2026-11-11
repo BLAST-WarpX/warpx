@@ -1,6 +1,7 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+add_subdirectory(conforming_xz)
 add_subdirectory(accelerator_lattice)
 add_subdirectory(boosted_diags)
 add_subdirectory(boundaries)

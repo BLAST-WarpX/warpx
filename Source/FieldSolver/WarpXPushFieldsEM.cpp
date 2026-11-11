@@ -952,7 +952,10 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real st
         EvolveB(lev, a_dt, subcycling_half, start_time);
     }
 
+    SynchronizeCompositeXZMagneticTrace();
+
     // Allow execution of Python callback after B-field push
+    MaskCompositeXZCoveredFields();
     ExecutePythonCallback("afterBpush");
 }
 
@@ -961,7 +964,7 @@ WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex
 {
     ABLASTR_PROFILE("WarpX::EvolveB()");
     EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
-    if (lev > 0)
+    if (lev > 0 && !m_composite_xz_interface)
     {
         EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time);
     }
@@ -1008,6 +1011,7 @@ WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
     }
 
     // Allow execution of Python callback after E-field push
+    ApplyCompositeXZInterface(a_dt);
     ExecutePythonCallback("afterEpush");
 }
 
@@ -1016,7 +1020,7 @@ WarpX::EvolveE (int lev, amrex::Real a_dt, amrex::Real start_time)
 {
     ABLASTR_PROFILE("WarpX::EvolveE()");
     EvolveE(lev, PatchType::fine, a_dt, start_time);
-    if (lev > 0)
+    if (lev > 0 && !m_composite_xz_interface)
     {
         EvolveE(lev, PatchType::coarse, a_dt, start_time);
     }

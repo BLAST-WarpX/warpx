@@ -956,6 +956,27 @@ Setting up the field mesh
     This patch is rectangular, and thus its extent is given here by the coordinates
     of the lower corner (:pp:param:`warpx.fine_tag_lo`) and upper corner (:pp:param:`warpx.fine_tag_hi`).
 
+.. pp:param:: warpx.composite_xz_interface
+    :type: ``bool``
+    :default: ``0``
+
+    Use a two-sided explicit Yee update for a static Cartesian XZ slab. The fine
+    slab spans periodic z and has two interior x faces. The normal magnetic
+    flux and tangential electric fields are shared there. Coarse and fine
+    magnetic circulations drive one electric update using the dual volumes
+    of the adjacent cells. Only the physical x boundary can carry an absorber.
+
+    The current implementation uses one rank and one box per level. It supports
+    square finest cells, refinement ratios (2, 1), (1, 2) and (2, 2), and
+    periodic or PML outer x boundaries. Use energy-conserving field gathering
+    with zero gather and current buffers. A run may contain kinetic
+    particles with shape orders one through three on either mesh. Their full
+    deposition and gather stencils must remain outside the interface collar.
+    The solver checks this condition as particles advance. Checkpoint restarts
+    preserve the interface, refinement ratio and particle shape. Materials,
+    divergence cleaning and current filtering require additional interface operators.
+
+
 .. pp:param:: warpx.ref_patch_function(x,y,z)
     :type: ``string``
     :optional:

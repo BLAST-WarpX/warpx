@@ -687,6 +687,16 @@ public:
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
 
+    // Two-sided Yee update for a full-length XZ refinement slab.
+    void WriteCompositeXZCheckpoint (std::string const& directory) const;
+    void CheckCompositeXZCheckpoint (std::string const& directory) const;
+    void InitCompositeXZInterface ();
+    void PrepareCompositeXZInterface ();
+    void ApplyCompositeXZInterface (amrex::Real a_dt);
+    void SynchronizeCompositeXZMagneticTrace ();
+    void MaskCompositeXZCoveredFields ();
+    void CheckCompositeXZParticles ();
+
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
     void FillBoundaryE   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -1171,6 +1181,11 @@ protected:
     void ClearLevel (int lev) final;
 
 private:
+    bool m_composite_xz_interface = false;
+    amrex::Gpu::DeviceVector<amrex::Real> m_composite_xz_inverse_y;
+    amrex::Gpu::DeviceVector<amrex::Real> m_composite_xz_boundary;
+    amrex::Gpu::DeviceVector<amrex::Real> m_composite_xz_rhs;
+
 
     /**
      * \brief

@@ -616,6 +616,8 @@ WarpX::OneStep_nosub (
 
     ExecutePythonCallback("beforeEsolve");
 
+    PrepareCompositeXZInterface();
+
     // Push E and B from {n} to {n+1}
     // (And update guard cells immediately afterwards)
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -1503,6 +1505,9 @@ WarpX::PushParticlesandDeposit (
     ImplicitOptions const * implicit_options
 )
 {
+    // Check after all deposition/collision callbacks, immediately before gathering.
+    CheckCompositeXZParticles();
+
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {

@@ -1557,6 +1557,10 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     pml_ncell: int | None = Field(
         default=None, description="The depth of the PML, in number of cells"
     )
+    composite_xz_interface: bool | None = Field(
+        default=None,
+        description="Use the two-sided Yee interface for a Cartesian XZ refinement slab spanning periodic z.",
+    )
     # option name (warpx_periodic_single_box_fft) differs from the field name:
     psatd_periodic_single_box_fft: bool | None = Field(
         default=None,
@@ -1611,6 +1615,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         self.grid.grid_initialize_inputs()
 
         pywarpx.warpx.pml_ncell = self.pml_ncell
+        pywarpx.warpx.composite_xz_interface = self.composite_xz_interface
 
         if self.method == "PSATD":
             pywarpx.psatd.periodic_single_box_fft = self.psatd_periodic_single_box_fft

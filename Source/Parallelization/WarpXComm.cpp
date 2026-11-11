@@ -639,11 +639,27 @@ WarpX::UpdateAuxiliaryDataSameType ()
     ablastr::fields::MultiLevelVectorField const Efield_aux = m_fields.get_mr_levels_alldirs(FieldType::Efield_aux, finest_level);
     ablastr::fields::MultiLevelVectorField const Bfield_aux = m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level);
 
+    if (m_composite_xz_interface) {
+        CheckCompositeXZParticles();
+        MaskCompositeXZCoveredFields();
+    }
+
     // Level 0 copies fine to aux. In some configurations aux and fine fields are aliases,
     // and MultiFab::Copy detects that and does nothing.
     CopyLevelZeroAuxiliaryData(m_fields, Efield_aux, Efield_fp, FieldType::Efield_avg_fp, ng_src);
     CopyLevelZeroAuxiliaryData(m_fields, Bfield_aux, Bfield_fp, FieldType::Bfield_avg_fp, ng_src);
 
+    if (m_composite_xz_interface) {
+        for (int direction = 0; direction < 3; ++direction) {
+            MultiFab::Copy(*Efield_aux[1][direction], *Efield_fp[1][direction],
+                          0, 0, Efield_aux[1][direction]->nComp(),
+                          Efield_aux[1][direction]->nGrowVect());
+            MultiFab::Copy(*Bfield_aux[1][direction], *Bfield_fp[1][direction],
+                          0, 0, Bfield_aux[1][direction]->nComp(),
+                          Bfield_aux[1][direction]->nGrowVect());
+        }
+        return;
+    }
     // Refined levels add the coarse-patch correction through the same helper for B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {

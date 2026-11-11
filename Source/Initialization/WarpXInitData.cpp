@@ -798,6 +798,8 @@ void
 WarpX::InitData ()
 {
     ABLASTR_PROFILE("WarpX::InitData()");
+    amrex::ParmParse("warpx").query("composite_xz_interface", m_composite_xz_interface);
+
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -834,11 +836,14 @@ WarpX::InitData ()
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
+        InitCompositeXZInterface();
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
+        CheckCompositeXZCheckpoint(restart_chkfile);
+        InitCompositeXZInterface();
         ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();
@@ -1101,6 +1106,12 @@ WarpX::InitPML ()
             // Note: fill_guards_fields and fill_guards_current are both set to
             // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
             // to the PML, for example in the presence of mesh refinement patches)
+            if (m_composite_xz_interface) {
+                // An inactive object preserves PML pointer plumbing while its
+                // constructor returns before allocating either FP or CP absorber.
+                do_pml_Lo[lev] = amrex::IntVect(0);
+                do_pml_Hi[lev] = amrex::IntVect(0);
+            }
             pml[lev] = std::make_unique<PML>(
                 lev, boxArray(lev), DistributionMap(lev), do_similar_dm_pml,
                 &Geom(lev), &Geom(lev-1),

@@ -75,6 +75,7 @@ FlushFormatCheckpoint::WriteToFile (
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);
 
     WriteWarpXHeader(checkpointname, geom, /*is_checkpoint=*/true);
+    warpx.WriteCompositeXZCheckpoint(checkpointname);
 
     WriteJobInfo(checkpointname);
 
