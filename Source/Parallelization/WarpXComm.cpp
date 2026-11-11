@@ -658,6 +658,9 @@ WarpX::UpdateAuxiliaryDataSameType ()
                           0, 0, Bfield_aux[1][direction]->nComp(),
                           Bfield_aux[1][direction]->nGrowVect());
         }
+#ifdef WARPX_DIM_XZ
+        if (m_composite_xz_fixed_shape) { UpdateCompositeXZGather(); }
+#endif
         return;
     }
     // Refined levels add the coarse-patch correction through the same helper for B and E.

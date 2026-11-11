@@ -799,6 +799,9 @@ WarpX::InitData ()
 {
     ABLASTR_PROFILE("WarpX::InitData()");
     amrex::ParmParse("warpx").query("composite_xz_interface", m_composite_xz_interface);
+    amrex::ParmParse("warpx").query("composite_xz_fixed_shape", m_composite_xz_fixed_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_composite_xz_fixed_shape || m_composite_xz_interface,
+        "The fixed-shape XZ particle coupling requires the conforming XZ interface.");
 #ifndef WARPX_DIM_XZ
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_composite_xz_interface,
         "composite_xz_interface requires Cartesian XZ.");

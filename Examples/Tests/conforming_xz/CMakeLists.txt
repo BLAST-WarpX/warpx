@@ -75,6 +75,85 @@ if(2 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
     )
     set_tests_properties(test_2d_xz_slab_changed_filter_picmi_restart.run PROPERTIES
         PASS_REGULAR_EXPRESSION "The checkpoint and current input must use the same")
+    foreach(layout IN ITEMS 1x2 2x1 2x2)
+        string(REPLACE "x" " " ratio "${layout}")
+        if(layout STREQUAL "1x2")
+            set(shape 3)
+        elseif(layout STREQUAL "2x1")
+            set(shape 1)
+        else()
+            set(shape 2)
+        endif()
+        foreach(deposition IN ITEMS esirkepov villasenor)
+            set(smoothing "")
+            if(deposition STREQUAL "villasenor")
+                set(smoothing "--filter")
+            endif()
+            set(name test_2d_xz_slab_crossing_${layout}_${deposition}_picmi)
+            set(crossing "--ratio ${ratio} --shape ${shape} --deposition ${deposition} ${smoothing}")
+            add_warpx_test(
+                test_2d_xz_slab_crossing_${layout}_${deposition}_picmi
+                2
+                1
+                "inputs_test_2d_conforming_xz_crossing_picmi.py ${crossing}"
+                OFF
+                OFF
+                OFF
+            )
+            if(layout STREQUAL "1x2" AND deposition STREQUAL "villasenor")
+                add_warpx_test(
+                    test_2d_xz_slab_crossing_picmi_restart
+                    2
+                    1
+                    "inputs_test_2d_conforming_xz_crossing_picmi.py ${crossing} --restart ../${name}/diags/chk000005"
+                    OFF
+                    OFF
+                    ${name}
+                )
+            endif()
+        endforeach()
+    endforeach()
+    add_warpx_test(
+        test_2d_xz_slab_parent_particles_picmi_restart
+        2
+        1
+        "inputs_test_2d_conforming_xz_filter_picmi.py --fixed-shape --restart ${filtered_checkpoint}"
+        OFF
+        OFF
+        ${filtered}
+    )
+    set_tests_properties(test_2d_xz_slab_parent_particles_picmi_restart.run PROPERTIES
+        PASS_REGULAR_EXPRESSION "A guarded XZ checkpoint requires every kinetic")
+    add_warpx_test(
+        test_2d_xz_slab_crossing_native_sources_picmi
+        2
+        1
+        "inputs_test_2d_conforming_xz_crossing_picmi.py --ratio 2 2 --shape 2 --deposition esirkepov --native-source"
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_2d_xz_slab_crossing_periodic_corner_picmi
+        2
+        1
+        "inputs_test_2d_conforming_xz_crossing_picmi.py --ratio 2 2 --shape 3 --deposition villasenor --filter --periodic-corner"
+        OFF
+        OFF
+        OFF
+    )
+    set(crossed test_2d_xz_slab_crossing_1x2_villasenor_picmi)
+    add_warpx_test(
+        test_2d_xz_slab_crossing_to_guarded_picmi_restart
+        2
+        1
+        "inputs_test_2d_conforming_xz_crossing_picmi.py --ratio 1 2 --shape 3 --deposition villasenor --filter --restart ../${crossed}/diags/chk000005 --guarded-restart"
+        OFF
+        OFF
+        ${crossed}
+    )
+    set_tests_properties(test_2d_xz_slab_crossing_to_guarded_picmi_restart.run PROPERTIES
+        PASS_REGULAR_EXPRESSION "The checkpoint and current input must use the same")
     set(parent test_2d_xz_slab_2x2_te_oblique_picmi)
     set(uniform test_2d_xz_slab_uniform_te_oblique_picmi)
     set(pulse "--ratio 2 2 --polarization te --oblique")

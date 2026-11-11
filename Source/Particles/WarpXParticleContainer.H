@@ -696,6 +696,7 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    [[nodiscard]] bool isPushed () const { return !do_not_push; }
     void setDoNotGather (int flag) { do_not_gather = flag; }
     void setDoNotDeposit (int flag) { do_not_deposit = flag; }
 

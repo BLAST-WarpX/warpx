@@ -606,6 +606,10 @@ WarpX::OneStep_nosub (
         FinalizeJ(); // Apply boundary conditions and inverse volume scaling to J
     }
 
+#ifdef WARPX_DIM_XZ
+    if (m_composite_xz_fixed_shape) { AssembleCompositeXZCurrent(a_dt); }
+#endif
+
     // At this point, J is up-to-date inside the domain except with Vay deposition,
     // and E and B are up-to-date including enough guard cells for the first
     // step of the field solve.

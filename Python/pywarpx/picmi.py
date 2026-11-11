@@ -1561,6 +1561,10 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         default=None,
         description="Use the two-sided Yee interface for a Cartesian XZ refinement slab spanning periodic z.",
     )
+    composite_xz_fixed_shape: bool | None = Field(
+        default=None,
+        description="Couple kinetic particles across the Cartesian XZ slab using a fixed physical shape on both meshes.",
+    )
     # option name (warpx_periodic_single_box_fft) differs from the field name:
     psatd_periodic_single_box_fft: bool | None = Field(
         default=None,
@@ -1616,6 +1620,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 
         pywarpx.warpx.pml_ncell = self.pml_ncell
         pywarpx.warpx.composite_xz_interface = self.composite_xz_interface
+        pywarpx.warpx.composite_xz_fixed_shape = self.composite_xz_fixed_shape
 
         if self.method == "PSATD":
             pywarpx.psatd.periodic_single_box_fft = self.psatd_periodic_single_box_fft

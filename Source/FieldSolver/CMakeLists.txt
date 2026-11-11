@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         CompositeXZInterface.cpp
+        CompositeXZParticles.cpp
         WarpXPushFieldsEM.cpp
         WarpXPushFieldsHybridPIC.cpp
         WarpX_QED_Field_Pushers.cpp

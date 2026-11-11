@@ -970,7 +970,7 @@ Setting up the field mesh
     square finest cells, refinement ratios (2, 1), (1, 2) and (2, 2), and
     periodic or PML outer x boundaries. Use energy-conserving field gathering
     with zero gather and current buffers. A run may contain kinetic
-    particles with shape orders one through three on either mesh. Their full
+    particles with shape orders one through three on either mesh. By default their full
     deposition and gather stencils must remain outside the interface collar.
     The solver checks this condition as particles advance. The usual binomial
     current filter is supported on each mesh. Passes in x extend the required
@@ -978,6 +978,24 @@ Setting up the field mesh
     Passes in periodic z leave the clearance unchanged. Checkpoint restarts
     preserve the interface, refinement ratio, particle shape and filter passes. Materials and
     divergence cleaning require additional interface operators.
+
+
+.. pp:param:: warpx.composite_xz_fixed_shape
+    :type: ``bool``
+    :default: ``0``
+
+    With :pp:param:`warpx.composite_xz_interface`, follow particles through
+    either internal refinement face using their finest-grid shape everywhere.
+    The solver deposits a charge-conserving current on a full-domain finest
+    mesh, applies the requested binomial filter there and transfers the source
+    to the two physical grids. Field gathering uses the matching interpolation.
+    Memory for these temporary fields scales with the full finest mesh.
+
+    This option supports fixed species charge, shape orders one through three,
+    and Esirkepov or Villasenor deposition. Particles may cross periodic seams.
+    At an outer PML boundary, particle stencils must stay in the physical domain.
+    An earlier guarded checkpoint can be continued with this option when every
+    particle stencil is still completely inside the fine slab.
 
 
 .. pp:param:: warpx.ref_patch_function(x,y,z)

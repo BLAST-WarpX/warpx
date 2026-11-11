@@ -40,7 +40,7 @@ namespace
 {
     constexpr char checkpoint_marker[] = "/CompositeXZSlab";
 
-    std::string CheckpointIdentity (WarpX const& warpx)
+    std::string CheckpointIdentity (WarpX const& warpx, bool fixed)
     {
         std::ostringstream stream;
         stream << "CompositeXZSlab-V1 " << warpx.refRatio(0) << ' '
@@ -50,6 +50,7 @@ namespace
         if (WarpX::use_filter && WarpX::filter_npass_each_dir != amrex::IntVect(0)) {
             stream << " filter " << WarpX::filter_npass_each_dir;
         }
+        if (fixed) { stream << " fixed-shape"; }
         stream << '\n';
         return stream.str();
     }
@@ -71,7 +72,7 @@ void WarpX::WriteCompositeXZCheckpoint (std::string const& directory) const
 #ifdef WARPX_DIM_XZ
     if (m_composite_xz_interface && amrex::ParallelDescriptor::IOProcessor()) {
         std::ofstream marker(directory + checkpoint_marker);
-        marker << CheckpointIdentity(*this);
+        marker << CheckpointIdentity(*this, m_composite_xz_fixed_shape);
         marker.close();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(marker.good(), "Cannot write the XZ slab checkpoint identity.");
     }
@@ -80,7 +81,7 @@ void WarpX::WriteCompositeXZCheckpoint (std::string const& directory) const
 #endif
 }
 
-void WarpX::CheckCompositeXZCheckpoint (std::string const& directory) const
+void WarpX::CheckCompositeXZCheckpoint (std::string const& directory)
 {
 #ifdef WARPX_DIM_XZ
     int compatible = 0;
@@ -90,12 +91,17 @@ void WarpX::CheckCompositeXZCheckpoint (std::string const& directory) const
             std::ifstream marker(name);
             std::string const saved{std::istreambuf_iterator<char>{marker}, {}};
             compatible = m_composite_xz_interface && marker.good()
-                && max_level == 1 && finest_level == 1 && saved == CheckpointIdentity(*this);
+                && max_level == 1 && finest_level == 1 && saved == CheckpointIdentity(*this, m_composite_xz_fixed_shape);
+            if (!compatible && m_composite_xz_interface && m_composite_xz_fixed_shape &&
+                max_level == 1 && finest_level == 1 && saved == CheckpointIdentity(*this, false)) {
+                compatible = 2;
+            }
         } else {
             compatible = !m_composite_xz_interface;
         }
     }
     amrex::ParallelDescriptor::Bcast(&compatible, 1, amrex::ParallelDescriptor::IOProcessorNumber());
+    if (compatible == 2) { CheckCompositeXZParticles(true); }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(compatible != 0,
         "The checkpoint and current input must use the same Cartesian XZ slab interface, "
         "patch, refinement ratio, particle shape and current filter.");
@@ -205,19 +211,26 @@ void WarpX::InitCompositeXZInterface ()
     }
     m_composite_xz_boundary.resize(4 * nz);
     m_composite_xz_rhs.resize(4 * nz);
+    if (m_composite_xz_fixed_shape) { InitCompositeXZParticleCoupling(); }
     CheckCompositeXZParticles();
     MaskCompositeXZCoveredFields();
 #endif
 }
 
-void WarpX::CheckCompositeXZParticles ()
+void WarpX::CheckCompositeXZParticles (bool require_fine)
 {
-#ifdef WARPX_DIM_XZ
+#ifndef WARPX_DIM_XZ
+    amrex::ignore_unused(require_fine);
+#else
     if (!m_composite_xz_interface) { return; }
     auto const fine = boxArray(1).minimalBox();
     auto const h = Geom(1).CellSize(0);
     auto const left = Geom(1).ProbLo(0) + fine.smallEnd(0) * h;
     auto const right = Geom(1).ProbLo(0) + (fine.bigEnd(0) + 1) * h;
+    bool const crossing = m_composite_xz_fixed_shape && !require_fine;
+    bool const periodic_x = Geom(1).isPeriodic(0);
+    auto const physical_lo = Geom(1).ProbLo(0);
+    auto const physical_hi = Geom(1).ProbHi(0);
     // A normal binomial pass extends the current by one cell. Restricted fine
     // current also passes through the parent filter. Keep its full stencil and
     // one coarse cell for restriction clear of the interface on both meshes.
@@ -233,6 +246,7 @@ void WarpX::CheckCompositeXZParticles ()
             // physical-c particle trajectory. Never substitute a reduced wave c.
             auto const margin = 0.5_rt * (nox + 3) * Geom(lev).CellSize(0) +
                 PhysConst::c * dt[0] + filter_margin;
+            auto const outer_margin = (0.5_rt * (nox + 3) + passes) * h + PhysConst::c * dt[0];
             for (WarpXParIter pti(*species, lev); pti.isValid(); ++pti) {
                 auto const position = GetParticlePosition(pti);
                 operation.eval(pti.numParticles(), data,
@@ -240,17 +254,22 @@ void WarpX::CheckCompositeXZParticles ()
                     {
                         amrex::ParticleReal x, y, z;
                         position(i, x, y, z);
+                        if (crossing) {
+                            return {std::isfinite(x) && (periodic_x ||
+                                (x > physical_lo + outer_margin && x < physical_hi - outer_margin)) ? 0 : 1};
+                        }
                         bool const allowed = lev == 1
                             ? x > left + margin && x < right - margin
-                            : x < left - margin || x > right + margin;
+                            : !require_fine && (x < left - margin || x > right + margin);
                         return {std::isfinite(x) && allowed ? 0 : 1};
                     });
             }
         }
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(amrex::get<0>(data.value()) == 0,
-        "A particle entered the unsupported physical-interface gather/deposition "
-        "buffer. Interface crossing is not implemented.");
+        crossing ? "The fixed-shape XZ particle stencil reached the outer physical boundary." :
+        require_fine ? "A guarded XZ checkpoint requires every kinetic stencil inside the fine slab to change coupling." :
+        "A particle entered the unsupported physical-interface gather/deposition buffer. Interface crossing is not implemented.");
 #endif
 }
 
@@ -380,30 +399,33 @@ void WarpX::ApplyCompositeXZInterface (amrex::Real const a_dt)
     auto const bf = Arrays(m_fields, FieldType::Bfield_fp, 1);
     auto const jc = Arrays(m_fields, FieldType::current_fp, 0);
     auto const jf = Arrays(m_fields, FieldType::current_fp, 1);
-    amrex::ReduceOps<amrex::ReduceOpMax> operation;
-    amrex::ReduceData<amrex::Real> data(operation);
-    using Tuple = typename decltype(data)::Type;
-    operation.eval(2 * nz, data,
-        [=] AMREX_GPU_DEVICE (int index) -> Tuple
-        {
-            int const side = index / nz;
-            int const j = index % nz;
-            int const xf = side == 0 ? fl : fr;
-            int const xc = xf / rx;
-            int const ic = side == 0 ? xc - 1 : xc;
-            int const i_f = side == 0 ? xf : xf - 1;
-            amrex::Real value = std::abs(jc[0](ic,j,0));
-            for (int d = 0; d < 3; ++d) {
-                int const cx = d == 0 ? ic : xc;
-                int const fx = d == 0 ? i_f : xf;
-                value = amrex::max(value, std::abs(jc[d](cx,j,0)),
-                    std::abs(jf[d](fx,rz*j,0)), std::abs(jf[d](fx,rz*j+rz-1,0)));
-            }
-            return {value};
-        });
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(amrex::get<0>(data.value()) == 0.0_rt,
-        "Physical-interface current ownership is not implemented: sources must "
-        "vanish on both tangential traces and adjacent normal-current edges.");
+    bool const fixed = m_composite_xz_fixed_shape;
+    if (!fixed) {
+        amrex::ReduceOps<amrex::ReduceOpMax> operation;
+        amrex::ReduceData<amrex::Real> data(operation);
+        using Tuple = typename decltype(data)::Type;
+        operation.eval(2 * nz, data,
+            [=] AMREX_GPU_DEVICE (int index) -> Tuple
+            {
+                int const side = index / nz;
+                int const j = index % nz;
+                int const xf = side == 0 ? fl : fr;
+                int const xc = xf / rx;
+                int const ic = side == 0 ? xc - 1 : xc;
+                int const i_f = side == 0 ? xf : xf - 1;
+                amrex::Real value = std::abs(jc[0](ic,j,0));
+                for (int d = 0; d < 3; ++d) {
+                    int const cx = d == 0 ? ic : xc;
+                    int const fx = d == 0 ? i_f : xf;
+                    value = amrex::max(value, std::abs(jc[d](cx,j,0)),
+                        std::abs(jf[d](fx,rz*j,0)), std::abs(jf[d](fx,rz*j+rz-1,0)));
+                }
+                return {value};
+            });
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(amrex::get<0>(data.value()) == 0.0_rt,
+            "Physical-interface current ownership is not implemented: sources must "
+            "vanish on both tangential traces and adjacent normal-current edges.");
+    }
     auto* rhs = m_composite_xz_rhs.data();
     amrex::ParallelFor(4 * nz,
         [=] AMREX_GPU_DEVICE (int index) noexcept
@@ -436,6 +458,18 @@ void WarpX::ApplyCompositeXZInterface (amrex::Real const a_dt)
                 }
                 rhs[index] = mc * dc + mf * df / h -
                     sign * (h * bz - dzc * bc[2](ic,j,0));
+            }
+            if (fixed) {
+                // Add the load on the independent trace. Fine nodal currents use
+                // the transpose of linear interpolation in z, and edge currents
+                // sum along z. The virtual sources have full fine dual areas.
+                auto fine_load = jf[d](xf,k,0);
+                if (rz == 2) {
+                    fine_load += d == 1
+                        ? 0.5_rt * (jf[d](xf,km,0) + jf[d](xf,k+1,0))
+                        : jf[d](xf,k+1,0);
+                }
+                rhs[index] -= PhysConst::mu0 * (2._rt*mc*jc[d](xc,j,0) + 2._rt*mf*fine_load);
             }
         });
     auto* updated = m_composite_xz_boundary.data();
