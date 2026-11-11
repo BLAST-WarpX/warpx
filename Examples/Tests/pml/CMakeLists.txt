@@ -334,7 +334,7 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
             test_rz_radial_fixed_shape_${shape}_picmi
             RZ
             1
-            "inputs_test_rz_radial_crossing.py --shape ${shape} ${crossing_options}"
+            "inputs_test_rz_radial_crossing_picmi.py --shape ${shape} ${crossing_options}"
             OFF
             OFF
             OFF
@@ -344,7 +344,7 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
         test_rz_radial_fixed_shape_3_picmi_restart
         RZ
         1
-        "inputs_test_rz_radial_crossing.py --shape 3 --inward --filter --restart ../test_rz_radial_fixed_shape_3_picmi/diags/chk000032 --reference ../test_rz_radial_fixed_shape_3_picmi/radial_crossing.npz"
+        "inputs_test_rz_radial_crossing_picmi.py --shape 3 --inward --filter --restart ../test_rz_radial_fixed_shape_3_picmi/diags/chk000032 --reference ../test_rz_radial_fixed_shape_3_picmi/radial_crossing.npz"
         OFF
         OFF
         test_rz_radial_fixed_shape_3_picmi
