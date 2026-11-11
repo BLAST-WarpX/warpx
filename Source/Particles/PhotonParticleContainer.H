@@ -93,7 +93,8 @@ public:
                         const amrex::MultiFab& /*Bx*/,
                         const amrex::MultiFab& /*By*/,
                         const amrex::MultiFab& /*Bz*/,
-                        MomentumPushType /*momentum_push_type*/) override {}
+                        MomentumPushType /*momentum_push_type*/,
+                        std::optional<FieldGatherOrders> /*gather_orders*/) override {}
 
     // DepositCharge should do nothing for photons
     void DepositCharge (WarpXParIter& /*pti*/,
@@ -125,7 +126,9 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/,
+                                 int /*particle_shape*/,
                                  bool /*use_stored_old_position*/) override {}
+
     /**
      * \brief No-op override: photons are massless and carry no charge, so
      * they do not contribute to the implicit-solver mass matrices
@@ -134,7 +137,8 @@ public:
      */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
                               int /*lev*/,
-                              amrex::Real /*dt*/) override {}
+                              amrex::Real /*dt*/,
+                              ImplicitOptions const& /*implicit_options*/) override {}
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_

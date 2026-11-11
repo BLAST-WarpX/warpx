@@ -20,6 +20,7 @@ n10 = 2.2e17
 tau = 20.0e-9
 shift = 150.0e-9
 dt = 0.001e-9
+weight_ratio = 2
 
 time_arr = np.arange(0, 250e-9 + dt, dt)
 decay_rate = Amp * np.exp(-(((time_arr - shift) / tau) ** 2) / 2)
@@ -49,5 +50,37 @@ ion_weight_rtol = 0.5  # half a percent
 ion_weight_error = 100 * np.abs(nI_arr[-1] - ion_weight_end) / nI_arr[-1]
 print(f"ion weight (WarpX) = {ion_weight_end}")
 print(f"ion weight (0D)    = {nI_arr[-1]}")
-print(f"weight error       = {ion_weight_error}")
+print(f"ion weight error       = {ion_weight_error}")
 assert ion_weight_error < ion_weight_rtol
+
+ele_weight_end = ele_weight[-1]
+ele_weight_rtol = 0.5  # half a percent
+ele_weight_error = 100 * np.abs(nI_arr[-1] - ele_weight_end) / nI_arr[-1]
+print(f"ele weight (WarpX) = {ele_weight_end}")
+print(f"ele weight (0D)    = {nI_arr[-1]}")
+print(f"ele weight error       = {ele_weight_error}")
+assert ele_weight_error < ele_weight_rtol
+
+neu_weight_end = neu_weight[-1]
+neu_weight_rtol = 0.5  # half a percent
+neu_weight_error = 100 * np.abs(n1_arr[-1] - neu_weight_end) / nI_arr[-1]
+print(f"neu weight (WarpX) = {neu_weight_end}")
+print(f"neu weight (0D)    = {n1_arr[-1]}")
+print(f"neu weight error       = {neu_weight_error}")
+assert neu_weight_error < neu_weight_rtol
+
+neu_number_change = neu_number[0] - neu_number[-1]
+ion_number_end = ion_number[-1]
+print(f"neu number change = {neu_number_change}")
+print(f"ion number = {ion_number_end}")
+assert ion_number_end == weight_ratio * neu_number_change
+
+ele_number_end = ele_number[-1]
+print(f"ele number = {ele_number_end}")
+assert ele_number_end == weight_ratio * neu_number_change
+
+print(f"initial neu weight change = {neu_weight[0] - neu_weight[-1]:.16e}")
+print(f"final ion weight          = {ion_weight[-1]:.16e}")
+print(f"final ele weight          = {ele_weight[-1]:.16e}")
+assert np.allclose(neu_weight[0], neu_weight[-1] + ion_weight[-1], rtol=1e-15)
+assert np.allclose(neu_weight[0], neu_weight[-1] + ele_weight[-1], rtol=1e-15)

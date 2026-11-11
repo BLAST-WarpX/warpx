@@ -11,6 +11,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
@@ -302,9 +303,22 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
-WarpX::DepositMassMatrices (amrex::Real a_dt)
+WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options)
 {
     ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
+
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        // RSPHERE only deposits the radial (xx) mass matrix.
+        bool initialized = implicit_options.ncomp_xx[dir] > 0;
+#if !defined(WARPX_DIM_RSPHERE)
+        initialized = initialized && implicit_options.ncomp_yy[dir] > 0
+                                  && implicit_options.ncomp_zz[dir] > 0;
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            initialized,
+            "DepositMassMatrices requires initialized mass-matrix component counts. "
+            "Call InitData before depositing mass matrices.");
+    }
 
     amrex::Real const dt_scale = a_dt/dt[0];
 
@@ -313,7 +327,8 @@ WarpX::DepositMassMatrices (amrex::Real a_dt)
         mypc->DepositMassMatrices(
             m_fields,
             lev,
-            dt[lev]*dt_scale
+            dt[lev]*dt_scale,
+            implicit_options
         );
     }
 
@@ -360,14 +375,14 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
-                                        m_eb_update_E[lev],
+                                        m_eb_update_E_fp[lev],
                                         a_dt );
     } else {
         m_fdtd_solver_cp[lev]->EvolveE( m_fields,
                                         lev,
                                         patch_type,
                                         a_Erhs_vec.getArrayVec()[lev],
-                                        m_eb_update_E[lev],
+                                        m_eb_update_E_cp[lev],
                                         a_dt );
     }
 

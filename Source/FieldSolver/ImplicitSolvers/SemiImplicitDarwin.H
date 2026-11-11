@@ -70,8 +70,7 @@ public:
                       const WarpXSolverVec&  a_Z,
                       amrex::Real      start_time,
                       int              a_nl_iter,
-                      bool             a_from_jacobian,
-                      bool update_pc = true ) override;
+                      bool             a_from_jacobian ) override;
 
     /** \brief Pointer back to the main WarpX class, used by DarwinLinearFieldOperator */
     [[nodiscard]] WarpX* GetWarpX () const { return m_WarpX; }
@@ -144,12 +143,21 @@ private:
     std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
-     * \brief Whether the predictor velocity push in OneStep() should
-     *  temporarily override the global galerkin_interpolation flag to true.
+     * \brief Whether the predictor velocity push in OneStep() should gather
+     *  the electrostatic E-field with the Galerkin scheme.
      *  Set once in Define(); false if the user explicitly selected
      *  momentum-conserving gathering, to avoid silently overriding that choice.
      */
     bool m_predictor_use_galerkin = false;
+
+    /**
+     * \brief Order of the particle shape factors used for the magnetostatic part
+     *  of the solve: the current and mass matrices deposition, the E-field gather
+     *  in the corrector push and the B-field gather in both pushes. Must not
+     *  exceed algo.particle_shape, which is used for the electrostatic part
+     *  and is the default.
+     */
+    int m_magnetostatic_particle_shape;
 
     /**
      * \brief Choice of linear solver

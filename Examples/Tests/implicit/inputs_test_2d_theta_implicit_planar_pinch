@@ -1,10 +1,14 @@
 # base input parameters
-FILE = inputs_base_2d_theta_implicit_planar_pinch
+FILE = inputs_base_2d_implicit_planar_pinch
 
 # test input parameters
+algo.evolve_scheme = "theta_implicit_em"
+implicit_evolve.theta = 0.5
+particles.max_grid_crossings = 2
 newton.linear_solver = petsc_ksp
 jacobian.pc_type = pc_petsc
-pc_petsc.verbose = true
+precon_mat.verbose = true
 pc_petsc.type = asm
 pc_petsc.asm_overlap = 4
 pc_petsc.sub_type = lu
+implicit_evolve.petsc_reinit_interval = 7

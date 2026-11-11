@@ -60,6 +60,10 @@ public:
     //! Solvers without a cached preconditioner need no notification.
     virtual void invalidatePreconditioner () {}
 
+    //! Destroy and recreate the PETSc objects around a PETSc re-initialization.
+    //! Returns false if the solver does not use PETSc.
+    virtual bool reinitializePETSc () { return false; }
+
     //! Sets verbosity.
     virtual void setVerbose (int v) = 0;
 
@@ -75,6 +79,9 @@ public:
 
     //! Gets the solver status.
     [[nodiscard]] virtual int getStatus () const = 0;
+
+    //! Whether the last solve converged; the status codes differ between solvers.
+    [[nodiscard]] virtual bool converged () const = 0;
 
     //! Gets the 2-norm of the residual.
     [[nodiscard]] virtual RT getResidualNorm () const = 0;
