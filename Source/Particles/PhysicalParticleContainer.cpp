@@ -770,7 +770,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -778,7 +778,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     if (has_buffer)
                     {
@@ -788,7 +788,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
-                                       lev, lev-1, dt, relative_time, push_type);
+                                       lev, lev-1, dt, relative_time, push_type, WarpX::nox);
                     }
                 } // end of "if skip_deposition"
 
@@ -798,7 +798,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jy = fields.get(current_fp_string, Direction{1}, lev);
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         long const offset = 0;
-                        ImplicitPushXPSubOrbits(pti, fields,
+                        ImplicitPushXPSubOrbits(pti,
                                                 exfab, eyfab, ezfab,
                                                 bxfab, byfab, bzfab,
                                                 implicit_options,
@@ -829,7 +829,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
 
                         long const offset = num_unconverged_particles;
-                        ImplicitPushXPSubOrbits(pti, fields,
+                        ImplicitPushXPSubOrbits(pti,
                                                 cexfab, ceyfab, cezfab,
                                                 cbxfab, cbyfab, cbzfab,
                                                 implicit_options,
@@ -1262,10 +1262,11 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
             const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
             const amrex::ParticleReal Ez_external_particle = m_E_external_particle[2];
+#if !defined(WARPX_DIM_RSPHERE)
             const amrex::ParticleReal Bx_external_particle = m_B_external_particle[0];
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
-
+#endif
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
@@ -1333,9 +1334,15 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                 amrex::ParticleReal Exp = Ex_external_particle;
                 amrex::ParticleReal Eyp = Ey_external_particle;
                 amrex::ParticleReal Ezp = Ez_external_particle;
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal Bxp = 0._prt;
+                amrex::ParticleReal Byp = 0._prt;
+                amrex::ParticleReal Bzp = 0._prt;
+#else
                 amrex::ParticleReal Bxp = Bx_external_particle;
                 amrex::ParticleReal Byp = By_external_particle;
                 amrex::ParticleReal Bzp = Bz_external_particle;
+#endif
 
                 if (!t_do_not_gather){
                     // first gather E and B to the particle positions
@@ -1792,6 +1799,14 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
     {
         Redistribute();
         global_numparts = TotalNumberOfParticles();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Particles in the same cylindrical (or spherical) cell can sit at different
+        // azimuthal (and polar) angles, so their Cartesian momenta are not comparable.
+        // Temporarily rotate the momenta to the local curvilinear frame so that the
+        // resampling algorithms bin and merge (u_r, u_theta, u_z) / (u_r, u_theta, u_phi),
+        // and rotate back with each remaining particle's own angle(s) afterwards.
+        TransformMomentumToCurvilinear(/*forward*/true);
+#endif
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
@@ -1799,6 +1814,10 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                 m_resampler(geom[lev], pti, lev, this);
             }
         }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Undo the rotation above
+        TransformMomentumToCurvilinear(/*forward*/false);
+#endif
         deleteInvalidParticles();
         if (verbose) {
             const amrex::Long new_global_numparts = TotalNumberOfParticles();

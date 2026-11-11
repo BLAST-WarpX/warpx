@@ -10,7 +10,6 @@
 #include "LinearSolverLibrary.H"
 #include "NonlinearSolver.H"
 #include "PreconditionerTypes.H"
-#include "Utils/TextMsg.H"
 
 #include <AMReX_Enum.H>
 #include <AMReX_ParmParse.H>
@@ -92,17 +91,6 @@ struct NewtonSolverParams
 
         const amrex::ParmParse pp_jac("jacobian");
         pp_jac.query("pc_type", pc_type);
-
-        // Jacobi reads MassMatrices_PC directly. A scheduled PC update can clear these
-        // coefficients during residual evaluation and leave them unfinished if Newton
-        // converges before PreLinearSolve(). Restrict the Newton interval when lagging
-        // across time steps, until the PC deposition is moved to PreLinearSolve().
-        if (pc_type == PreconditionerType::pc_jacobi && pc_update_time_step_interval > 1) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                pc_update_newton_interval == 0,
-                "newton.pc_update_newton_interval must be 0 when using "
-                "pc_type = pc_jacobi and pc_update_time_step_interval > 1.");
-        }
     }
 
     /**
