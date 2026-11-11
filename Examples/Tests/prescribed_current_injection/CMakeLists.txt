@@ -19,6 +19,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_prescribed_current_kinetic_picmi
+    2
+    1
+    inputs_base_2d_antenna_plasma.py
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
     test_3d_prescribed_current_injection  # name
     3  # dims
     1  # nprocs
