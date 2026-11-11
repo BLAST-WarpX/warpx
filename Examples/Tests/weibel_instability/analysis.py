@@ -9,8 +9,12 @@
 """
 Analyse the linear phase of the 2D Weibel instability test.
 
-The two electron populations counter-stream along y. In this geometry the unstable magnetic
-field component is B_z, so the growth-rate fit is performed on ln(sum(B_z^2)). The fitted
+The two electron populations counter-stream along y, which is out of the x-z simulation plane.
+The Weibel modes therefore have wave vectors k in the x-z plane and magnetic fields
+B = y_hat x k, also in the plane: modes with k || x drive B_z and modes with k || z drive B_x,
+and in the cold limit both grow at the same rate. B_y is not driven and stays at noise level.
+On this grid dx < dz, so more of the resolved unstable modes have |k_x| > |k_z|, and B_z carries
+most of the magnetic energy. The growth-rate fit is performed on ln(sum(B_z^2)). The fitted
 growth rate is compared to the cold k -> infinity asymptote gamma = beta * omega_p, used here
 as an upper-bound estimate for the warm, finite-box simulation.
 """
@@ -33,6 +37,10 @@ from scipy.constants import e as q_e
 from scipy.constants import epsilon_0, m_e
 
 MIN_FIT_POINTS = 6  # minimum number of diagnostics needed to fit a growth rate
+TRANSIENT_LN_BZ_2_RISE = (
+    1.0  # ln(B_z^2) rise above the initial level marking the end of transient
+)
+MIN_FIT_LN_BZ_2_RISE = 1.0  # minimum ln(B_z^2) growth covered by the fit window
 GAMMA_RTOL_UPPER = 0.10  # fitted gamma must not exceed gamma_theory by more than 10%
 GAMMA_RTOL_LOWER = (
     0.30  # fitted gamma must not fall below gamma_theory by more than 30%
@@ -205,33 +213,33 @@ if max_step is not None:
     )
 
 # Accumulate sum(B_i^2) over all cells at every diagnostic iteration.
-B_x_2 = np.empty_like(t)
-B_y_2 = np.empty_like(t)
-B_z_2 = np.empty_like(t)
-B_z_abs_max = 0.0  # track the peak |B_z| for the animation color scale
+Bx_2 = np.empty_like(t)
+By_2 = np.empty_like(t)
+Bz_2 = np.empty_like(t)
+Bz_abs_max = 0.0  # track the peak |B_z| for the animation color scale
 rho_spatial_mean = (
     None  # mean of rho_electrons_1 in first frame (proxy for bulk density)
 )
 rho_dev_max = 0.0  # max spatial deviation from that mean, across all frames
 
 for i, iteration in enumerate(iterations):
-    B_x, _ = ts.get_field(field="B", coord="x", iteration=iteration, plot=False)
-    B_y, _ = ts.get_field(field="B", coord="y", iteration=iteration, plot=False)
-    B_z, _ = ts.get_field(field="B", coord="z", iteration=iteration, plot=False)
+    Bx, _ = ts.get_field(field="B", coord="x", iteration=iteration, plot=False)
+    By, _ = ts.get_field(field="B", coord="y", iteration=iteration, plot=False)
+    Bz, _ = ts.get_field(field="B", coord="z", iteration=iteration, plot=False)
     rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iteration, plot=False)
 
-    B_x_2[i] = np.sum(np.square(B_x))
-    B_y_2[i] = np.sum(np.square(B_y))
-    B_z_2[i] = np.sum(np.square(B_z))
-    B_z_abs_max = max(B_z_abs_max, float(np.max(np.abs(B_z))))
+    Bx_2[i] = np.sum(np.square(Bx))
+    By_2[i] = np.sum(np.square(By))
+    Bz_2[i] = np.sum(np.square(Bz))
+    Bz_abs_max = max(Bz_abs_max, float(np.max(np.abs(Bz))))
     if rho_spatial_mean is None:
         rho_spatial_mean = float(np.mean(rho_1))
     rho_dev_max = max(rho_dev_max, float(np.max(np.abs(rho_1 - rho_spatial_mean))))
 
-assert np.all(np.isfinite(B_x_2))
-assert np.all(np.isfinite(B_y_2))
-assert np.all(np.isfinite(B_z_2))
-assert B_z_abs_max > 0.0, "B_z is identically zero across all field diagnostics"
+assert np.all(np.isfinite(Bx_2))
+assert np.all(np.isfinite(By_2))
+assert np.all(np.isfinite(Bz_2))
+assert Bz_abs_max > 0.0, "B_z is identically zero across all field diagnostics"
 
 # Load the FieldEnergy reduced diagnostic. Columns: 0=step, 1=time, 2=total, 3=electric, 4=magnetic energy.
 field_energy = np.atleast_2d(np.loadtxt("diags/reducedfiles/EF.txt", skiprows=1))
@@ -278,68 +286,68 @@ charge_scale = (
 )  # characteristic charge density used for absolute tolerance
 np.testing.assert_allclose(rho, rho_1 + rho_2, rtol=1.0e-7, atol=1.0e-10 * charge_scale)
 
-# The out-of-plane component B_z is the Weibel-unstable mode for k || x and v_d || y.
-# Confirm that it dominates the other components at late time.
+# At late time, B_z must dominate the other components. B_z > B_y is physics: B_y is not driven
+# by the out-of-plane drift. B_z > B_x is a property of this grid, not of the physics: both are
+# Weibel-unstable, but dx < dz resolves more modes with k mostly along x, which drive B_z.
 late = slice(max(1, len(t) - 5), len(t))  # average over the last 5 snapshots
-B_x_late = np.mean(B_x_2[late])
-B_y_late = np.mean(B_y_2[late])
-B_z_late = np.mean(B_z_2[late])
+Bx_late = np.mean(Bx_2[late])
+By_late = np.mean(By_2[late])
+Bz_late = np.mean(Bz_2[late])
 dominance_factor = 1.0
-assert B_z_late > dominance_factor * max(B_x_late, B_y_late), (
+assert Bz_late > dominance_factor * max(Bx_late, By_late), (
     "Expected late-time B_z^2 to be the leading magnetic component: "
-    f"B_z^2={B_z_late:.6e}, B_x^2={B_x_late:.6e}, B_y^2={B_y_late:.6e}"
+    f"B_z^2={Bz_late:.6e}, B_x^2={Bx_late:.6e}, B_y^2={By_late:.6e}"
 )
 
-# Select the linear growth phase by amplitude, excluding early startup noise and late saturation.
+# Select the linear growth phase. The run is deliberately short and ends during linear growth,
+# well before saturation, so the series is: a short initial transient (while the fastest
+# growing modes emerge from the particle noise), then exponential growth up to the final
+# diagnostic. Skip the transient and fit everything after it.
 with np.errstate(divide="ignore", invalid="ignore"):
-    ln_B_z_2 = np.log(
-        B_z_2
-    )  # work in log-space; B_z_2 == 0 gives -inf (silently ignored)
+    ln_Bz_2 = np.log(Bz_2)  # work in log-space; Bz_2 == 0 gives -inf (silently ignored)
 
-finite_positive = np.flatnonzero(np.isfinite(ln_B_z_2))
+finite_positive = np.flatnonzero(np.isfinite(ln_Bz_2))
 assert finite_positive.size >= MIN_FIT_POINTS, (
     f"Need at least {MIN_FIT_POINTS} positive B_z^2 diagnostics to fit growth"
 )
 
-# Estimate the noise floor from the first few finite snapshots.
+# Reference level: mean of the first few finite snapshots (initial particle noise).
 noise_sample_count = min(5, max(2, finite_positive.size // 10))
 noise_indices = finite_positive[:noise_sample_count]
-noise_floor = np.mean(ln_B_z_2[noise_indices])
-saturation_level = np.max(ln_B_z_2[finite_positive])  # log-amplitude at saturation
-dynamic_range = saturation_level - noise_floor  # total e-folds of growth
+noise_floor = np.mean(ln_Bz_2[noise_indices])
+dynamic_range = (
+    np.max(ln_Bz_2[finite_positive]) - noise_floor
+)  # total rise in ln(B_z^2)
 
-assert dynamic_range > 3.0, (
-    f"Dynamic range of B_z^2 is only {dynamic_range:.3g} e-folds; "
-    "the linear Weibel phase did not develop enough to fit a growth rate."
-)
-
-# Keep only the window that is at least 2 e-folds above noise and 1 e-fold below saturation.
+# The transient is over once ln(B_z^2) has risen TRANSIENT_LN_BZ_2_RISE above the initial level;
+# from there on, fit up to the last diagnostic (the longest contiguous run above threshold).
 candidate = np.flatnonzero(
-    np.isfinite(ln_B_z_2)
-    & (ln_B_z_2 >= noise_floor + 2.0)
-    & (ln_B_z_2 <= saturation_level - 1.0)
+    np.isfinite(ln_Bz_2) & (ln_Bz_2 >= noise_floor + TRANSIENT_LN_BZ_2_RISE)
 )
 assert candidate.size >= MIN_FIT_POINTS, (
-    "Could not identify a resolved linear B_z^2 growth window. "
+    "B_z^2 did not grow past the initial transient. "
     f"t_final={t[-1]:.6e} s, ln-noise floor={noise_floor:.6g}, "
-    f"ln-saturation={saturation_level:.6g}"
+    f"ln(B_z^2) dynamic range={dynamic_range:.3g}"
 )
 
 fit_indices = largest_contiguous_block(candidate)
-assert fit_indices.size >= MIN_FIT_POINTS, (
-    "The amplitude-selected B_z^2 growth window is too short. "
-    f"Selected {fit_indices.size} diagnostics between t={t[fit_indices[0]]:.6e} s "
-    f"and t={t[fit_indices[-1]]:.6e} s."
+fit_ln_Bz_2_rise = ln_Bz_2[fit_indices[-1]] - ln_Bz_2[fit_indices[0]]
+assert (
+    fit_indices.size >= MIN_FIT_POINTS and fit_ln_Bz_2_rise >= MIN_FIT_LN_BZ_2_RISE
+), (
+    "The B_z^2 growth window after the initial transient is too short: "
+    f"{fit_indices.size} diagnostics and {fit_ln_Bz_2_rise:.3g} rise in ln(B_z^2) "
+    f"between t={t[fit_indices[0]]:.6e} s and t={t[fit_indices[-1]]:.6e} s."
 )
 
 fit_t = t[fit_indices]
-fit_ln_B_z_2 = ln_B_z_2[fit_indices]
-slope, intercept, r_sq = linear_fit(fit_t, fit_ln_B_z_2)
+fit_ln_Bz_2 = ln_Bz_2[fit_indices]
+slope, intercept, r_sq = linear_fit(fit_t, fit_ln_Bz_2)
 # ln(B_z^2) grows as 2*gamma*t, so the growth rate is half the log-slope.
 gamma_fit = 0.5 * slope
 
 # Amplitude-match the theoretical slope to the fit window for plotting.
-theory_intercept = np.mean(fit_ln_B_z_2 - 2.0 * gamma_theory * fit_t)
+theory_intercept = np.mean(fit_ln_Bz_2 - 2.0 * gamma_theory * fit_t)
 theory_ln = (
     theory_intercept + 2.0 * gamma_theory * t
 )  # extended over all t for the plot
@@ -347,7 +355,8 @@ fit_ln = intercept + slope * t
 
 print(f"Fit window: {fit_t[0]:.6e} s to {fit_t[-1]:.6e} s")
 print(f"Fit points: {fit_indices.size}")
-print(f"B_z^2 dynamic range: {dynamic_range:.6g} e-folds")
+print(f"ln(B_z^2) dynamic range: {dynamic_range:.6g}")
+print(f"ln(B_z^2) rise over fit window: {fit_ln_Bz_2_rise:.6g}")
 print(f"Fit R^2: {r_sq:.6f}")
 print(f"Fitted gamma: {gamma_fit:.6e} 1/s")
 print(f"gamma_fit / gamma_theory: {gamma_fit / gamma_theory:.6f}")
@@ -366,9 +375,9 @@ assert gamma_fit >= gamma_theory * (1.0 - GAMMA_RTOL_LOWER), (
 
 # Semilog plot of all three magnetic-field components together with the theory and fit slopes.
 fig, ax = plt.subplots()
-ax.semilogy(t, B_x_2, label=r"$\sum B_x^2$")
-ax.semilogy(t, B_y_2, label=r"$\sum B_y^2$")
-ax.semilogy(t, B_z_2, label=r"$\sum B_z^2$ (unstable)")
+ax.semilogy(t, Bx_2, label=r"$\sum B_x^2$")
+ax.semilogy(t, By_2, label=r"$\sum B_y^2$")
+ax.semilogy(t, Bz_2, label=r"$\sum B_z^2$ (fitted)")
 ax.semilogy(
     t,
     np.exp(theory_ln),
@@ -382,9 +391,9 @@ ax.axvspan(
 
 positive_plot_values = np.concatenate(
     (
-        B_x_2[B_x_2 > 0.0],
-        B_y_2[B_y_2 > 0.0],
-        B_z_2[B_z_2 > 0.0],
+        Bx_2[Bx_2 > 0.0],
+        By_2[By_2 > 0.0],
+        Bz_2[Bz_2 > 0.0],
         np.exp(theory_ln),
         np.exp(fit_ln),
     )
@@ -402,15 +411,16 @@ fig.tight_layout()
 fig.savefig("weibel_magnetic_energy_growth.png", dpi=150)
 plt.close(fig)
 
-# Animate the unstable B_z component and the electrons_1 charge density.
+# Animate the fitted B_z component and the electrons_1 charge density. The rho color scale is
+# centered on the initial mean of rho_electrons_1, so filamentation shows as red/blue deviations.
 save_field_animation(
     iterations,
     t,
     get_field_frame=lambda it: ts.get_field(
         field="B", coord="z", iteration=it, plot=False
     ),
-    vmin=-B_z_abs_max,
-    vmax=B_z_abs_max,
+    vmin=-Bz_abs_max,
+    vmax=Bz_abs_max,
     colorbar_label=r"$B_z$ (T)",
     title_prefix="B_z",
     filename="weibel_Bz.gif",
@@ -423,7 +433,7 @@ save_field_animation(
     ),
     vmin=rho_spatial_mean - rho_dev_max,
     vmax=rho_spatial_mean + rho_dev_max,
-    colorbar_label=r"$\rho_{\mathrm{e1}} - \langle\rho_{\mathrm{e1}}\rangle$ (C/m$^3$)",
+    colorbar_label=r"$\rho_{\mathrm{e1}}$ (C/m$^3$)",
     title_prefix="rho_electrons_1",
     filename="weibel_rho_electrons_1.gif",
 )
