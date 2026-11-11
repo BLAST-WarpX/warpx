@@ -109,4 +109,3 @@ for direction, level, lower, upper, expected in (
         electric, -dt * expected / 8.8541878188e-12, rtol=2e-9, atol=1e-14
     )
 libwarpx.finalize()
-
