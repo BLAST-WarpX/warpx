@@ -983,7 +983,10 @@ Setting up the field mesh
     physical shape across both leaf grids. Supports linear or cubic Esirkepov
     or Villasenor deposition for kinetic particles with fixed species charge.
     Particle trajectories and their deposition and filter stencils must remain
-    clear of material and physical boundaries. The reference implementation
+    clear of the outer box. With Villasenor deposition the projected particle
+    current feeds the native macroscopic and embedded-boundary update on the
+    parent grid. A parent conductor can collect particles. Esirkepov deposition
+    still requires particle stencils to remain clear of material boundaries. The reference implementation
     allocates temporary source arrays at the fine spacing across the domain.
 
 .. pp:param:: warpx.composite_yee_fixed_shape_gather

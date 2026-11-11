@@ -25,12 +25,28 @@ using amrex::Real;
 using warpx::fields::FieldType;
 
 namespace {
-// Restrict the source experiment to free-particle paths. Erode the vacuum
-// cells by a full step, shape support, and any current filter. Physical wall
-// charge, periodic images, and cut-cell deposition need separate operators.
 void
 initialize_centers (WarpX& w, amrex::iMultiFab& centers) {
     auto const box = w.Geom(0).Domain();
+    auto const filter =
+        WarpX::use_filter ? WarpX::filter_npass_each_dir : IntVect(0);
+    auto const ratio = w.refRatio(0);
+    // Round the fine stencil radius up in each parent direction.
+    auto const reach = amrex::coarsen(
+        IntVect((WarpX::nox + 1) / 2 + 1) + filter + ratio - IntVect(1), ratio);
+    if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+        // Villasenor uses the same fixed shape in the parent's regular and
+        // material cells. Its virtual current is restricted before the native
+        // macroscopic and EB field update. WarpX scrapes particles at the EB
+        // after that update. The refinement patch and its collar are checked
+        // separately; only the physical box can truncate this source stencil.
+        centers.setVal(0);
+        auto const interior = amrex::grow(box, -reach);
+        if (interior.ok()) { centers.setVal(1, interior, 0, 1); }
+        return;
+    }
+    // The native Esirkepov operator changes shape near an embedded boundary.
+    // Its virtual fixed-shape counterpart still requires a vacuum collar.
     auto const map = centers.DistributionMap();
     amrex::iMultiFab vacuum(amrex::BoxArray(box), map, 1, 0);
     auto const good = vacuum.array(0);
@@ -70,12 +86,6 @@ initialize_centers (WarpX& w, amrex::iMultiFab& centers) {
                 good(p) = int(ok);
             });
     }
-    auto const filter =
-        WarpX::use_filter ? WarpX::filter_npass_each_dir : IntVect(0);
-    auto const ratio = w.refRatio(0);
-    // Round the fine stencil radius up in each parent direction.
-    auto const reach = amrex::coarsen(
-        IntVect((WarpX::nox + 1) / 2 + 1) + filter + ratio - IntVect(1), ratio);
     auto const valid = centers.array(0);
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         IntVect const p{i, j, k};
@@ -229,7 +239,9 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
     });
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         amrex::get<0>(outside.value()) == 0,
-        "A fixed-shape particle source stencil reached a material or physical boundary.");
+        WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor
+            ? "A fixed-shape particle source stencil reached the outer physical boundary."
+            : "A fixed-shape particle source stencil reached a material or physical boundary.");
     std::array<amrex::Array4<Real>, 3> j;
     for (int d = 0; d < 3; ++d) {
         raw[d]->setVal(0._rt);
