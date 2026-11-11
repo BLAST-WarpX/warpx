@@ -982,12 +982,15 @@ Setting up the field mesh
     On the 3D conforming interface, deposit a particle current with the same
     physical shape across both leaf grids. Supports linear or cubic Esirkepov
     or Villasenor deposition for kinetic particles with fixed species charge.
-    Particle trajectories and their deposition and filter stencils must remain
-    clear of the outer box. With Villasenor deposition the projected particle
-    current feeds the native macroscopic and embedded-boundary update on the
-    parent grid. A parent conductor can collect particles. Esirkepov deposition
-    still requires particle stencils to remain clear of material boundaries. The reference implementation
-    allocates temporary source arrays at the fine spacing across the domain.
+    With Villasenor deposition the projected particle current feeds the native
+    macroscopic and embedded-boundary update on the parent grid. Particles
+    can reach parent conductors or leave through absorbing particle boundaries
+    backed by exterior PML. At these open faces the physical particle shape
+    extends into guard cells on its last push. Other outer boundaries require
+    the particle stencil to remain inside the domain. Esirkepov deposition
+    requires clearance from both material and physical boundaries.
+    This implementation allocates temporary arrays at the fine spacing across
+    the domain.
 
 .. pp:param:: warpx.composite_yee_fixed_shape_gather
     :type: bool

@@ -1255,7 +1255,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
         {
             amrex::Box box = pti.tilebox();
             box.grow(Ex.nGrowVect());
-            if(fixed) {box=warpx.Geom(1).Domain();}
+            if (fixed) { box = fixed.box; }
 
             const long np = pti.numParticles();
 
@@ -1464,7 +1464,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     // Add guard cells to the box.
     box.grow(ngEB);
-    if(fixed) {box=warpx.Geom(1).Domain();}
+    if (fixed) { box = fixed.box; }
 
     // Auxiliary booleans
     bool const gather_fields = (

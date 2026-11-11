@@ -31,6 +31,27 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
         set_tests_properties(test_3d_conforming_yee_esirkepov_wall_guard.run PROPERTIES
             PASS_REGULAR_EXPRESSION "A fixed-shape particle source stencil reached a material")
     endif()
+    foreach(side IN ITEMS lo hi)
+        set(reference test_3d_conforming_yee_uniform_exit_${side})
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_exit_${side}
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --uniform --open-face ${side}"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_exit_${side}
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --open-face ${side} --reference ../${reference}/wall_reference.npz"
+            OFF
+            OFF
+            ${reference}
+        )
+    endforeach()
     foreach(layout IN ITEMS box stepped)
         add_warpx_test(
             test_3d_conforming_yee_${layout}_pulse

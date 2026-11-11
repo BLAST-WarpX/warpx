@@ -12,6 +12,7 @@ class WarpX;
 
 struct FixedShapeGather {
     std::array<amrex::FArrayBox const*, 6> fields{};
+    amrex::Box box;
     [[nodiscard]] explicit
     operator bool () const {
         return fields[0] != nullptr;
