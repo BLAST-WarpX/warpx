@@ -180,3 +180,24 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
+
+if(WarpX_COMPUTE STREQUAL "NOACC" OR WarpX_COMPUTE STREQUAL "OMP")
+    add_warpx_test(
+        test_2d_collision_host_streams
+        2
+        1
+        inputs_test_2d_collision_host_streams
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_2d_collision_host_streams_restart
+        2
+        1
+        inputs_test_2d_collision_host_streams_restart
+        "analysis_default_restart.py --path diags/diag1000008"
+        OFF
+        test_2d_collision_host_streams
+    )
+endif()

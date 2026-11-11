@@ -1,4 +1,5 @@
 #include "FlushFormatCheckpoint.H"
+#include "HostRandomState.H"
 
 #include "BoundaryConditions/PML.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
@@ -195,6 +196,7 @@ FlushFormatCheckpoint::WriteToFile (
     WriteDMaps(checkpointname, nlev);
 
     WriteReducedDiagsData(checkpointname);
+    warpx::checkpoint::write_host_random_state(checkpointname);
 
     VisMF::SetHeaderVersion(current_version);
 
