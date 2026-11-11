@@ -6,6 +6,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "WarpX.H"
 #include "FieldSolver/CompositeYeeSurface.H"
 
@@ -809,6 +812,7 @@ WarpX::UpdateAuxiliaryDataSameType ()
                            Bfield_aux[1][d]->nGrowVect());
         }
         FillRadialInterfaceGatherGuards();
+        warpx::radial_particles::update_gather(*this);
         return;
     }
 #endif

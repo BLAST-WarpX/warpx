@@ -8,6 +8,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "WarpX.H"
 #include "FieldSolver/CompositeYeeSurface.H"
 
@@ -1026,6 +1029,10 @@ WarpX::InitData ()
         ExecutePythonCallback("afterInitatRestart");
     }
 
+#ifdef WARPX_DIM_RZ
+    warpx::radial_particles::initialize(*this, restart_chkfile);
+    warpx::radial_particles::update_gather(*this);
+#endif
     if (m_use_composite_yee_surface) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(finest_level == 1, "The conforming Yee surface requires a fine mesh.");
         m_composite_yee_surface = std::make_unique<CompositeYeeSurface>(*this);

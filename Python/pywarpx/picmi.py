@@ -1569,6 +1569,10 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         alias="warpx_composite_yee_fixed_shape_gather",
         description="Gather the force with the shape used by the fixed-shape current.",
     )
+    conforming_radial_fixed_shape: bool | None = Field(
+        default=None,
+        description="Use a fixed physical particle shape across the axisymmetric radial join.",
+    )
     conforming_radial_interface: bool | None = Field(
         default=None,
         description="Use a shared Yee interface for a full-length, axisymmetric bore refined by (2, 1).",
@@ -1648,6 +1652,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
             self.composite_yee_fixed_shape_gather
         )
         pywarpx.warpx.conforming_radial_interface = self.conforming_radial_interface
+        pywarpx.warpx.conforming_radial_fixed_shape = self.conforming_radial_fixed_shape
 
         if self.method == "PSATD":
             pywarpx.psatd.periodic_single_box_fft = self.psatd_periodic_single_box_fft

@@ -1,3 +1,6 @@
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "FlushFormatCheckpoint.H"
 
 #include "BoundaryConditions/PML.H"
@@ -80,6 +83,7 @@ FlushFormatCheckpoint::WriteToFile (
 
 #ifdef WARPX_DIM_RZ
     if (warpx.usesConformingRadialInterface() && ParallelDescriptor::IOProcessor()) {
+        warpx::radial_particles::write_identity(warpx, checkpointname);
         auto const filename = checkpointname + "/ConformingRadialInterface";
         std::ofstream marker(filename);
         marker << "Axisymmetric conforming radial Yee grid, version 1\n";

@@ -1015,6 +1015,27 @@ Setting up the field mesh
     method when restarting a checkpoint.
 
 
+.. pp:param:: warpx.conforming_radial_fixed_shape
+    :type: ``bool``
+    :default: ``0``
+
+    With :pp:param:`warpx.conforming_radial_interface`, a kinetic particle can
+    cross the radial join while keeping its physical shape. WarpX deposits
+    Esirkepov current on a finest-spacing particle grid, sums its guard cells
+    and applies the cylindrical volume factors. On the exterior Maxwell grid,
+    the radial current is the average of the two fine radial fluxes. The axial
+    current uses the annular dual area, including the larger dual cell at the
+    join. The particle force uses the same radial interpolation. The field
+    solve still takes place on the inner and outer Yee meshes.
+
+    The option supports particle shapes one through three, the energy-conserving
+    gather and axial current filtering. Prescribed antenna currents continue to
+    use their native grid and must have zero support in the interface collar.
+    A fixed-shape checkpoint records the particle shape and filter. A checkpoint
+    from the guarded radial interface can enable this option when every kinetic
+    stencil is still contained in the fine bore.
+
+
 .. pp:param:: warpx.ref_patch_function(x,y,z)
     :type: ``string``
     :optional:

@@ -8,6 +8,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "WarpX.H"
 #include "FieldSolver/CompositeYeeSurface.H"
 
@@ -607,6 +610,19 @@ WarpX::OneStep_nosub (
         FinalizeJ(); // Apply boundary conditions and inverse volume scaling to J
     }
 
+#ifdef WARPX_DIM_RZ
+    if (m_conforming_radial_interface) {
+        CheckRadialInterfaceCollar();
+        if (warpx::radial_particles::enabled(m_fields)) {
+            auto current = warpx::radial_particles::deposit(*this, a_dt);
+            if (use_filter) { ApplyFilterJ(current, 1); }
+            SumBoundaryJ(current, 1, Geom(1).periodicity());
+            auto const& j = current[1];
+            FinalizeJOnLevel(1, j[0], j[1], j[2], PatchType::fine);
+            warpx::radial_particles::add_current(*this, j);
+        }
+    }
+#endif
     if (m_composite_yee_surface) { m_composite_yee_surface->AssembleParticleCurrent(a_dt); }
 
     // At this point, J is up-to-date inside the domain except with Vay deposition,
@@ -662,7 +678,6 @@ WarpX::OneStep_nosub (
 
 #ifdef WARPX_DIM_RZ
         if (m_conforming_radial_interface) {
-            CheckRadialInterfaceCollar();
             ShareRadialInterface(false);
         }
 #endif

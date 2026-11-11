@@ -325,6 +325,30 @@ add_warpx_test(
 )
 
 if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
+    foreach(shape IN ITEMS 1 2 3)
+        set(crossing_options "")
+        if(shape EQUAL 3)
+            set(crossing_options "--inward --filter")
+        endif()
+        add_warpx_test(
+            test_rz_radial_fixed_shape_${shape}_picmi
+            RZ
+            1
+            "inputs_test_rz_radial_crossing.py --shape ${shape} ${crossing_options}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+    add_warpx_test(
+        test_rz_radial_fixed_shape_3_picmi_restart
+        RZ
+        1
+        "inputs_test_rz_radial_crossing.py --shape 3 --inward --filter --restart ../test_rz_radial_fixed_shape_3_picmi/diags/chk000032 --reference ../test_rz_radial_fixed_shape_3_picmi/radial_crossing.npz"
+        OFF
+        OFF
+        test_rz_radial_fixed_shape_3_picmi
+    )
     foreach(polarization IN ITEMS bz bt)
         foreach(direction IN ITEMS in out)
             add_warpx_test(

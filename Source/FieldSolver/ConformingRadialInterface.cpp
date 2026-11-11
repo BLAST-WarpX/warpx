@@ -1,5 +1,6 @@
 /* This file is part of WarpX. License: BSD-3-Clause-LBNL. */
 #include "WarpX.H"
+#include "RadialParticleCoupling.H"
 
 #include "Fields.H"
 #include "Particles/MultiParticleContainer.H"
@@ -104,10 +105,11 @@ WarpX::CheckRadialInterfaceCollar ()
     amrex::ReduceOps<amrex::ReduceOpMax> reduction;
     amrex::ReduceData<int> result(reduction);
     using Result = decltype(result)::Type;
+    bool const check_particle_stencils = !warpx::radial_particles::enabled(m_fields);
     for (int lev = 0; lev <= 1; ++lev) {
         amrex::Real const guard =
             0.5_rt * (nox + 2) * Geom(lev).CellSize(0) + PhysConst::c * dt[0];
-        for (int species = 0; species < mypc->nSpecies(); ++species) {
+        for (int species = 0; check_particle_stencils && species < mypc->nSpecies(); ++species) {
             auto& pc = mypc->GetParticleContainer(species);
             for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti) {
                 auto const* radial = pti.GetStructOfArrays().GetRealData(PIdx::r).data();

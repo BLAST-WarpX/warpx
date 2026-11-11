@@ -12,7 +12,7 @@ foreach(D IN LISTS WarpX_DIMS)
         WarpXSolveFieldsES.cpp
     )
     if(D STREQUAL "RZ")
-        target_sources(lib_${SD} PRIVATE ConformingRadialInterface.cpp)
+        target_sources(lib_${SD} PRIVATE ConformingRadialInterface.cpp RadialParticleCoupling.cpp)
     endif()
 endforeach()
 

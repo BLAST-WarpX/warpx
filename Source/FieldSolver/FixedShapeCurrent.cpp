@@ -3,6 +3,8 @@
  */
 #include "FixedShapeCurrent.H"
 
+#include "WarpX.H"
+
 #ifdef WARPX_DIM_3D
 #include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
@@ -11,7 +13,6 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Utils/TextMsg.H"
-#include "WarpX.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Reduce.H>
@@ -336,6 +337,9 @@ FixedShapeCurrent::UpdateGather (WarpX& w) {
     }
 }
 
+#endif
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
 FixedShapeGather
 get_fixed_shape_gather (
     WarpX& w, int lev, std::array<amrex::MultiFab const*, 6> const* requested) {
@@ -347,8 +351,8 @@ get_fixed_shape_gather (
         for (int d = 0; d < 3; ++d) {
             auto const dir = ablastr::fields::Direction{d};
             if (requested && (*requested)[3 * s + d] !=
-                                 w.m_fields.get(s ? FieldType::Bfield_aux
-                                                  : FieldType::Efield_aux,
+                                 w.m_fields.get(s ? warpx::fields::FieldType::Bfield_aux
+                                                  : warpx::fields::FieldType::Efield_aux,
                                                 dir, lev)) {
                 return {};
             }

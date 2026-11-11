@@ -8,6 +8,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "PhysicalParticleContainer.H"
 
 #include "Fields.H"
@@ -554,6 +557,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         !do_not_deposit
     );
     bool const deposit_current = (
+#ifdef WARPX_DIM_RZ
+        !warpx::radial_particles::enabled(fields) &&
+#endif
         !skip_deposition &&
         !do_not_deposit &&
         !(implicit_options && implicit_options->evolve_suborbit_particles_only)
