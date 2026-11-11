@@ -29,7 +29,6 @@
 
 using namespace amrex::literals;
 using amrex::Real;
-using warpx::fields::FieldType;
 
 namespace {
 std::string
@@ -87,6 +86,8 @@ CompositeYeeSurface::CheckRestartIdentity (WarpX& w,
 }
 
 #ifdef WARPX_DIM_3D
+using warpx::fields::FieldType;
+
 namespace {
 using Point = std::array<int, 3>;
 using Site = std::array<int, 4>; // component and native Yee index
