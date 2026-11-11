@@ -54,6 +54,8 @@ namespace {
 
 void WarpX::InitCompositeXZParticleCoupling ()
 {
+    // A vacuum restart can retain the interface option with no kinetic species.
+    if (mypc->nContainers() == 0) { return; }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         mypc->nSpecies() == mypc->nContainers() && nox >= 1 && nox <= 3 &&
         (current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -90,6 +92,7 @@ void WarpX::InitCompositeXZParticleCoupling ()
 
 void WarpX::AssembleCompositeXZCurrent (amrex::Real a_dt)
 {
+    if (!m_fields.has_vector(reference_current, 1)) { return; }
     auto const raw = m_fields.get_alldirs(reference_current, 1);
     auto const box = Geom(1).Domain();
     auto const dinv = InvCellSize(1);
@@ -168,6 +171,7 @@ void WarpX::AssembleCompositeXZCurrent (amrex::Real a_dt)
 
 void WarpX::UpdateCompositeXZGather ()
 {
+    if (!m_fields.has_vector(reference_current, 1)) { return; }
     auto const ratio = refRatio(0);
     for (int family = 0; family < 2; ++family) {
         auto const type = family ? FieldType::Bfield_fp : FieldType::Efield_fp;

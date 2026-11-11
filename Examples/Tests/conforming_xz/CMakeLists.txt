@@ -142,6 +142,15 @@ if(2 IN_LIST WarpX_DIMS AND WarpX_PYTHON)
         OFF
         OFF
     )
+    add_warpx_test(
+        test_2d_xz_slab_fixed_vacuum_picmi
+        2
+        1
+        inputs_test_2d_xz_slab_fixed_vacuum_picmi.py
+        OFF
+        OFF
+        OFF
+    )
     set(crossed test_2d_xz_slab_crossing_1x2_villasenor_picmi)
     add_warpx_test(
         test_2d_xz_slab_crossing_to_guarded_picmi_restart
