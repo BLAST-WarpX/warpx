@@ -11,6 +11,7 @@ from pywarpx.particle_containers import ParticleContainerWrapper
 parser = argparse.ArgumentParser()
 parser.add_argument("--inward", action="store_true")
 parser.add_argument("--low-seam", action="store_true")
+parser.add_argument("--axis", action="store_true")
 parser.add_argument("--shape", type=int, choices=(1, 2, 3), default=3)
 parser.add_argument("--filter", action="store_true")
 parser.add_argument("--restart", type=Path)
@@ -23,6 +24,12 @@ velocity = -0.38 if args.inward else 0.38
 z_direction = -1 if args.low_seam else 1
 dt = 0.45 * h / 299792458.0
 steps = 64
+initial_r = radius / 2 + (4 if args.inward else -4) * h
+azimuthal_velocity = 0.13
+if args.axis:
+    initial_r = 1.68 * h
+    velocity = -0.38
+    azimuthal_velocity = 0.0
 settings = [
     "radial-fixed-shape-crossing",
     "geometry.dims=RZ",
@@ -53,13 +60,15 @@ settings = [
     "particles.species_names=ions",
     "ions.species_type=proton",
     "ions.injection_style=singleparticle",
-    f"ions.single_particle_pos={radius / 2 + (4 if args.inward else -4) * h} 0 {z_direction * length * 0.41}",
-    f"ions.single_particle_u={velocity} 0.13 {z_direction * 0.28}",
+    f"ions.single_particle_pos={initial_r} 0 {z_direction * length * 0.41}",
+    f"ions.single_particle_u={velocity} {azimuthal_velocity} {z_direction * 0.28}",
     "ions.single_particle_weight=1e7",
     f"warpx.const_dt={dt:.17g}",
     "warpx.verbose=0",
     f"max_step={steps}",
 ]
+if args.axis:
+    settings.append("boundary.verboncoeur_axis_correction=0")
 if args.inward:
     settings += [
         "diagnostics.diags_names=chk",
@@ -110,7 +119,10 @@ def particle_charge():
             )
     assert len(locations) == 1
     r, z, level = locations[0]
-    wr = shape(np.arange(2 * n + 1) - r / h)
+    radial_indices = np.arange(2 * n + 1)
+    wr = shape(radial_indices - r / h)
+    # The even scalar charge shape folds its negative-r lobe back onto the mesh.
+    wr[1:] += shape(-radial_indices[1:] - r / h)
     distance = np.arange(nz) - (z + length / 2) / dz
     wz = shape((distance + nz / 2) % nz - nz / 2)
     if args.filter:
@@ -145,6 +157,8 @@ def work_error():
             widths = np.diff(np.r_[0.0, rface, radius])
             leaf_volume = 2 * np.pi * rnodes * widths * dz
         else:
+            # At r=0 the axial field has a finite dual disk.
+            fine_volume[0] = np.pi * (h / 2) ** 2 * dz
             leaf_volume = area * dz
         virtual = (
             values("radial_fixed_J", direction, 1)
@@ -185,9 +199,14 @@ for step in range(libwarpx.warpx.getistep(0), steps):
 print(
     f"Level {original} to {level}, peak continuity {peak_continuity:.3g}, Gauss {peak_gauss:.3g}, work {peak_work:.3g}"
 )
-if not args.restart:
-    assert original == int(not args.inward)
-assert level == int(args.inward)
+if args.axis:
+    assert original == level == 1
+    (theta,) = [t for t in pc.get_particle_theta(1, copy_to_host=True) if len(t)]
+    assert len(theta) == 1 and np.cos(theta[0]) < -0.99
+else:
+    if not args.restart:
+        assert original == int(not args.inward)
+    assert level == int(args.inward)
 assert peak_continuity < 2.0e-11
 assert peak_gauss < 2.0e-10
 assert peak_work < 2.0e-12
