@@ -5,6 +5,7 @@
 #
 # License: BSD-3-Clause-LBNL
 
+import os
 import re
 import sys
 
@@ -101,8 +102,6 @@ class WarpX(Bucket):
         """Parse an AMReX input file (and its includes) and return the
         geometry.dims value as a string or None if not found.
         """
-        import os
-
         if visited is None:
             visited = set()
         filename = os.path.abspath(filename)
@@ -110,8 +109,10 @@ class WarpX(Bucket):
             return None
         visited.add(filename)
 
-        # included files
-        file_pattern = re.compile(r'^\s*FILE\s*=\s*"?([^"\n\r]+)"?', re.I)
+        # included files, in quotes or up to a blank: a comment can follow
+        file_pattern = re.compile(
+            r'^\s*FILE\s*=\s*(?:"([^"\n\r]+)"|([^\s"#]\S*))', re.I
+        )
         # geometry.dims can be 1/2/3/RZ/RCYLINDER/RSPHERE
         dims_pattern = re.compile(
             r'^\s*geometry\.dims\s*=\s*"?\s*(1|2|3|RZ|RCYLINDER|RSPHERE)\s*"?', re.I
@@ -124,7 +125,7 @@ class WarpX(Bucket):
                     # Check for FILE = ... recursively
                     m_file = file_pattern.search(line)
                     if m_file:
-                        included_file = m_file.group(1).strip()
+                        included_file = m_file.group(1) or m_file.group(2)
                         val = WarpX.read_dims_from_file(included_file, visited)
                         if val is not None:
                             dims_value = val
@@ -143,6 +144,50 @@ class WarpX(Bucket):
 
         return dims_value
 
+    @staticmethod
+    def _amrex_argv(filename):
+        """The AMReX command line that loads an inputs file.
+
+        AMReX guesses whether its first argument is an inputs file: it is not
+        if it contains "=", and if it starts with "-", the parser is skipped
+        entirely (amrex::Initialize). A Jupyter kernel's sys.argv is
+        ["...launcher.py", "-f", "...json"], which would hide the inputs file
+        and every parameter in it. The file is thus included with an explicit
+        FILE directive, which also loads a path that contains "=".
+
+        Overrides as in `python run.py max_step=10 amr.n_cell=64 64 128` are
+        passed on the way AMReX sees them after an inputs file: arguments are
+        skipped up to the first "name=value", "name= value" or "name = value"
+        and passed on verbatim from there, since a value can span several
+        arguments. Arguments of the script itself thus go before the first
+        override or after a "--" separator, where AMReX stops parsing.
+        argv[0] is absolute for AMReX backtraces, as in init().
+        """
+        args = sys.argv[1:]
+        # AMReX does not parse past "--", so no override starts there
+        end = args.index("--") if "--" in args else len(args)
+
+        def starts_override(i):
+            # AMReX ends a definition only at the next "name =", so any other word
+            # before it joins FILE's values. FILE with more than one value is not
+            # included.
+            name, equals, _ = args[i].partition("=")
+            if not equals and not (i + 1 < end and args[i + 1].startswith("=")):
+                return False
+            words = name.split()
+            # a leading "-" marks an option of the script, e.g.,
+            # --opt=val or a kernel's --f=kernel.json
+            return len(words) == 1 and not words[0].startswith("-")
+
+        first = next((i for i in range(end) if starts_override(i)), end)
+        filename = os.fsdecode(filename)
+        if '"' in filename:
+            raise ValueError(
+                f"AMReX cannot include an inputs file with a double quote in its path: {filename}"
+            )
+        # quoted, since "=" and blanks split an unquoted value
+        return [sys.executable, f'FILE = "{filename}"'] + args[first:]
+
     def load_inputs_file(self, filename):
         from .Geometry import geometry
 
@@ -152,7 +197,7 @@ class WarpX(Bucket):
                 f"Error: Could not find the geometry.dims in the input file '{filename}' or its included files."
             )
 
-        libwarpx.initialize(sys.argv + [filename])
+        libwarpx.initialize(self._amrex_argv(filename))
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces
@@ -183,7 +228,51 @@ class WarpX(Bucket):
         self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
+        """Tear down WarpX and AMReX and clear all input state.
+
+        After this call, the process is ready to build and initialize a new
+        WarpX simulation variable of the *same* dimensionality. The compiled
+        ``warpx_pybind_*`` module stays loaded: multiple AMReX/WarpX geometries
+        cannot be loaded into the same Python process (see
+        :meth:`pywarpx._libwarpx.LibWarpX.load_library`), so the dimensionality
+        is fixed for the lifetime of the process.
+
+        Note that this is deliberately not part of
+        :meth:`pywarpx._libwarpx.LibWarpX.finalize`, which is the function
+        registered with :mod:`atexit`: there is nothing to gain from resetting
+        Python state while the interpreter is shutting down.
+        """
+        # shut down the C++ side first; a no-op if it was never initialized.
+        # This always unregisters the Python callbacks.
         libwarpx.finalize(finalize_mpi)
+
+        # this module imports these lists by name (see above), so they must be
+        # cleared in place; the dicts of the buckets below are rebound to fresh
+        # defaults by Bucket.clear() itself
+        del collisions_list[:]
+        del lasers_list[:]
+        del particles_list[:]
+
+        for bucket in [
+            algo,
+            amr,
+            amrex,
+            boundary,
+            collisions,
+            diagnostics,
+            eb2,
+            external_vector_potential,
+            geometry,
+            hybridpicmodel,
+            interpolation,
+            lasers,
+            my_constants,
+            particles,
+            psatd,
+            reduced_diagnostics,
+            self,
+        ]:
+            bucket.clear()
 
     def getProbLo(self, direction):
         return libwarpx.libwarpx_so.warpx_getProbLo(direction)

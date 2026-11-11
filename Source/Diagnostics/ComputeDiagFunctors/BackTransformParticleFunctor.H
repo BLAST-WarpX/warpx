@@ -161,7 +161,7 @@ struct LorentzTransformParticles
         amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
         dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
         dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
-        dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
+        dst.m_rdata[PIdx::phi][i_dst] = std::atan2(zp, rpxy);
 #elif defined (WARPX_DIM_XZ)
         dst.m_rdata[PIdx::x][i_dst] = xp;
         dst.m_rdata[PIdx::z][i_dst] = zp;

@@ -57,12 +57,18 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         // Minimum allowed energy of the virtual photons
         amrex::Real vphoton_min_energy = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_min_energy", vphoton_min_energy);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            vphoton_min_energy > 0.0_rt,
+            "qed_virtual_photons_min_energy must be strictly positive.");
 
         // Sampling factor (a.k.a. multiplier):
         // the number of virtual photons generated is multiplied by this factor,
         // the weight of each virtual photon is divided by this factor
         amrex::Real sampling_factor = 0.0_rt;
         utils::parser::getWithParser(pp_species_name, "qed_virtual_photons_multiplier", sampling_factor);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            sampling_factor > 0.0_rt,
+            "qed_virtual_photons_multiplier must be strictly positive.");
 
         amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
         amrex::Real constexpr inv_c2 = PhysConst::inv_c2;
@@ -285,6 +291,17 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 });
             } // mfi
         } // lev
+
+#if defined (WARPX_DIM_3D)
+        if (do_beam_size_effect) {
+            // The beam-size effect displaces virtual photons away from the cell
+            // of their parent particle, so they need a Redistribute to be placed
+            // in the correct box/tile. This must happen before they are used in
+            // collisions (see CollisionHandler::doCollisions) since the collision
+            // kernel assumes that particles are already in the correct box/tile.
+            vphotons.Redistribute();
+        }
+#endif
     } // species
 
 #else

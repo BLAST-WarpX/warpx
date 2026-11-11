@@ -51,11 +51,11 @@ namespace ablastr::fields {
 /** Compute the vector potential `A` by solving the Poisson equation
  *
  * Uses `J` as a source, assuming that the source moves at a
- * constant speed \f$\vec{\beta}\f$. This uses the AMReX solver.
+ * constant speed \f$\boldsymbol{\beta}\f$. This uses the AMReX solver.
  *
  * More specifically, this solves the equation
  * \f[
- *   \vec{\nabla}^2 r \vec{A} - (\vec{\beta}\cdot\vec{\nabla})^2 r \vec{A} = - r \mu_0 \vec{J}
+ *   \nabla^2 r \boldsymbol{A} - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \boldsymbol{A} = - r \mu_0 \boldsymbol{J}
  * \f]
  *
  * \tparam T_BoundaryHandler handler for boundary conditions, for example @see MagnetostaticSolver::MultiPoissonBoundaryHandler
@@ -212,6 +212,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
             mlmg[adim]->setVerbose(verbosity);
             mlmg[adim]->setMaxIter(max_iters);
             mlmg[adim]->setConvergenceNormType(always_use_bnorm ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+            mlmg[adim]->setNoGpuSync(true);
 
             // Solve Poisson equation at lev
             mlmg[adim]->solve( {A[lev][adim]}, {curr[lev][adim]},

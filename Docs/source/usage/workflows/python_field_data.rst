@@ -198,7 +198,8 @@ In the example below, a new ``MultiFab`` is created with the same properties as 
                                          ngrow=Ex.n_grow_vect,
                                          initial_value=0.,
                                          redistribute=True,
-                                         redistribute_on_remake=True)
+                                         redistribute_on_remake=True,
+                                         checkpoint_restart=False)
 
 
 .. dropdown:: See this function used in a full example

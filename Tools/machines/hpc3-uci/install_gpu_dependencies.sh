@@ -26,7 +26,7 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 #    echo "Is the \$proj environment variable of value \"$proj\" correctly set? "
 #    echo "Please edit line 2 of your hpc3_gpu_warpx.profile file to continue!"
 ##    exit
-fi
+#fi
 
 
 # Remove old dependencies #####################################################
@@ -39,6 +39,10 @@ mkdir -p ${SW_DIR}
 python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
+
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
 
 
 # General extra dependencies ##################################################
@@ -109,7 +113,6 @@ rm -rf $HOME/src/lapackpp-pm-gpu-build
 #
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade virtualenv
-python3 -m pip cache purge
 rm -rf ${SW_DIR}/venvs/warpx-gpu
 python3 -m venv ${SW_DIR}/venvs/warpx-gpu
 source ${SW_DIR}/venvs/warpx-gpu/bin/activate

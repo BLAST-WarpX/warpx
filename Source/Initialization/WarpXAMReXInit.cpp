@@ -236,7 +236,7 @@ namespace {
         const auto params_to_parse = std::vector<std::string>{
             "max_grid_size", "max_grid_size_x", "max_grid_size_y", "max_grid_size_z",
             "blocking_factor", "blocking_factor_x", "blocking_factor_y", "blocking_factor_z"};
-        std::for_each(params_to_parse.begin(), params_to_parse.end(), preparse_amrex_input_int_array);
+        std::ranges::for_each(params_to_parse, preparse_amrex_input_int_array);
     }
 
     /** This method groups calls to functions related to the initialization of AMReX

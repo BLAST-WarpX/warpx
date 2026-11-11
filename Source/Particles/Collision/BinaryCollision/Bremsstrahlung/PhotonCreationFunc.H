@@ -271,6 +271,7 @@ public:
         {
             const auto start_index = int(products_np[i]);
             const auto stop_index  = int(products_np[i] + num_added_vec[i]);
+            setNewParticleIDs(*tile_products[i], start_index, num_added_vec[i]);
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                                  *pc_products[i], start_index, stop_index);
         }

@@ -107,8 +107,12 @@ if not sim.test:
     def get_field_lines(Bx, Bz):
         field_line_coords = []
 
-        Bx_interp = interpolate.interp2d(x_grid, z_grid, Bx[:-1].T)
-        Bz_interp = interpolate.interp2d(x_grid, z_grid, Bz[:, :-1].T)
+        Bx_interp = interpolate.RegularGridInterpolator(
+            (x_grid, z_grid), Bx[:-1], bounds_error=False, fill_value=None
+        )
+        Bz_interp = interpolate.RegularGridInterpolator(
+            (x_grid, z_grid), Bz[:, :-1], bounds_error=False, fill_value=None
+        )
 
         for kk, z in enumerate(start_z):
             path_x = [start_x[kk]]
@@ -117,8 +121,8 @@ if not sim.test:
             ii = 0
             while ii < 10000:
                 ii += 1
-                Bx = Bx_interp(path_x[-1], path_z[-1])[0]
-                Bz = Bz_interp(path_x[-1], path_z[-1])[0]
+                Bx = Bx_interp((path_x[-1], path_z[-1])).item()
+                Bz = Bz_interp((path_x[-1], path_z[-1])).item()
 
                 # print(path_x[-1], path_z[-1], Bx, Bz)
 

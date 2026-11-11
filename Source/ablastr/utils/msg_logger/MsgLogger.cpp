@@ -337,7 +337,7 @@ std::pair<int,int> Logger::find_gather_rank_and_its_msgs(int how_many_msgs) cons
 
     const auto m_am_i_io = (m_rank == m_io_rank);
     if (m_am_i_io){
-        const auto it_max = std::max_element(num_msg.begin(), num_msg.end());
+        const auto it_max = std::ranges::max_element(num_msg);
         max_items = *it_max;
 
         //In case of an "ex aequo" the I/O rank should be the gather rank
@@ -423,7 +423,7 @@ Logger::compute_msgs_with_counter_and_ranks(
             #pragma omp critical
 #endif
             {
-                if (tmap.find(msg_with_counter.msg) == tmap.end()){
+                if (!tmap.contains(msg_with_counter.msg)){
                     const auto msg_with_counter_and_ranks =
                         MsgWithCounterAndRanks{
                             msg_with_counter,
@@ -460,7 +460,7 @@ Logger::compute_msgs_with_counter_and_ranks(
 
     // Sort affected ranks lists
     for(auto& el : msgs_with_counter_and_ranks){
-        std::sort(el.ranks.begin(), el.ranks.end());
+        std::ranges::sort(el.ranks);
     }
 
     return msgs_with_counter_and_ranks;

@@ -8,6 +8,9 @@ import numpy as np
 import yt
 from scipy.constants import c, mu_0, pi
 
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import parse_input_file
+
 # This is a script that analyses the simulation results from
 # the script `inputs_3d`. This simulates a TMmnp mode in a PEC cubic resonator.
 # The magnetic field in the simulation is given (in theory) by:
@@ -25,6 +28,10 @@ test_name = os.path.split(os.getcwd())[1]
 hi = [0.8, 0.8, 0.8]
 lo = [-0.8, -0.8, -0.8]
 ncells = [48, 48, 48]
+# Read the finest mesh-refinement level from the input file, and analyze the
+# fields on that level (level 0 without mesh refinement, level 1 with it)
+input_dict = parse_input_file("./warpx_used_inputs")
+mr_level = int(input_dict["amr.max_level"][0])
 dx = (hi[0] - lo[0]) / ncells[0]
 dy = (hi[1] - lo[1]) / ncells[1]
 dz = (hi[2] - lo[2]) / ncells[2]
@@ -39,9 +46,7 @@ h_2 = (m * pi / Lx) ** 2 + (n * pi / Ly) ** 2 + (p * pi / Lz) ** 2
 # Open the right plot file
 filename = sys.argv[1]
 ds = yt.load(filename)
-data = ds.covering_grid(
-    level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
-)
+data = ds.covering_grid(level=mr_level, left_edge=lo, dims=ncells)
 
 # Parse test name and check whether this use the macroscopic solver
 # (i.e. solving the equation in a dielectric)

@@ -48,7 +48,7 @@ alias getNode="salloc -N 1 --partition=gpu --ntasks-per-node=2 --cpus-per-task=2
 alias runNode="srun -N 1 --partition=gpu --ntasks-per-node=2 --cpus-per-task=20 --gpus-per-task=v100:1 -t 1:00:00 -A $proj"
 
 # optimize CUDA compilation for V100
-export AMREX_CUDA_ARCH=7.0
+export CUDAARCHS=70
 
 # optimize CPU microarchitecture for Intel Xeon Gold 6148
 export CXXFLAGS="-march=skylake-avx512"

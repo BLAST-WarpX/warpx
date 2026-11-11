@@ -246,7 +246,7 @@ void CheckGriddingForRZSpectral ()
 #ifdef WARPX_DIM_RZ
     const ParmParse pp_algo("algo");
     auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
-    pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
+    pp_algo.query_enum_case_insensitive("maxwell_solver", electromagnetic_solver_id);
 
     // only check for PSATD in RZ
     if (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {

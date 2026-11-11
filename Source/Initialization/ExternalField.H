@@ -14,6 +14,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_BaseFab.H>
+#include <AMReX_Dim3.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuContainers.H>
@@ -203,7 +204,7 @@ public:
     [[nodiscard]] ExternalFieldView getView (int li) const;
 
     //! Return lightweight view that can be used in kernels
-    [[nodiscard]] ExternalFieldView getView () const;
+    [[nodiscard]] ExternalFieldView getView () const noexcept;
 
     /**
      * \brief This must be called before calling `getView` to prepare for
@@ -239,7 +240,7 @@ private:
     //! Read data within this box
     void load_data (amrex::RealBox const& pbox);
     //! Used by getView to make ExternalFieldView
-    [[nodiscard]] ExternalFieldView make_view (amrex::BaseFab<double> const& fab) const;
+    [[nodiscard]] ExternalFieldView make_view (amrex::BaseFab<double> const& fab) const noexcept;
     //! During the moving window stage, we cache the data for
     //! performance. This function makes a Box for caching.
     void make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign);
@@ -261,5 +262,59 @@ private:
     amrex::BaseFab<double> m_fab; //! data container for loaded data
     amrex::FabArray<amrex::BaseFab<double>> m_mf; //! non-owning container for communication purpose
 };
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+/**
+ * \brief Companion class for a triplet of ExternalFieldReader.
+ *
+ * This groups the views of the three components of a vector record into a
+ * single lightweight functor that can be used in kernels. It is the
+ * vector-valued analogue of ExternalFieldView.
+ */
+struct ExternalFieldVectorView
+{
+    /**
+     * \brief Construct the view from the readers of the three components.
+     */
+    ExternalFieldVectorView (ExternalFieldReader const* x_reader,
+                             ExternalFieldReader const* y_reader,
+                             ExternalFieldReader const* z_reader) noexcept;
+
+    //! Return the three components of the field, linearly interpolated at the
+    //! given position.
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::XDim3
+    getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if (AMREX_SPACEDIM < 3)
+        amrex::ignore_unused(x,y,z);
+#endif
+#if (AMREX_SPACEDIM == 1)
+        amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_XZ)
+        amrex::RealVect const pos{x,z};
+#else
+        amrex::RealVect const pos{x,y,z};
+#endif
+#if defined(AMREX_USE_GPU)
+        // The views can only be evaluated on device: ExternalFieldView calls
+        // the interpolation routines of ablastr::math, which are device-only.
+        AMREX_IF_ON_HOST((amrex::Abort(
+            "For GPU builds, ExternalFieldVectorView only works on device.");))
+        AMREX_IF_ON_DEVICE((return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};))
+        return amrex::XDim3{0.0, 0.0, 0.0};
+#else
+        return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};
+#endif
+    }
+
+private:
+    ExternalFieldView m_x_view;
+    ExternalFieldView m_y_view;
+    ExternalFieldView m_z_view;
+};
+#endif
 
 #endif //WARPX_EXTERNAL_FIELD_H_

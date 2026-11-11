@@ -116,7 +116,8 @@ public:
      */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                               int lev,
-                              amrex::Real dt) override;
+                              amrex::Real dt,
+                              ImplicitOptions const& implicit_options) override;
 
     /**
      * \brief Gather fields and push particles in one fused kernel.
@@ -169,7 +170,6 @@ public:
                          amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
     void ImplicitPushXPSubOrbits (WarpXParIter& pti,
-                                  ablastr::fields::MultiFabRegister& fields,
                                   amrex::FArrayBox const * exfab,
                                   amrex::FArrayBox const * eyfab,
                                   amrex::FArrayBox const * ezfab,
@@ -196,7 +196,8 @@ public:
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
                         const amrex::MultiFab& Bz,
-                        MomentumPushType momentum_push_type) override;
+                        MomentumPushType momentum_push_type,
+                        std::optional<FieldGatherOrders> gather_orders) override;
 
     void PartitionParticlesInBuffers (
                         long& nfine_current,
@@ -295,18 +296,6 @@ public:
  * \brief Apply NCI Godfrey filter to all components of E and B before gather
  * \param lev MR level
  * \param box box onto which the filter is applied
- * \param exeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field Ex
- * \param eyeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field Ey
- * \param ezeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field Ez
- * \param bxeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field Bx
- * \param byeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field By
- * \param bzeli safeguard Elixir object (to avoid de-allocating too early
-            --between ParIter iterations-- on GPU) for field Bz
  * \param filtered_Ex Array containing filtered value
  * \param filtered_Ey Array containing filtered value
  * \param filtered_Ez Array containing filtered value
@@ -332,8 +321,6 @@ public:
  */
     void applyNCIFilter (
         int lev, const amrex::Box& box,
-        amrex::Elixir& exeli, amrex::Elixir& eyeli, amrex::Elixir& ezeli,
-        amrex::Elixir& bxeli, amrex::Elixir& byeli, amrex::Elixir& bzeli,
         amrex::FArrayBox& filtered_Ex, amrex::FArrayBox& filtered_Ey,
         amrex::FArrayBox& filtered_Ez, amrex::FArrayBox& filtered_Bx,
         amrex::FArrayBox& filtered_By, amrex::FArrayBox& filtered_Bz,
@@ -465,7 +452,6 @@ protected:
     */
     bool findRefinedInjectionBox (amrex::Box& fine_injection_box, amrex::IntVect& rrfac);
 
-    std::string species_name;
     std::vector<std::unique_ptr<PlasmaInjector>> plasma_injectors;
 
     // When true, adjust the transverse particle positions accounting

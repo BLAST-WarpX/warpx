@@ -1,0 +1,20 @@
+# Basic `dependabot.yml` file with minimum configuration for package managers.
+# Reference: https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-version-updates.
+
+version: 2
+updates:
+  # Enable version updates for GitHub Actions.
+  # Workflows pin every action to a full commit SHA, with the release tag as a
+  # trailing comment, e.g., `uses: actions/checkout@<sha> # v7.0.1`, because
+  # tags can be moved. Dependabot updates both the SHA and the comment.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "development"
+    # One weekly PR for all actions, instead of one per action
+    # (or per sub-action, e.g., `github/codeql-action/init`).
+    groups:
+      github-actions:
+        patterns:
+          - "*"

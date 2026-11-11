@@ -13,6 +13,7 @@
 #include "Fields.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Python/callbacks.H"
 #include "WarpX.H"
 
 using namespace amrex;
@@ -37,7 +38,8 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     [[maybe_unused]] MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
     ABLASTR_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
 
@@ -58,13 +60,16 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     // set the boundary potentials appropriately
     setPhiBC(phi_fp, warpx.gett_new(0));
 
+    ExecutePythonCallback("beforedeposition");
     // Calculate the mass enhancement factor - see  Appendix A of
     // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
     // Also accumulate the total charge density.
     ComputeSigma(rho_fp);
+    ExecutePythonCallback("afterdeposition");
 
     // perform phi calculation
-    computePhi(rho_fp, phi_fp, Efield_fp);
+    int const verbosity = verbose_step ? m_mlmg_options.verbosity : 0;
+    computePhi(rho_fp, phi_fp, Efield_fp, verbosity);
 
     // Compute the electric field. Note that if an EB is used the electric
     // field will be calculated in the computePhi call.
@@ -77,12 +82,13 @@ void EffectivePotentialES::ComputeSpaceChargeField (
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
-    ablastr::fields::MultiLevelVectorField const& efield )
+    ablastr::fields::MultiLevelVectorField const& efield,
+    int const verbosity)
 {
     // Use the AMREX MLMG solver
-    computePhi(rho, phi, efield, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity);
+    auto mlmg_options = m_mlmg_options;
+    mlmg_options.verbosity = verbosity;
+    computePhi(rho, phi, efield, mlmg_options);
 }
 
 void EffectivePotentialES::ComputeSigma (
@@ -114,7 +120,7 @@ void EffectivePotentialES::ComputeSigma (
     // The "coarsening is just 1 i.e. no coarsening"
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
 
-    // GetChargeDensity returns a nodal multifab
+    // GetChargeDensityOnLevel returns a nodal multifab
     // Below we set all the unused dimensions to have cell-centered values for
     // rho since these values will be interpolated onto a cell-centered grid
     // - if this is not done the Interp function returns nonsense values.
@@ -156,12 +162,13 @@ void EffectivePotentialES::ComputeSigma (
         // grab the charge density for this species
         // Note: local deposition is done since the guard cells values are added
         // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below.
-        // The rho boundary condition and inverse volume scaling for RZ is done
-        // within the `GetChargeDensity` function.
-        auto rho = pc->GetChargeDensity(lev, true);
+        // Defer physical boundary folding and volume scaling until after filtering.
+        auto rho = pc->GetChargeDensityOnLevel(lev, true, /*finalize*/false);
 
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
+        // Apply boundary conditions to rho, and then apply volume scaling
+        warpx.FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
 
         // Add rho for this species to the total charge density MultiFab,
         // but only over the guard region that exists in both MultiFabs
@@ -206,10 +213,7 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     ablastr::fields::MultiLevelVectorField const& efield,
-    amrex::Real required_precision,
-    amrex::Real absolute_tolerance,
-    int max_iters,
-    int verbosity
+    ablastr::fields::MLMGOptions const & mlmg_options
 ) const
 {
     // create a vector to our fields, sorted by level
@@ -279,10 +283,7 @@ void EffectivePotentialES::computePhi (
         sorted_rho,
         sorted_phi,
         *sigma,
-        required_precision,
-        absolute_tolerance,
-        max_iters,
-        verbosity,
+        mlmg_options,
         warpx.Geom(),
         warpx.DistributionMap(),
         warpx.boxArray(),

@@ -2,15 +2,15 @@
 #export proj="<yourProjectNameHere>"  # edit this and comment in
 
 # required dependencies
-module load cmake/3.26.3
-module load clang/14.0.6-magic
+module load cmake/3.30.5
+module load clang/22.1.5-magic
 module load mvapich2/2.3.7
 
 # optional: for PSATD support
 module load fftw/3.3.10
 
 # optional: for QED lookup table generation support
-module load boost/1.80.0
+module load boost/1.86.0
 
 # optional: for openPMD support
 module load hdf5-parallel/1.14.0
@@ -29,9 +29,16 @@ export CMAKE_PREFIX_PATH=${WARPX_SW_DIR}/install/lapackpp-2024.10.26:$CMAKE_PREF
 export LD_LIBRARY_PATH=${WARPX_SW_DIR}/install/blaspp-2024.10.26/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${WARPX_SW_DIR}/install/lapackpp-2024.10.26/lib64:$LD_LIBRARY_PATH
 
+# optional: for implicit solvers
+# only do this is PETSC_DIR is not already defined
+if [[ -z "${PETSC_DIR:-}" ]]; then
+    export PETSC_DIR="${WARPX_SW_DIR}/src/petsc"
+    export PETSC_ARCH="arch-opt"
+fi
+
 # optional: for Python bindings
 #module load python/3.12.2 # Note this version uses a too new GLIBCXX and breaks the adios build
-module load python/3.11.5
+module load python/3.14.6
 
 if [ -d "${WARPX_SW_DIR}/venvs/warpx-dane" ]
 then
@@ -39,10 +46,10 @@ then
 fi
 
 # optional: an alias to request an interactive node for two hours
-alias getNode="srun --time=0:30:00 --nodes=1 --ntasks-per-node=2 --cpus-per-task=56 -p pdebug --pty bash"
-# an alias to run a command on a batch node for up to 30min
+alias getNode="srun --time=2:00:00 --nodes=1 --ntasks-per-node=2 --cpus-per-task=56 -p pdebug --pty bash"
+# an alias to run a command on a batch node for up to 1 hour
 #   usage: runNode <command>
-alias runNode="srun --time=0:30:00 --nodes=1 --ntasks-per-node=2 --cpus-per-task=56 -p pdebug"
+alias runNode="srun --time=1:00:00 --nodes=1 --ntasks-per-node=1 --cpus-per-task=56 -p pdebug"
 
 # fix system defaults: do not escape $ with a \ on tab completion
 shopt -s direxpand

@@ -188,6 +188,7 @@ void ParticleHistogram2D::ComputeDiags (int step)
     Real const bin_size_ord = m_bin_size_ord;
 
     bool const do_parser_filter = m_do_parser_filter;
+    bool const do_parser_value = m_do_parser_value;
 
     int const nlevs = std::max(0, myspc.finestLevel()+1);
     for (int lev = 0; lev < nlevs; ++lev) {
@@ -207,8 +208,12 @@ void ParticleHistogram2D::ComputeDiags (int step)
 
                 long const np = pti.numParticles();
 
-                //Flag particles that need to be copied if they cross the z_slice
-                amrex::ParallelFor(np,
+                //Flag particles that need to be copied if they cross the z_slice.
+                // amrex::For: iterations accumulate into shared histogram bins;
+                // in serial (non-OpenMP) builds HostDevice::Atomic::Add is a plain
+                // +=, which is unsafe under the SIMD pragma of ParallelFor
+                // (see issue #7097)
+                amrex::For(np,
                                    [=] AMREX_GPU_DEVICE(int i)
                                    {
                                        amrex::ParticleReal x, y, z;
@@ -228,7 +233,10 @@ void ParticleHistogram2D::ComputeDiags (int step)
                                        // continue function if particle is not filtered out
                                        auto const f_abs = fun_partparser_abs(t, x, y, z, ux, uy, uz, w);
                                        auto const f_ord = fun_partparser_ord(t, x, y, z, ux, uy, uz, w);
-                                       auto const weight = static_cast<amrex::ParticleReal>(fun_valueparser(t, x, y, z, ux, uy, uz, w));
+                                       // default to the particle weight if no value function is given
+                                       auto const weight = do_parser_value ?
+                                           static_cast<amrex::ParticleReal>(fun_valueparser(t, x, y, z, ux, uy, uz, w)) :
+                                           static_cast<amrex::ParticleReal>(w);
 
                                        // determine particle bin
                                        int const bin_abs = int(Math::floor((f_abs-bin_min_abs)/bin_size_abs));

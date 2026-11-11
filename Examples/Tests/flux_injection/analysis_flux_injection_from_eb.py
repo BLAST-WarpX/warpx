@@ -13,7 +13,6 @@ We check that the embedded boundary emits the correct number of particles, and t
 the particle distributions are consistent with the expected distributions.
 """
 
-import re
 import sys
 
 import matplotlib.pyplot as plt
@@ -21,6 +20,9 @@ import numpy as np
 import yt
 from scipy.constants import c, m_e
 from scipy.special import erf
+
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
 
 yt.funcs.mylog.setLevel(0)
 
@@ -31,13 +33,12 @@ ad = ds.all_data()
 t_inj = 0.5e-8  # duration for which the flux injection was active
 
 # Extract the dimensionality of the simulation
-with open("./warpx_used_inputs", "r") as f:
-    warpx_used_inputs = f.read()
-if re.search("geometry.dims = 2", warpx_used_inputs):
+input_dict = parse_input_file("./warpx_used_inputs")
+if input_has_value(input_dict, "geometry.dims", "2"):
     dims = "2D"
-elif re.search("geometry.dims = RZ", warpx_used_inputs):
+elif input_has_value(input_dict, "geometry.dims", "RZ"):
     dims = "RZ"
-elif re.search("geometry.dims = 3", warpx_used_inputs):
+elif input_has_value(input_dict, "geometry.dims", "3"):
     dims = "3D"
 
 # Total number of electrons expected:

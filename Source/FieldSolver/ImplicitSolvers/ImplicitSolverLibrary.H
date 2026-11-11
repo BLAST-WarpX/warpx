@@ -10,5 +10,6 @@
 #include "SemiImplicitEM.H"  // IWYU pragma: export
 #include "ThetaImplicitEM.H"  // IWYU pragma: export
 #include "StrangImplicitSpectralEM.H"  // IWYU pragma: export
+#include "SemiImplicitDarwin.H"  // IWYU pragma: export
 
 #endif

@@ -117,7 +117,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
         }
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);
@@ -363,7 +363,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
             X6 = X6_coef[mfi].array();
         }
 
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         int const nr = bx.length(0);
         amrex::Real const dt = m_dt;
@@ -437,7 +437,7 @@ PsatdAlgorithmRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = field_data.getKrArray(mfi);
+        auto const & kr_modes = field_data.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);

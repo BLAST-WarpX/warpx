@@ -7,7 +7,7 @@
 #ifndef WARPX_PRECONDITIONER_H_
 #define WARPX_PRECONDITIONER_H_
 
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 
 #include "Utils/TextMsg.H"
 #include <AMReX_Enum.H>
@@ -58,7 +58,7 @@ class Preconditioner
         /**
          * \brief Update the preconditioner
          */
-        virtual void Update ( const T& a_U ) = 0;
+        virtual void Update () = 0;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS

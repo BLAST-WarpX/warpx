@@ -25,6 +25,7 @@
 #include <AMReX_FabFactory.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
@@ -167,6 +168,21 @@ public:
         return *sigba_cp;
     }
 
+    /** Flags indicating on which grid points the E field (and the PML current)
+     *  should be updated, depending on their position relative to the embedded
+     *  boundary, on the fine patch. */
+    [[nodiscard]] std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const & GetEBUpdateEFlag_fp () const
+    {
+        return m_eb_update_E_fp;
+    }
+
+    /** Same as `GetEBUpdateEFlag_fp`, for the coarse patch. The arrays are empty
+     *  when this PML has no coarse patch (i.e. at level 0). */
+    [[nodiscard]] std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const & GetEBUpdateEFlag_cp () const
+    {
+        return m_eb_update_E_cp;
+    }
+
 #ifdef WARPX_USE_FFT
     void PushPSATD (ablastr::fields::MultiFabRegister& fields, int lev);
 #endif
@@ -212,6 +228,12 @@ private:
 
     std::unique_ptr<MultiSigmaBox> sigba_fp;
     std::unique_ptr<MultiSigmaBox> sigba_cp;
+
+    // Flags indicating on which grid points the E field (and PML current) should
+    // be updated, depending on their position relative to the embedded boundary.
+    // The coarse-patch flags are only allocated when this PML has a coarse patch.
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > m_eb_update_E_fp;
+    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > m_eb_update_E_cp;
 
 #ifdef WARPX_USE_FFT
     std::unique_ptr<SpectralSolver> spectral_solver_fp;

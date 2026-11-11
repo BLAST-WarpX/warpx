@@ -2,6 +2,26 @@
 #
 
 add_warpx_test(
+    test_3d_projection_div_cleaner_applied_field_picmi  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_projection_div_cleaner_applied_field_picmi.py  # inputs
+    OFF  # analysis (efficacy assertions are embedded in the input script)
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_projection_div_cleaner_applied_field_zero_picmi  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_projection_div_cleaner_applied_field_zero_picmi.py  # inputs
+    OFF  # analysis (regression assertions are embedded in the input script)
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_projection_div_cleaner_callback_picmi  # name
     3  # dims
     1  # nprocs

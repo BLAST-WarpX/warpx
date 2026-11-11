@@ -7,19 +7,13 @@
 
 #include "GetVelocity.H"
 
-GetVelocity::GetVelocity (VelocityProperties const& vel) noexcept
-    : m_type{vel.m_type}, m_dir{vel.m_dir}, m_sign_dir{vel.m_sign_dir}
-{
-    if (m_type == VelConstantValue) {
-        m_velocity = vel.m_velocity;
-    }
-    else if (m_type == VelParserFunction) {
-        m_velocity_parser = vel.m_ptr_velocity_parser->compile<3>();
-    }
-}
-
 GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
     : m_type{vel.m_type}
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    , m_from_file{vel.m_u_mean_x_reader.get(), vel.m_u_mean_y_reader.get(),
+                  vel.m_u_mean_z_reader.get()}
+#endif
 {
     if (m_type == VelConstantVector) {
         m_ux_mean = vel.m_ux_mean;

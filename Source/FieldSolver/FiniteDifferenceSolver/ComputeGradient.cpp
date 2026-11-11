@@ -142,7 +142,7 @@ void FiniteDifferenceSolver::ComputeGradientCartesian (
         Box const& tby  = mfi.tilebox(out_field[1]->ixType().toIntVect());
         Box const& tbz  = mfi.tilebox(out_field[2]->ixType().toIntVect());
 
-        // Calculate the vector Laplacian of the input field (G)
+        // Calculate the gradient of the input field (G)
         amrex::ParallelFor(tbx, tby, tbz,
 
             // x calculation

@@ -104,10 +104,13 @@ namespace SpeciesUtils {
                 density_parser->compile<3>()));
         } else if (rho_prof_s == "read_from_file") {
             std::string density_file;
+            std::string field_name = "density";
             bool distributed = true;
             utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
+            utils::parser::query(pp_species, source_name, "density_mesh_name", field_name);
             pp_species.query("read_density_distributed", distributed);
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr,
+                density_file, field_name, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
@@ -118,11 +121,9 @@ namespace SpeciesUtils {
     // InjectorMomentum[Constant or Gaussian or etc.].getMomentum.
     void parseMomentum (std::string const& species_name, std::string const& source_name, const std::string& style,
         std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter>& h_inj_mom,
-        std::unique_ptr<amrex::Parser>& ux_parser,
-        std::unique_ptr<amrex::Parser>& uy_parser,
-        std::unique_ptr<amrex::Parser>& uz_parser,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
+        amrex::Geometry const& geom,
         int flux_normal_axis, int flux_direction)
     {
         using namespace amrex::literals;
@@ -203,36 +204,26 @@ namespace SpeciesUtils {
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwellian") {
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
-            const GetVelocity getVel(*h_mom_vel);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));
         } else if (mom_dist_s == "parse_momentum_function") {
-            std::string str_momentum_function_ux;
-            std::string str_momentum_function_uy;
-            std::string str_momentum_function_uz;
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_ux(x,y,z)", str_momentum_function_ux);
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_uy(x,y,z)", str_momentum_function_uy);
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_uz(x,y,z)", str_momentum_function_uz);
+            // The momentum is defined by the parser functions ux_mean_function,
+            // uy_mean_function, uz_mean_function, stored in VelocityProperties and
+            // evaluated through GetVelocityVector (the parsers are owned by h_mom_vel).
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumParser.
-            ux_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_ux, {"x","y","z"}));
-            uy_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uy, {"x","y","z"}));
-            uz_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uz, {"x","y","z"}));
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr,
-                                                ux_parser->compile<3>(),
-                                                uy_parser->compile<3>(),
-                                                uz_parser->compile<3>()));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr, getVelVec));
         } else {
             StringParseAbortMessage("Momentum distribution type", mom_dist_s);
         }

@@ -47,11 +47,11 @@
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/ParticleThermalizer/ParticleThermalizer.H"
 #include "Utils/export.H"
-#include "Utils/Parser/IntervalsParser.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -61,6 +61,7 @@
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #ifdef AMREX_USE_EB
+#   include <AMReX_EB2.H>
 #   include <AMReX_EBFabFactory.H>
 #endif
 #include <AMReX_GpuContainers.H>
@@ -124,8 +125,10 @@ public:
         return field_boundary_hi;
     }
 
-    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
-                                               int  bdry_side ) const;
+    [[nodiscard]] int GetPECInsulator_IsESet (int bdry_dir,
+                                              int bdry_side) const;
+
+    void ApplyPECInsulatorToPCMasks (int lev);
 
     void InitData ();
 
@@ -140,18 +143,20 @@ public:
     // Functions used by implicit solvers
     //
     void SyncMassMatricesPC ();
+    void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
-    void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
-    void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
-                                          amrex::Real a_thetadt, amrex::Real start_time );
-    void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
-    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
-                                          amrex::Real a_theta, amrex::Real a_time );
-    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
-                               const ablastr::fields::MultiLevelVectorField& Field_n,
-                               amrex::Real theta );
-    void DepositMassMatrices ();
+    void ResetImplicitParticleData ();
+    void SetElectricFieldAndApplyBCs (const WarpXSolverVec& a_E, amrex::Real a_time);
+    void UpdateMagneticFieldAndApplyBCs (ablastr::fields::MultiLevelVectorField const& a_Bn,
+                                         amrex::Real a_thetadt, amrex::Real start_time);
+    void SpectralSourceFreeFieldAdvance (amrex::Real start_time);
+    void FinishMagneticFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishElectricFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishImplicitField (const ablastr::fields::MultiLevelVectorField& Field_fp,
+                              const ablastr::fields::MultiLevelVectorField& Field_n,
+                              amrex::Real theta);
+    void DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options);
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -160,10 +165,12 @@ public:
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
+    /** Return the implicit solver, or nullptr when the evolve scheme is explicit */
+    [[nodiscard]] ImplicitSolver * get_pointer_ImplicitSolver () const { return m_implicit_solver.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag() { return m_eb_update_B; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag_fp() { return m_eb_update_E_fp; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag_fp() { return m_eb_update_B_fp; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
     /**
@@ -217,6 +224,11 @@ public:
      *  (0 to 4 correspond to Absorbing, Open, Reflecting, Periodic, Thermal)
      */
     static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
+
+    /** Particle boundary condition at embedded boundaries.
+     *  Default is Absorbing
+     */
+    static inline ParticleBoundaryType eb_particle_boundary = ParticleBoundaryType::Absorbing;
 
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
@@ -272,6 +284,10 @@ public:
 
     //! Maximum number of allowed grid crossings for particles
     static int particle_max_grid_crossings;
+
+    //! Maximum number of allowed grid crossings for Villasenor mass-matrix deposition
+    //! The Villasenor deposition requires this value at compile time for arrays used in the routine
+    static constexpr int villasenor_mass_matrices_max_grid_crossings = 3;
 
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
@@ -329,7 +345,7 @@ public:
     static bool do_dynamic_scheduling;
     static bool refine_plasma;
 
-    static utils::parser::IntervalsParser sort_intervals;
+    static ablastr::utils::text::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
@@ -424,10 +440,9 @@ public:
     /**
      * Determine the simulation timestep from the time step limiters
      */
-    amrex::Real ParticleGridSpeedMax ();
     amrex::Real GlobalPlasmaFrequencyMax ();
     amrex::Real GlobalCyclotronFrequencyMax ();
-    void ApplyDtLimiters ();
+    void ApplyDtLimiters (int step);
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -541,7 +556,7 @@ public:
 
     /** \brief returns the load balance interval
      */
-    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
+    [[nodiscard]] ablastr::utils::text::IntervalsParser get_load_balance_intervals () const
     {
         return load_balance_intervals;
     }
@@ -578,7 +593,8 @@ public:
                                                     int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
-                                                   int lev) const;
+                                                   int lev, int scomp = 0,
+                                                   int ncomp = -1) const;
 #endif
 
     /**
@@ -587,7 +603,7 @@ public:
      * the simulation domain. This function performs that logic.
      */
     void ApplyRhofieldBoundary (int lev, amrex::MultiFab* Rho,
-                                PatchType patch_type);
+                                PatchType patch_type, int scomp = 0, int ncomp = -1);
 
     /**
      * \brief If a PEC boundary conditions is used the current
@@ -646,18 +662,30 @@ public:
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
 
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
+
+    /** Perform essential particle house keeping at boundaries
+     *
+     * Inject, communicate, scrape and sort particles.
+     *
+     * @param step current step
+     * @param cur_time current time
+     * @param num_moved number of cells the moving window moved
+     */
+    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
-    void UpdateAuxilaryData ();
-    void UpdateAuxilaryDataStagToNodal ();
-    void UpdateAuxilaryDataSameType ();
+    void UpdateAuxiliaryData ();
+    void UpdateAuxiliaryDataStagToNodal ();
+    void UpdateAuxiliaryDataSameType ();
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -679,11 +707,81 @@ public:
 
     /**
      * \brief Synchronize J and rho:
-     * filter (if used), exchange guard cells, interpolate across MR levels
-     * and apply boundary conditions.
+     * filter (if used), exchange guard cells, and interpolate across MR levels.
      * Contains separate calls to WarpX::SyncCurrent and WarpX::SyncRho.
      */
     void SyncCurrentAndRho ();
+
+    /**
+     * \brief Finalize deposited current on all fine and coarse patches.
+     *
+     * - Apply physical boundary conditions: current deposited in guard cells beyond
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
+     * - In cylindrical and spherical geometries, fold current deposited at negative
+     *   radius onto cells at positive radius with the appropriate component parity,
+     *   and divide by the radial volume factors to obtain physical current density.
+     *
+     * Call once per deposition, before using J in a field solver or diagnostic.
+     * Normally, call after filtering, guard-cell summation and transfers between
+     * mesh-refinement levels (i.e. after SyncCurrent()). PSATD paths that defer
+     * synchronization until after current correction retain their solver-specific ordering.
+     */
+    void FinalizeJ ();
+
+    /**
+     * \brief Finalize deposited current on one fine or coarse patch.
+     *
+     * Apply the physical-boundary and radial-axis folding and radial volume scaling
+     * described in FinalizeJ() to the supplied current components. Call once per
+     * deposition for this patch, following the ordering requirements in FinalizeJ().
+     *
+     * \param[in] lev Mesh refinement level of the patch.
+     * \param[in,out] Jx First deposited current component to finalize.
+     * \param[in,out] Jy Second deposited current component to finalize.
+     * \param[in,out] Jz Third deposited current component to finalize.
+     * \param[in] patch_type Fine or coarse patch; a coarse patch uses level lev-1 geometry.
+     */
+    void FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
+                           amrex::MultiFab* Jz, PatchType patch_type);
+
+    /**
+     * \brief Finalize deposited rho on all fine and coarse patches.
+     *
+     * - Apply physical boundary conditions: charge deposited in guard cells beyond
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
+     * - In cylindrical and spherical geometries, fold charge deposited at negative
+     *   radius onto cells at positive radius and divide by the radial volume factor
+     *   so that rho becomes a physical charge density.
+     *
+     * Deposition routines accumulate raw charge on the grid. Finalize rho before
+     * using it in a field solver or writing it to a diagnostic. Call once per
+     * deposition, after filtering, guard-cell summation and transfers between
+     * mesh-refinement levels (i.e. after SyncRho()).
+     */
+    void FinalizeRho ();
+
+    /**
+     * \brief Finalize selected rho components on one fine or coarse patch.
+     *
+     * Apply the physical-boundary and radial-axis folding and radial volume scaling
+     * described in FinalizeRho(). Call once per deposited component, after filtering,
+     * guard-cell summation and transfers between mesh-refinement levels for those
+     * components are complete, and before using rho in a field solver or diagnostic.
+     *
+     * \param[in] lev Mesh refinement level of the patch.
+     * \param[in,out] rho Deposited charge to finalize into physical charge density.
+     * \param[in] patch_type Fine or coarse patch; a coarse patch uses level lev-1 geometry.
+     * \param[in] scomp Starting array component to finalize.
+     * \param[in] ncomp Number of array components; -1 selects all remaining components.
+     */
+    void FinalizeRhoOnLevel (int lev, amrex::MultiFab* rho, PatchType patch_type, int scomp = 0, int ncomp = -1);
+
+    [[nodiscard]] bool UseVerboncoeurAxisCorrection () const
+    {
+        return m_verboncoeur_axis_correction;
+    }
 
     /**
      * \brief Apply filter and sum guard cells across MR levels.
@@ -769,6 +867,24 @@ public:
         bool const step_after_start = (step >= start_moving_window_step);
         return do_moving_window && step_before_end && step_after_start;
     }
+    /** Physical distance the moving window travels in a single step of size dt
+     *
+     * Used every step in MoveWindow() to advance moving_window_x.
+     *
+     * @param dt time step size
+     */
+    static amrex::Real MovingWindowShiftPerStep (amrex::Real dt);
+    /** Number of cells by which the moving window has shifted past domain_lo
+     *
+     * The moving window position is continuous, but the domain and fields can
+     * only be shifted by an integer number of cells; this truncates the
+     * physical displacement to the grid, matching the alignment used in
+     * MoveWindow().
+     *
+     * @param displacement physical distance between the moving window and a reference point
+     * @param cell_size cell size in the moving window direction
+     */
+    static int NumCellsShifted (amrex::Real displacement, amrex::Real cell_size);
     static int moving_window_dir;
     static amrex::Real moving_window_v;
     static bool fft_do_time_averaging;
@@ -804,7 +920,7 @@ public:
     [[nodiscard]] amrex::IntVect get_numprocs() const {return numprocs;}
 
     /** Electrostatic solve call */
-    void ComputeSpaceChargeField (bool reset_fields);
+    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field, bool verbose_step);
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
@@ -892,6 +1008,44 @@ public:
         const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    /** Charge/current-conserving binomial smoothing in radial geometry.
+     *
+     * Filtering a density with the plain index-space binomial stencil does
+     * not conserve its volume integral on cells of unequal volume (and an
+     * extensive-quantity variant piles charge onto the small axis cells
+     * instead). This applies the binomial passes in flux form -- the
+     * discrete divergence of a two-point diffusive flux with face-averaged
+     * volume factors (conventions of the inverse-volume-scaling routines),
+     * which conserves the volume integral exactly, leaves constants
+     * untouched, has zero flux through the axis, and reduces to the
+     * standard bilinear filter where the volumes are uniform.
+     *
+     * \param[out] dst The destination MultiFab to store filtered data
+     * \param[in] src_mf The source MultiFab containing data to be filtered
+     * \param[in] lev The mesh refinement level
+     * \param[in] scomp The starting component index in the source MultiFab
+     * \param[in] dcomp The starting component index in the destination MultiFab
+     * \param[in] ncomp The number of components to filter
+     * \returns the guard-cell width over which dst holds filtered data.
+     */
+    amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
+                                    int lev, int scomp, int dcomp, int ncomp);
+#endif
+
+    /** Filter a current density. In radial geometries this dispatches to
+     * the volume-weighted (charge/current conserving) filter; in Cartesian
+     * geometries the cell volumes are uniform and it reduces to
+     * ApplyFilterMF. */
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev,
+        int idim);
+
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
@@ -951,6 +1105,16 @@ public:
     //! Use this function to override the Level 0 grids made by AMReX.
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
+
+#ifdef AMREX_USE_EB
+    amrex::EB2::IndexSpace const* GetEBIndexSpace (int lev) const {
+        // If EB data was built separately for each mesh-refinement level, return the one for
+        // this level; otherwise return the single global EB data (built at the finest level
+        // and coarsened for coarser levels).
+        return (m_build_eb_data_per_level && lev < m_eb_index_space.size())
+            ? m_eb_index_space[lev] : &(amrex::EB2::IndexSpace::top());
+    }
+#endif
 
 protected:
 
@@ -1045,7 +1209,8 @@ private:
     void OneStep (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
-        int a_step
+        int a_step,
+        bool verbose_step
     );
 
     void OneStep_nosub (
@@ -1170,8 +1335,11 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    // How often to update the timestep when using adaptive timestepping
+    ablastr::utils::text::IntervalsParser m_dt_update_interval;
+    ablastr::utils::text::IntervalsParser m_dt_update_write_interval;
     std::string m_dt_update_diagnostic_file;
+    void WriteDtUpdateFileHeader ();
 
     bool m_safe_guard_cells = false;
 
@@ -1214,9 +1382,13 @@ private:
 
     /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
      * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
+     * The `_cp` variants live on the coarse patch (coarsened grid) of each mesh-refinement level,
+     * and are used when updating the coarse-patch fields (`Efield_cp`/`Bfield_cp`).
      */
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_fp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_fp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_cp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_cp;
 
     /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
      *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.
@@ -1225,10 +1397,12 @@ private:
      */
     amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
 
-    /** EB: for every mesh face flag_info_face contains a:
-     *          * 0 if the face needs to be extended
-     *          * 1 if the face is large enough to lend area to other faces
-     *          * 2 if the face is actually intruded by other face
+    /** EB: for every mesh face flag_info_face contains one of the FaceInfo::Flag values:
+     *          * FaceInfo::extended if the face needs to be extended
+     *          * FaceInfo::available if the face is large enough to lend area to other faces
+     *          * FaceInfo::intruded if the face is actually intruded by other face
+     *          * FaceInfo::bck_stabilized if the face could not be extended and was stabilized
+     *            with the BCK correction instead
      * It is initialized in WarpX::MarkExtensionCells
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_info_face;
@@ -1312,7 +1486,7 @@ private:
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
      * for getting steps at which load balancing is performed */
-    utils::parser::IntervalsParser load_balance_intervals;
+    ablastr::utils::text::IntervalsParser load_balance_intervals;
     /** Collection of LayoutData to keep track of weights used in load balancing
      * routines. Contains timer-based or heuristic-based costs depending on input option */
     amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > > costs;
@@ -1345,7 +1519,7 @@ private:
     amrex::Real costs_heuristic_particles_wt = amrex::Real(0);
 
     // Determines timesteps for override sync
-    utils::parser::IntervalsParser override_sync_intervals;
+    ablastr::utils::text::IntervalsParser override_sync_intervals;
 
     // Other runtime parameters
     int verbose = 1;
@@ -1378,6 +1552,8 @@ private:
     int field_io_nfiles = 1024;
     int particle_io_nfiles = 1024;
 
+    ablastr::utils::text::IntervalsParser m_tiny_profiler_flush_interval;
+
     amrex::RealVect fine_tag_lo;
     amrex::RealVect fine_tag_hi;
     //! User-defined parser to define refinement patches
@@ -1404,7 +1580,7 @@ private:
 
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-#if defined(AMREX_USE_CUDA)
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
     bool m_sort_particles_for_deposition = true;
 #else
     bool m_sort_particles_for_deposition = false;
@@ -1441,16 +1617,6 @@ private:
      */
     [[nodiscard]]
     bool checkStopSimulation (amrex::Real cur_time);
-
-    /** Perform essential particle house keeping at boundaries
-     *
-     * Inject, communicate, scrape and sort particles.
-     *
-     * @param step current step
-     * @param cur_time current time
-     * @param num_moved number of cells the moving window moved
-     */
-    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
     /** Update the E and B fields in the explicit em PIC scheme.
      *
@@ -1621,6 +1787,15 @@ private:
      *        is set in WarpX::ReadParameters().
      */
     bool m_collisions_split_momentum_push;
+
+#ifdef AMREX_USE_EB
+    /** Whether to build the EB data separately for each mesh-refinement level (true, default),
+     *  instead of building it once at the finest level and coarsening it down for coarser levels.
+     *  Set via the runtime parameter "warpx.build_eb_data_per_level".
+     */
+    bool m_build_eb_data_per_level = true;
+    amrex::Vector<amrex::EB2::IndexSpace const*> m_eb_index_space;
+#endif
 };
 
 #endif

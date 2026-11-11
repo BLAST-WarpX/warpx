@@ -50,6 +50,14 @@ class LibWarpX:
             # return an AttributeError.
             return self.__getattribute__(attribute)
 
+    @property
+    def libwarpx_so_loaded(self):
+        """Check if the compiled ``warpx_pybind_*`` module is loaded.
+
+        Contrary to accessing ``libwarpx_so``, this does not load it.
+        """
+        return "libwarpx_so" in self.__dict__
+
     def _get_package_root(self):
         """
         Get the path to the installation location (where libwarpx.so would be installed).
@@ -172,13 +180,22 @@ class LibWarpX:
         """
         # TODO: simplify, part of pyAMReX already
         if self.initialized:
+            self.initialized = False
             del self.warpx
-            # The call to warpx_finalize causes a crash - don't know why
-            # self.libwarpx_so.warpx_finalize()
+            # Destroy the C++ WarpX singleton (and everything it owns) before
+            # tearing down AMReX, so that its MultiFabs are freed while the
+            # Arena that allocated them still exists.
+            self.libwarpx_so.finalize()
             self.libwarpx_so.amrex_finalize()
 
-            from pywarpx import callbacks
-
+        # Callbacks can be installed without initializing WarpX, e.g. already
+        # when constructing PICMI objects. Unregister them independently of
+        # self.initialized, otherwise they leak into the next simulation in
+        # this process. If the module was never imported, no callback can be
+        # installed and there is nothing to clear - this also avoids an import
+        # while the interpreter shuts down (atexit).
+        callbacks = sys.modules.get("pywarpx.callbacks")
+        if callbacks is not None:
             callbacks.clear_all()
 
 

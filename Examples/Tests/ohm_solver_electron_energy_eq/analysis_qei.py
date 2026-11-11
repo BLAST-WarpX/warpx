@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""Validate the electron-ion temperature relaxation (Q_ei), both the
+electron-side sink AND the conjugate ion heating -- i.e. that the exchange is
+energy-conserving.
+
+The companion deck evolves a uniform, zero-resistivity plasma with the ions at
+rest and hot electrons (Te0 >> Ti0), with ONLY the Q_ei exchange active:
+
+    dU_e/dt = -Q_ei,   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),     (electron sink)
+    ions GAIN exactly Q_ei via a thermal-velocity rescale.     (ion source)
+
+With U_e = n_e k_B T_e/(gamma_e-1), the (3/2) n_i k_B T_i ion thermal energy,
+a single proton species (Z=1, n_e=n_i) and constant nu_ei, the two
+temperatures relax toward a common value:
+
+    dT_e/dt = -3(gamma_e-1) nu_ei (T_e - T_i)        [electron side]
+    dT_i/dt = +2 nu_ei (T_e - T_i)                   [ion side, gamma-indep.]
+
+so the difference decays exponentially,
+
+    (T_e - T_i)(t) = (T_e0 - T_i0) exp(-rate t),  rate = [3(gamma_e-1) + 2] nu_ei,
+
+(= 4 nu_ei for gamma_e = 5/3), and the total thermal energy is conserved:
+
+    C_e T_e + C_i T_i = const,   C_e = n_e k_B/(gamma_e-1),  C_i = (3/2) n_i k_B.
+
+For gamma_e=5/3, C_e=C_i so T_e and T_i meet at (T_e0+T_i0)/2.
+
+A force-free magnetic field supplies an electron-ion relative drift without a
+J x B force. Because Q_ei is a temperature-relaxation operator, it must act on
+the ion thermal velocity about the ion bulk, not relax the ion bulk toward the
+electron flow. The deposited ion current projected onto the force-free mode
+must therefore remain at its initial shot-noise level.
+
+This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) from the
+post-step dumps -- the iteration-0 dump is skipped, since it is written before
+the first field solve while T_e still holds its zero allocation value (T_e is
+filled from the closure at the first step) -- so (Te0, Ti0) is the first
+post-step dump; the exponential fit does not depend on the normalisation
+point. It checks
+  (1) the difference-decay rate vs [3(gamma_e-1)+2] nu_ei, and
+  (2) energy conservation: C_e T_e + C_i T_i constant over the run, and
+  (3) ion bulk momentum remains unchanged despite the electron-ion drift.
+"""
+
+import argparse
+import sys
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from openpmd_viewer import OpenPMDTimeSeries
+from scipy.constants import mu_0
+
+Q_E = 1.602176634e-19
+K_B = 1.380649e-23
+K_PER_EV = Q_E / K_B  # T[eV] * this = T[K];  T[K] / this = T[eV]
+
+
+def post_step_iterations(ts):
+    """Iterations to analyse: all dumps except iteration 0 (T_e = 0 there)."""
+    return [it for it in ts.iterations if it > 0]
+
+
+def domain_means(ts, its):
+    """Return (t[s], <Te>[eV], <Ti>[eV]) density-weighted domain means over
+    the iterations `its`."""
+    t = np.asarray(ts.t, dtype=float)[-len(its) :]
+
+    Te_m, Ti_m = [], []
+    for it in its:
+        Te, _ = ts.get_field("Te", iteration=it)
+        Ti, _ = ts.get_field("T_ions", iteration=it)
+        rho, _ = ts.get_field("rho", iteration=it)
+        w = np.asarray(rho, dtype=float) / Q_E
+        wsum = float(np.sum(w))
+        Te_m.append(float(np.sum(np.asarray(Te, float) * w) / wsum) / K_PER_EV)
+        Ti_m.append(float(np.sum(np.asarray(Ti, float) * w) / wsum))  # already eV
+    return t, np.array(Te_m), np.array(Ti_m)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--diag-dir",
+        default="diags/field_diags",
+        help="openPMD field-diagnostics directory",
+    )
+    ap.add_argument(
+        "--nu-ei",
+        type=float,
+        default=1.0e6,
+        help="constant relaxation rate used in the run (1/s); must match the deck",
+    )
+    ap.add_argument(
+        "--gamma", type=float, default=5.0 / 3.0, help="electron adiabatic index"
+    )
+    ap.add_argument(
+        "--rtol",
+        type=float,
+        default=0.05,
+        help="allowed relative error on the fitted difference-rate",
+    )
+    ap.add_argument(
+        "--etol",
+        type=float,
+        default=0.02,
+        help="allowed relative drift of total thermal energy",
+    )
+    ap.add_argument("--B0", type=float, default=0.1, help="force-free B amplitude (T)")
+    ap.add_argument("--Lx", type=float, default=0.5, help="domain length in x (m)")
+    ap.add_argument(
+        "--momentum-tol",
+        type=float,
+        default=0.08,
+        help="max allowed force-free ion-current projection relative to curl(B)/mu0",
+    )
+    ap.add_argument("--out", default="qei_check.png")
+    args = ap.parse_args(argv)
+
+    ts = OpenPMDTimeSeries(args.diag_dir)
+    its = post_step_iterations(ts)
+    t, Te, Ti = domain_means(ts, its)
+    if t.size < 3:
+        print(f"ERROR: need >=3 post-step dumps, found {t.size} in {args.diag_dir}")
+        return 1
+
+    g = args.gamma
+    # rate at which (Te - Ti) decays = [3(g-1) + 2] nu_ei.
+    rate_pred = (3.0 * (g - 1.0) + 2.0) * args.nu_ei
+    # Reference = first post-step dump (t[0] > 0); the fitted slope is
+    # independent of where the difference is normalised.
+    Te0, Ti0 = Te[0], Ti[0]
+
+    # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate (t - t0).
+    d = (Te - Ti) / (Te0 - Ti0)
+    # Fit only while the difference is well above the particle-noise floor;
+    # long (multi-tau) runs otherwise flatten the tail and bias the rate low.
+    good = d > max(1e-3, 0.05 * d[0])
+    rate_fit = -np.polyfit(t[good], np.log(d[good]), 1)[0]
+    rel_err = abs(rate_fit - rate_pred) / rate_pred
+
+    # (2) energy conservation: heat capacities (per n k_B; n_e=n_i cancels).
+    ce = 1.0 / (g - 1.0)  # C_e / (n k_B)
+    ci = 1.5  # C_i / (n k_B)
+    E = ce * Te + ci * Ti  # total thermal "energy" per n k_B (eV units)
+    E_drift = (E - E[0]) / E[0]
+    e_max = float(np.max(np.abs(E_drift)))
+    T_eq_pred = (ce * Te0 + ci * Ti0) / (ce + ci)
+
+    # Project the deposited ion current onto the force-free pattern. The
+    # pattern amplitude is J0 = k B0 / mu0; a thermal-only Q_ei operator must
+    # not transfer any of this electron current to the ion bulk.
+    k = 2.0 * np.pi / args.Lx
+    J0 = k * args.B0 / mu_0
+    current_projection = []
+    for iteration in its:
+        Jy, info_y = ts.get_field(field="j", coord="y", iteration=iteration)
+        Jz, info_z = ts.get_field(field="j", coord="z", iteration=iteration)
+        ay = np.mean(Jy * np.sin(k * info_y.x)[np.newaxis, :])
+        az = np.mean(Jz * np.cos(k * info_z.x)[np.newaxis, :])
+        current_projection.append(ay + az)
+    current_projection = np.asarray(current_projection)
+    current_fraction = np.abs(current_projection) / J0
+    current_fraction_max = float(np.max(current_fraction))
+    broken_prediction = 1.0 - np.exp(-args.nu_ei * t[-1])
+
+    print("=" * 66)
+    print("Electron-ion relaxation (Q_ei), energy-conserving exchange")
+    print(f"  Te0 = {Te0:.2f} eV,  Ti0 = {Ti0:.2f} eV,  gamma = {g:.4f}")
+    print(f"  nu_ei (input)             = {args.nu_ei:.4e} 1/s")
+    print(f"  diff-rate predicted [3(g-1)+2]nu_ei = {rate_pred:.4e} 1/s")
+    print(f"  diff-rate fitted          = {rate_fit:.4e} 1/s")
+    print(
+        f"  relative error            = {rel_err * 100:.2f}%   (tol {args.rtol * 100:.1f}%)"
+    )
+    print(f"  equilibrium T predicted   = {T_eq_pred:.2f} eV")
+    print(f"  Te_end / Ti_end (meet?)   = {Te[-1]:.2f} / {Ti[-1]:.2f} eV")
+    print(
+        f"  total-energy max drift    = {e_max * 100:.3f}%   (tol {args.etol * 100:.2f}%)"
+    )
+    print(f"  max |projected J_i|/J0    = {current_fraction_max:.4f}")
+    print(f"  momentum tolerance        = {args.momentum_tol:.4f}")
+    print(f"  bulk-relaxing bug predicts ~ {broken_prediction:.4f}")
+    print("=" * 66)
+
+    tus = t * 1e6
+    fig, ax = plt.subplots(1, 3, figsize=(15, 4.4))
+    ax[0].plot(tus, Te, "o-", ms=4, label=r"$\langle T_e\rangle$")
+    ax[0].plot(tus, Ti, "s-", ms=4, color="C3", label=r"$\langle T_i\rangle$")
+    ax[0].axhline(T_eq_pred, color="gray", lw=0.9, ls=":", label=r"$T_{eq}$ pred")
+    ax[0].set_xlabel(r"time ($\mu$s)")
+    ax[0].set_ylabel("temperature (eV)")
+    ax[0].set_title("e-i relaxation to common T")
+    ax[0].legend()
+    ax[0].grid(alpha=0.3)
+
+    ax[1].semilogy(tus[good], d[good], "o", ms=5, label="measured")
+    ax[1].semilogy(
+        tus,
+        np.exp(-rate_fit * (t - t[0])),
+        "-",
+        lw=2,
+        label=f"fit  rate={rate_fit:.2e}",
+    )
+    ax[1].semilogy(
+        tus,
+        np.exp(-rate_pred * (t - t[0])),
+        "--",
+        lw=2,
+        label=f"pred rate={rate_pred:.2e}",
+    )
+    ax[1].set_xlabel(r"time ($\mu$s)")
+    ax[1].set_ylabel(r"$(T_e-T_i)/(T_{e0}-T_{i0})$")
+    ax[1].set_title(f"difference decay (err {rel_err * 100:.1f}%)")
+    ax[1].legend()
+    ax[1].grid(alpha=0.3, which="both")
+
+    ax[2].plot(tus, E_drift * 100, "o-", ms=4, color="C2")
+    ax[2].axhline(0.0, color="gray", lw=0.8, ls=":")
+    ax[2].set_xlabel(r"time ($\mu$s)")
+    ax[2].set_ylabel(r"$(E-E_0)/E_0$ (%)")
+    ax[2].set_title(f"total thermal energy (max {e_max * 100:.2f}%)")
+    ax[2].grid(alpha=0.3)
+
+    fig.suptitle("$Q_{ei}$ energy-conserving electron-ion relaxation")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(args.out, dpi=150)
+    print(f"[saved] {args.out}")
+
+    ok = (
+        (rel_err <= args.rtol)
+        and (e_max <= args.etol)
+        and (current_fraction_max <= args.momentum_tol)
+    )
+    print("PASS" if ok else "FAIL")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

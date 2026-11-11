@@ -189,7 +189,7 @@ void ParticleHistogram::ComputeDiags (int step)
     bool const do_parser_filter = m_do_parser_filter;
 
     // zero-out old data on the host
-    std::fill(m_data.begin(), m_data.end(), amrex::Real(0.0));
+    std::ranges::fill(m_data, 0.0_rt);
     amrex::Gpu::DeviceVector< amrex::Real > d_data( m_data.size(), 0.0 );
     amrex::Real* const AMREX_RESTRICT dptr_data = d_data.dataPtr();
 
@@ -211,8 +211,12 @@ void ParticleHistogram::ComputeDiags (int step)
 
                 long const np = pti.numParticles();
 
-                //Flag particles that need to be copied if they cross the z_slice
-                amrex::ParallelFor(np,
+                //Flag particles that need to be copied if they cross the z_slice.
+                // amrex::For: iterations accumulate into shared histogram bins;
+                // in serial (non-OpenMP) builds HostDevice::Atomic::Add is a plain
+                // +=, which is unsafe under the SIMD pragma of ParallelFor
+                // (see issue #7097)
+                amrex::For(np,
                    [=] AMREX_GPU_DEVICE(int i)
                 {
                     amrex::ParticleReal x, y, z;

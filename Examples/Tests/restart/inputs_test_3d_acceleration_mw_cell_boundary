@@ -1,0 +1,11 @@
+FILE = inputs_base_3d_mw
+
+# With CFL = 0.99, 300 active steps put the window at a cell boundary.
+# Accumulating the position step by step and recomputing 300*v*dt can round
+# to different cell shifts. Restart after the window stops so subsequent
+# moving-window updates cannot mask an error in the restored diagnostic bounds.
+max_step = 310
+warpx.start_moving_window_step = 0
+warpx.end_moving_window_step = 301
+diag1.intervals = 310
+chk.intervals = 305

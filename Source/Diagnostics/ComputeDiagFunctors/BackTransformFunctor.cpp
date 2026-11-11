@@ -148,6 +148,10 @@ BackTransformFunctor::operator ()(amrex::MultiFab& mf_dst, int /*dcomp*/, const 
                     // real part of mode 1 for Et (1*3+1) = 4
                     dst_arr(i, k_lab, k, n) = src_arr(i, j, k, icomp*n_rz_comp+rzcomp);
 #else
+                    // The destination index does not depend on i: this is only
+                    // compatible with the iteration-independence requirement of
+                    // ParallelFor because in 1D the z-slice box tbx contains a
+                    // single cell in i (see issue #7097)
                     dst_arr(k_lab, j, k, n) = src_arr(i, j, k, icomp);
 #endif
                 } );

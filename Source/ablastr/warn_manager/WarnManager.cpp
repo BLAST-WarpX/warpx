@@ -312,6 +312,11 @@ WarnManager::MsgFormatter(
     return ss_out.str();
 }
 
+void WarnManager::Clear()
+{
+    m_p_logger->clear();
+}
+
 WarnManager& ablastr::warn_manager::GetWMInstance()
 {
     return WarnManager::GetInstance();
@@ -324,4 +329,9 @@ void ablastr::warn_manager::WMRecordWarning(
 {
     WarnManager::GetInstance().RecordWarning(
         topic, text, priority);
+}
+
+void ablastr::warn_manager::WMClear()
+{
+    WarnManager::GetInstance().Clear();
 }

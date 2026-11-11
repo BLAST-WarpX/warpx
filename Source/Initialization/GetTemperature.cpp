@@ -11,6 +11,7 @@
 // Constructor for single-component (scalar) temperature
 GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
+    , m_q_e_over_mc2{temp.m_q_e_over_mc2}
 {
     if (m_type == TempConstantValue) {
         m_temperature = temp.m_temperature;
@@ -18,11 +19,23 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     else if (m_type == TempParserFunction) {
         m_temperature_parser = temp.m_ptr_temperature_parser->compile<3>();
     }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    else if (m_type == TempFromFileValue) {
+        m_temperature_in_eV_from_file = temp.m_temperature_in_eV_reader->getView();
+    }
+#endif
 }
 
 // Constructor for three-component (vector) temperature
 GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
+    , m_temperature{temp}
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    , m_u_std_from_file{temp.m_u_std_x_reader.get(), temp.m_u_std_y_reader.get(),
+                        temp.m_u_std_z_reader.get()}
+#endif
 {
     if (m_type == TempConstantVector) {
         m_ux_std = temp.m_ux_std;

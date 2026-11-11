@@ -12,6 +12,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_collision_z_modulus_shuffle  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_collision_z_modulus_shuffle  # inputs
+    "analysis_collision_1d.py diags/diag1000600"  # analysis
+    "analysis_default_regression.py --path diags/diag1000600"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_collision_z_correct_conservation  # name
     1  # dims
     2  # nprocs
@@ -72,6 +82,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_collision_iso_modulus_shuffle  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_collision_iso_modulus_shuffle  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_collision_iso_subcycle  # name
     3  # dims
     1  # nprocs
@@ -86,8 +106,8 @@ add_warpx_test(
     3  # dims
     1  # nprocs
     inputs_test_3d_collision_xyz  # inputs
-    "analysis_collision_3d.py diags/diag1000150"  # analysis
-    "analysis_default_regression.py --path diags/diag1000150"  # checksum
+    "analysis_collision_3d.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 
@@ -116,6 +136,16 @@ add_warpx_test(
     1  # dims
     1  # nprocs
     inputs_test_1d_collision_z_Bremsstrahlung_picmi.py  # inputs
+    "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_1d_collision_z_inverse_Bremsstrahlung  # name
+    1  # dims
+    1  # nprocs
+    inputs_test_1d_collision_z_inverse_Bremsstrahlung  # inputs
     "analysis_collision_1d_Bremsstrahlung.py diags/diag1000100"  # analysis
     "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency

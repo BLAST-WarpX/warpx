@@ -1,3 +1,4 @@
+CEXE_sources += IntervalsParser.cpp
 CEXE_sources += StreamUtils.cpp
 CEXE_sources += StringUtils.cpp
 

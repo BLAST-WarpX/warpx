@@ -131,8 +131,10 @@ BreitWheelerEngine::get_default_ctrl() const
 {
     namespace pxr_bw = picsar::multi_physics::phys::breit_wheeler;
     return PicsarBreitWheelerCtrl{
-        pxr_bw::default_dndt_lookup_table_params<amrex::ParticleReal>,
-        pxr_bw::default_pair_prod_lookup_table_params<amrex::ParticleReal>
+        .dndt_params =
+            pxr_bw::default_dndt_lookup_table_params<amrex::ParticleReal>,
+        .pair_prod_params =
+            pxr_bw::default_pair_prod_lookup_table_params<amrex::ParticleReal>
     };
 }
 

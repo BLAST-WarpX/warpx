@@ -12,9 +12,3 @@ set(CTEST_NIGHTLY_START_TIME 08:00:00 UTC)
 set(CTEST_SUBMIT_URL https://my.cdash.org/submit.php?project=WarpX)
 
 set(CTEST_DROP_SITE_CDASH TRUE)
-
-# Set site and build names
-# - CTest script variables: CTEST_SITE, CTEST_BUILD_NAME
-# - CTest module variables: SITE, BUILDNAME
-set(SITE "Azure-Pipelines")
-set(BUILDNAME "CI-Development")

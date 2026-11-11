@@ -8,19 +8,25 @@
 #ifndef WARPX_VELOCITY_PROPERTIES_H_
 #define WARPX_VELOCITY_PROPERTIES_H_
 
+#include "ExternalField_fwd.H"
+
+#include <AMReX_Geometry.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
-/* Type of velocity initialization. Used by VelocityProperties and GetVelocity. */
-enum VelocityInitType {VelConstantValue, VelParserFunction, VelConstantVector, VelParserFunctionVector};
+#include <memory>
+#include <string>
+
+/* Type of velocity initialization. Used by VelocityProperties and GetVelocityVector. */
+enum VelocityInitType {VelConstantVector, VelParserFunctionVector, VelFromFileVector};
 
 /**
  * \brief Struct to store velocity properties, for use in momentum initialization.
  *
  * Reads in and stores velocity used to initialize the Maxwellian and Maxwell-Juttner
  * momentum distributions in InjectorMomentum. The information is read from the parameters of
- * the species being initialized, and will be accessed by GetVelocity.
+ * the species being initialized, and will be accessed by GetVelocityVector.
  */
 struct VelocityProperties
 {
@@ -34,25 +40,27 @@ struct VelocityProperties
      *
      * \param[in] pp: Reference to the parameter parser object for the species being initialized
      * \param[in] source_name: Optional group name of the input parameters
+     * \param[in] geom: Simulation geometry (for aligning openPMD external fields)
      */
-    VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name);
+    VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                        amrex::Geometry const& geom);
 
     /* Type of velocity initialization */
     VelocityInitType m_type;
-
-    /* Velocity direction */
-    int m_dir; // Index x=0, y=1, z=2
-    int m_sign_dir; // Sign of the velocity direction positive=1, negative=-1
-
-    /* Constant velocity value, if m_type == VelConstantValue */
-    amrex::Real m_velocity{0};
-    /* Storage of the parser function, if m_type == VelParserFunction */
-    std::unique_ptr<amrex::Parser> m_ptr_velocity_parser;
 
     /* Mean velocity components for velocity vector, if m_type == VelConstantVector */
     amrex::Real m_ux_mean{0.0}, m_uy_mean{0.0}, m_uz_mean{0.0};
     /* Storage of the parser functions for velocity vector, if m_type == VelParserFunctionVector */
     std::unique_ptr<amrex::Parser> m_ptr_ux_mean_parser, m_ptr_uy_mean_parser, m_ptr_uz_mean_parser;
+
+    std::string m_read_u_mean_path;
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    std::unique_ptr<ExternalFieldReader> m_u_mean_x_reader;
+    std::unique_ptr<ExternalFieldReader> m_u_mean_y_reader;
+    std::unique_ptr<ExternalFieldReader> m_u_mean_z_reader;
+#endif
 };
 
 #endif //WARPX_VELOCITY_PROPERTIES_H_

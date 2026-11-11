@@ -29,7 +29,7 @@ sudo apt install -y     \
 $(dirname "$0")/ccache.sh
 
 # parse version number from command line argument
-VERSION_DOTTED=${1:-25.1}
+VERSION_DOTTED=${1:-26.5}
 VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
 
 # install nvhpc
@@ -42,7 +42,7 @@ sudo apt install -y --no-install-recommends nvhpc-${VERSION_DASHED}
 sudo rm -rf /var/lib/apt/lists/*
 sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/examples
 sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/profilers
-sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/math_libs/12.6/targets/x86_64-linux/lib/lib*_static*.a
+sudo rm -rf /opt/nvidia/hpc_sdk/Linux_x86_64/${VERSION_DOTTED}/math_libs/*/targets/x86_64-linux/lib/lib*_static*.a
 
 # things should reside in /opt/nvidia/hpc_sdk now
 

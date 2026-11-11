@@ -4,7 +4,7 @@ string(JSON warpx_version GET "${dependencies_data}" version_warpx)
 
 # Preamble ####################################################################
 #
-cmake_minimum_required(VERSION 3.24.0)
+cmake_minimum_required(VERSION 3.25.0)
 project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
@@ -15,22 +15,6 @@ if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     message(FATAL_ERROR "Building in-source is not supported! "
             "Create a build directory and remove "
             "${CMAKE_SOURCE_DIR}/CMakeCache.txt ${CMAKE_SOURCE_DIR}/CMakeFiles/")
-endif()
-
-
-# CMake policies ##############################################################
-#
-# Setting a cmake_policy to OLD is deprecated by definition and will raise a
-# verbose warning
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
-endif()
-
-# AMReX 21.06+ supports CUDA_ARCHITECTURES with CMake 3.20+
-# CMake 3.18+: CMAKE_CUDA_ARCHITECTURES
-# https://cmake.org/cmake/help/latest/policy/CMP0104.html
-if(POLICY CMP0104)
-    cmake_policy(SET CMP0104 OLD)
 endif()
 
 
@@ -403,6 +387,25 @@ foreach(D IN LISTS WarpX_DIMS)
             PDB_OUTPUT_DIRECTORY ${CMAKE_PYTHON_OUTPUT_DIRECTORY}/pywarpx
             COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_PYTHON_OUTPUT_DIRECTORY}/pywarpx
         )
+
+        # The CXX_VISIBILITY_PRESET above only hides pyWarpX's own objects, but
+        # statically-embedded dependencies (HDF5, openPMD, ADIOS2, and the WarpX
+        # lib) are compiled without hidden visibility and would otherwise
+        # be re-exported from this extension. If another extension loaded in the
+        # same process also statically embeds them (openpmd_api, ImpactX, a second
+        # openPMD/HDF5), the duplicate exported symbols cross-bind, one has two
+        # HDF5/openPMD instances in one process, UBs and crashes.
+        # Export only the module init symbol so each extension keeps its
+        # dependencies private.
+        # Windows does not auto-export and Emscripten links a single namespace, so
+        # neither needs this.
+        if(APPLE)
+            target_link_options(pyWarpX_${SD} PRIVATE
+                "LINKER:-exported_symbol,_PyInit_warpx_pybind_${SD}")
+        elseif(NOT WIN32 AND NOT EMSCRIPTEN)
+            target_link_options(pyWarpX_${SD} PRIVATE "LINKER:--exclude-libs,ALL")
+        endif()
+
         get_property(isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
         if(isMultiConfig)
             foreach(CFG IN LISTS CMAKE_CONFIGURATION_TYPES)
@@ -848,6 +851,9 @@ if(BUILD_TESTING)
     enable_testing()
     if(WarpX_APP OR WarpX_PYTHON)
         add_subdirectory(Examples)
+    endif()
+    if(WarpX_PYTHON)
+        add_subdirectory(tests/unit)
     endif()
 endif()
 
