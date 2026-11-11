@@ -911,7 +911,7 @@ void SNES_impl::preLinearSolve(int const a_iter)
     AMREX_ALWAYS_ASSERT(isDefined());
 
     // A line search can evaluate the residual multiple times per Newton iteration.
-    // Use PETSc's iteration for both PC and Jacobian mass-matrix refresh schedules;
+    // Use PETSc's iteration for both PC and PreLinearSolve() schedules;
     // the residual counter m_iter would shift or skip scheduled updates.
     m_update_pc = m_force_pc_update ||
         m_newton_params.UpdatePC(m_step, a_iter, m_pc_initialized);
