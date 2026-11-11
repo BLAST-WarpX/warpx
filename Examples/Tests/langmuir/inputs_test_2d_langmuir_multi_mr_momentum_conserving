@@ -11,4 +11,3 @@ diag1.positrons.variables = x z w ux uy uz
 warpx.use_filter = 1
 warpx.fine_tag_lo = -10.e-6 -10.e-6
 warpx.fine_tag_hi =  10.e-6  10.e-6
-warpx.safe_guard_cells = 1
