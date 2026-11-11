@@ -1,5 +1,40 @@
 if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
     if(WarpX_EB)
+        set(enclosed_reference test_3d_conforming_yee_uniform_enclosed_port)
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_enclosed_port
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --uniform"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_enclosed_port
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --reference ../${enclosed_reference}/enclosed_reference.npz"
+            OFF
+            OFF
+            ${enclosed_reference}
+        )
+        set(collar_material "collar must have vacuum material")
+        set(collar_eb "collar must have active edges and faces")
+        set(collar_port "ports must lie clear of the Yee interface collar")
+        foreach(obstacle IN ITEMS material eb port)
+            add_warpx_test(
+                test_3d_conforming_yee_invalid_collar_${obstacle}
+                3
+                1
+                "inputs_base_3d_conforming_enclosed_port.py --touch ${obstacle}"
+                OFF
+                OFF
+                OFF
+            )
+            set_tests_properties(test_3d_conforming_yee_invalid_collar_${obstacle}.run
+                PROPERTIES PASS_REGULAR_EXPRESSION "${collar_${obstacle}}")
+        endforeach()
         set(wall_reference test_3d_conforming_yee_uniform_parent_wall)
         add_warpx_test(
             test_3d_conforming_yee_uniform_parent_wall

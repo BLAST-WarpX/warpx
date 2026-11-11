@@ -177,11 +177,10 @@ struct Coverage {
     }
 };
 
-// The current leaf operator represents vacuum; conducting or cut edges may
-// occur on the exterior grid only. Also exclude a two-parent-cell stencil
-// collar.
+// Only the joined edges and their neighboring magnetic faces use the vacuum
+// surface operator. Interior fields use the native solver on their own grid.
 void
-check_vacuum_patch (WarpX& w) {
+check_vacuum_collar (WarpX& w) {
     amrex::ParmParse const pp("warpx");
     std::vector<amrex::RealBox> ports;
     if (w.HasCurrentControlledPorts()) {
@@ -208,11 +207,17 @@ check_vacuum_patch (WarpX& w) {
             ports.emplace_back(lo.data(), hi.data());
         }
     }
-    for (int k = 0; k < w.boxArray(1).size(); ++k) {
-        auto const fb = w.boxArray(1)[k];
-        auto const cb = amrex::grow(amrex::coarsen(fb, w.refRatio(0)), 2);
-        auto const& geom = w.Geom(0);
-        amrex::RealBox const physical(cb, geom.CellSize(), geom.ProbLo());
+    auto const& geom = w.Geom(0);
+    auto const ratio = w.refRatio(0);
+    auto const covered = amrex::coarsen(w.boxArray(1), ratio);
+    auto exterior = amrex::complementIn(geom.Domain(), covered);
+    auto interior = covered;
+    // Take the collar of the union. Adjacent fine FABs share native fields
+    // and their internal faces are not coarse/fine interfaces.
+    auto collar = amrex::intersect(interior.grow(2), exterior.grow(2));
+    collar.removeOverlap();
+    for (int k = 0; k < collar.size(); ++k) {
+        amrex::RealBox const physical(collar[k], geom.CellSize(), geom.ProbLo());
         for (auto const& port : ports) {
             bool overlaps = true;
             for (int d = 0; d < 3; ++d) {
@@ -220,11 +225,15 @@ check_vacuum_patch (WarpX& w) {
                             physical.lo(d) <= port.hi(d);
             }
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !overlaps, "Prescribed ports must lie outside the Yee patch "
-                           "and its stencil collar.");
+                !overlaps, "Prescribed ports must lie clear of the Yee interface collar.");
         }
-        for (int lev = 0; lev < 2; ++lev) {
-            auto const region = lev ? fb : cb;
+    }
+    auto fine_collar = amrex::intersect(collar, covered);
+    fine_collar.refine(ratio);
+    for (int lev = 0; lev < 2; ++lev) {
+        auto const& regions = lev ? fine_collar : collar;
+        for (int k = 0; k < regions.size(); ++k) {
+            auto const region = regions[k];
             if (auto* mat = w.get_pointer_MacroscopicProperties(lev)) {
                 auto constant = [&] (amrex::MultiFab const& field, Real value) {
                     auto const box = amrex::convert(region, field.ixType());
@@ -235,8 +244,7 @@ check_vacuum_patch (WarpX& w) {
                     constant(mat->getsigma_mf(), 0._rt) &&
                         constant(mat->getepsilon_mf(), PhysConst::epsilon_0) &&
                         constant(mat->getmu_mf(), PhysConst::mu0),
-                    "The refined volume and its interface collar must have "
-                    "vacuum material coefficients.");
+                    "The Yee interface collar must have vacuum material coefficients.");
             }
             if (EB::enabled()) {
                 for (int d = 0; d < 3; ++d) {
@@ -246,8 +254,7 @@ check_vacuum_patch (WarpX& w) {
                             flag && flag->min(
                                         amrex::convert(region, flag->ixType()),
                                         0) > 0,
-                            "The refined volume and its interface collar must "
-                            "have active Yee edges and faces.");
+                            "The Yee interface collar must have active edges and faces.");
                     }
                 }
             }
@@ -546,7 +553,7 @@ struct CompositeYeeSurface::Implementation {
                 "The Yee surface expects zero-origin native indices and "
                 "positive refinement ratios.");
         }
-        check_vacuum_patch(w);
+        check_vacuum_collar(w);
         bool use_fixed_shape = false;
         amrex::ParmParse("warpx").query("composite_yee_fixed_shape_current",
                                         use_fixed_shape);

@@ -968,12 +968,13 @@ Setting up the field mesh
     explicit staggered Yee evolution, energy-conserving gathering and exactly
     two levels. Divergence cleaning and subcycling must be disabled.
 
-    The fine patch must lie inside the physical domain. The patch and a collar
-    two parent cells wide must have vacuum material coefficients and active
-    Maxwell edges and faces. Conductors, embedded boundaries and prescribed
-    magnetic ports can occupy the exterior parent mesh. The physical outer
-    PML remains active on the parent. Restart with the same interface and
-    particle coupling.
+    The fine patch must lie inside the physical domain. The coarse/fine
+    boundary needs a two-parent-cell vacuum collar with active Maxwell edges
+    and faces. Conductors, embedded boundaries and prescribed magnetic ports
+    can lie inside the fine volume or on the exterior parent grid, clear of
+    this collar. Adjacent fine boxes use native fields across their common
+    faces. The physical outer PML remains active on the parent. Restart with
+    the same interface and particle coupling.
 
 .. pp:param:: warpx.composite_yee_fixed_shape_current
     :type: bool
