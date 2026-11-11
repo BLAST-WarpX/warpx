@@ -6,7 +6,7 @@ warpx.checkpoint_host_random_state = 1
 electron.num_particles_per_cell = 32
 ion.num_particles_per_cell = 32
 
-diagnostics.diags_names = diag1 checkpoint
+diagnostics.diags_names = diag1 diag_parser_filter diag_uniform_filter diag_random_filter checkpoint
 diag1.format = plotfile
 diag1.intervals = 8
 checkpoint.diag_type = Full

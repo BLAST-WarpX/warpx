@@ -196,7 +196,7 @@ if(WarpX_COMPUTE STREQUAL "NOACC" OR WarpX_COMPUTE STREQUAL "OMP")
         2
         1
         inputs_test_2d_collision_host_streams_restart
-        "analysis_default_restart.py --path diags/diag1000008"
+        "../../analysis_default_restart.py --path diags/diag1000008"
         OFF
         test_2d_collision_host_streams
     )
