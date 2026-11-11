@@ -64,12 +64,17 @@ See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-technical-com
 
 ### Role
 
-The technical committee (TC) is the core governance body, where under normal operations most ideas are discussed and decisions are made.
-Individual TC members can approve and merge code changes.
-Usually, they seek approval by another maintainer for their own changes, too.
-TC members lead - and weigh in on - technical discussions and, if needed, can call for a vote between TC members for a technical decision.
-TC members merge/close PRs and issues, and moderate (including block/mute) bad actors.
+The technical committee (TC) is the core governance body, where, under normal operations, most ideas are discussed and decisions are made.
+TC members lead and weigh in on technical discussions and, if needed, can call for a vote among TC members on a technical decision.
+TC members also moderate bad actors, including blocking or muting them.
 The TC can propose governance changes to the SC.
+
+Individual TC members can approve, merge, and close pull requests, and close issues.
+For their own pull requests, they usually also seek approval from another TC member.
+To help manage the large number of open pull requests and issues, TC members are expected to:
+
+1. assign reviewers and at least one assignee to the pull requests and issues they open themselves;
+2. regularly monitor unassigned pull requests and issues, opened by anyone, and assign themselves as reviewers and/or assignees whenever they judge it appropriate.
 
 
 ### Decision Process
