@@ -159,16 +159,18 @@ deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
 
 FixedShapeCurrent::FixedShapeCurrent (WarpX& w) {
     auto& pcs = w.GetPartContainer();
+    // Prescribed-current antennas deposit on their native levels. Only the
+    // physical species in for_tiles use the virtual kinetic current grid.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        pcs.nContainers() == pcs.nSpecies() &&
+        pcs.nLasers() == 0 &&
             (WarpX::nox == 1 || WarpX::nox == 3) && WarpX::nox == WarpX::noy &&
             WarpX::nox == WarpX::noz &&
             (WarpX::current_deposition_algo ==
                  CurrentDepositionAlgo::Esirkepov ||
              WarpX::current_deposition_algo ==
                  CurrentDepositionAlgo::Villasenor),
-        "The fixed-shape current control requires ordinary kinetic species and "
-        "linear or cubic charge-conserving deposition.");
+        "The fixed-shape current control requires linear or cubic charge-conserving "
+        "deposition without laser particles.");
     for (int s = 0; s < pcs.nSpecies(); ++s) {
         auto& pc = pcs.GetParticleContainer(s);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

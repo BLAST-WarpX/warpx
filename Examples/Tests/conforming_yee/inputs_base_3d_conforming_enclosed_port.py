@@ -11,6 +11,7 @@ from pywarpx import geometry, libwarpx
 parser = argparse.ArgumentParser()
 parser.add_argument("--uniform", action="store_true")
 parser.add_argument("--expand-aperture", action="store_true")
+parser.add_argument("--impressed-current", action="store_true")
 parser.add_argument("--reference", type=Path)
 parser.add_argument("--touch", choices=("material", "eb", "port"))
 args = parser.parse_args()
@@ -69,6 +70,35 @@ settings = [
     "max_step=6",
     "warpx.verbose=0",
 ]
+if args.impressed_current:
+    settings.extend(
+        [
+            f"warpx.composite_yee_fixed_shape_current={int(not args.uniform)}",
+            f"warpx.composite_yee_fixed_shape_gather={int(not args.uniform)}",
+            "algo.current_deposition=villasenor",
+            "algo.field_gathering=energy-conserving",
+            "algo.particle_shape=3",
+            "warpx.use_filter=0",
+            "warpx.n_current_deposition_buffer=0",
+            "warpx.n_field_gather_buffer=0",
+            "particles.species_names=ions",
+            "ions.species_type=proton",
+            "ions.injection_style=singleparticle",
+            "ions.single_particle_pos=0.009 0.006 0.0064",
+            "ions.single_particle_u=0 0.02 0",
+            "ions.single_particle_weight=1.0e9",
+            "warpx.current_injection=1",
+            "warpx.current_injection.file=coil_waveform.txt",
+            "warpx.current_injection.pair_0.drive.xlo=-0.003125",
+            "warpx.current_injection.pair_0.drive.xhi=0.003125",
+            "warpx.current_injection.pair_0.drive.ylo=-0.015625",
+            "warpx.current_injection.pair_0.drive.yhi=-0.009375",
+            "warpx.current_injection.pair_0.drive.zlo=-0.003125",
+            "warpx.current_injection.pair_0.drive.zhi=0.003125",
+            "warpx.current_injection.pair_0.drive.A=0.00625*0.00625",
+            "warpx.current_injection.pair_0.drive.dir=0",
+        ]
+    )
 libwarpx.initialize(settings)
 fields = libwarpx.warpx.multifab_register()
 level = int(not args.uniform)
@@ -97,6 +127,19 @@ for step in range(1, 7):
     for family in "EB":
         for component, direction in enumerate("xyz"):
             saved[f"{family}{direction}_{step}"] = snapshot(family, component)
+    if args.impressed_current:
+        jx, jy = (snapshot("j", d) for d in (0, 1))
+        saved[f"jx_{step}"], saved[f"jy_{step}"] = jx, jy
+        if step == 1:
+            # Initial fields vanish. The antenna supplies a 1 A step-average
+            # along x, while the independent proton carries current along y.
+            np.testing.assert_allclose(jx.sum() * h**3 / 0.00625, 1.0, rtol=2e-9)
+            proton_current_length = (
+                1.602176634e-19 * 1.0e9 * 299792458.0 * 0.02 / np.sqrt(1 + 0.02**2)
+            )
+            np.testing.assert_allclose(
+                jy.sum() * h**3, proton_current_length, rtol=2e-9
+            )
     by, bz = saved[f"By_{step}"], saved[f"Bz_{step}"]
     i, j0, j1, k0, k1 = (
         32 - start[0],

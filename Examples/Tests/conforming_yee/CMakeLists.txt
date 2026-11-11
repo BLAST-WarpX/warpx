@@ -28,6 +28,25 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
             OFF
             ${enclosed_reference}
         )
+        set(antenna_reference test_3d_conforming_yee_uniform_enclosed_antenna)
+        add_warpx_test(
+            ${antenna_reference}
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --uniform --impressed-current"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_enclosed_antenna
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --impressed-current --reference ../${antenna_reference}/enclosed_reference.npz"
+            OFF
+            OFF
+            ${antenna_reference}
+        )
         set(collar_material "collar must have vacuum material")
         set(collar_eb "collar must have active edges and faces")
         set(collar_port "ports must lie clear of the Yee interface collar")

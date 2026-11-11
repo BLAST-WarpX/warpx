@@ -4431,8 +4431,13 @@ In macroscopic media, the measurement uses the patch's permeability with the sam
 indexing as the macroscopic Ampere update.
 
 In a fully kinetic Maxwell solve this controls the **total Ampere current** through
-:math:`S`: particle current, macroscopic conduction current, and displacement current.  It
-does not require the carrier current alone to jump instantaneously to the requested value.
+:math:`S`. The total includes particle current, separately impressed antenna current,
+macroscopic conduction current, and displacement current. In a vacuum gap without
+free current, the prescribed current changes the electric flux through the aperture
+and can produce a large voltage. To represent an external lead carrying a known
+current through the gap, supply its waveform and physical cross section separately
+with ``warpx.current_injection``. Measure the free current and the electric field
+integral across the gap when interpreting the terminal voltage.
 In Hybrid-PIC, which omits displacement current, the same constraint controls the combined
 ion and electron-fluid current.  The 3D correction is constructed as a discrete curl, so it
 does not introduce magnetic divergence.  The source is an ideal current constraint; an
