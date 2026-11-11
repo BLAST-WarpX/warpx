@@ -35,10 +35,6 @@ public:
     void ReadParameters ();
 
     [[nodiscard]] bool hasDielectrics () const noexcept { return !m_materials.empty(); }
-    [[nodiscard]] bool hasTimeDependentPermittivity () const noexcept
-    {
-        return m_has_time_dependent_permittivity;
-    }
 
     void AllocLevelData (
         WarpX& warpx,
@@ -56,7 +52,6 @@ public:
 
     void InitData (WarpX& warpx);
     void InitLevelData (WarpX& warpx, int lev);
-    void UpdateEpsilon (WarpX& warpx, int max_level, amrex::Real time);
 
     [[nodiscard]] amrex::iMultiFab const* MaterialID (int lev) const;
 
@@ -100,8 +95,7 @@ private:
 
     void FillEpsilon (
         amrex::MultiFab& epsilon,
-        amrex::Geometry const& geom,
-        amrex::Real time) const;
+        amrex::Geometry const& geom) const;
 
     void FillParserSignedDistance (
         amrex::MultiFab& object_sdf,
@@ -121,7 +115,6 @@ private:
 
     std::vector<Material> m_materials;
     amrex::Vector<std::unique_ptr<amrex::iMultiFab> > m_material_id;
-    bool m_has_time_dependent_permittivity = false;
 };
 
 #endif // WARPX_DIELECTRICMATERIALS_H_

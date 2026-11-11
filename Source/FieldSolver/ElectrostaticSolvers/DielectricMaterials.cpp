@@ -96,12 +96,12 @@ namespace
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             epsilon.is_finite(0, 1, epsilon.nGrowVect(), local),
             "Dielectric material '" + material_name +
-            "' has non-finite values from permittivity_function(x,y,z,t). "
+            "' has non-finite values from permittivity_function(x,y,z). "
             "Relative permittivity must be finite and greater than or equal to 1.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             epsilon.min(0, epsilon.nGrowVect().min(), local) >= 1.0_rt,
             "Dielectric material '" + material_name +
-            "' has values less than 1 from permittivity_function(x,y,z,t). "
+            "' has values less than 1 from permittivity_function(x,y,z). "
             "Relative permittivity must be finite and greater than or equal to 1.");
     }
 
@@ -184,8 +184,7 @@ namespace
         amrex::MultiFab& epsilon,
         amrex::Geometry const& geom,
         amrex::ParserExecutor<3> const shape_exec,
-        amrex::ParserExecutor<4> const permittivity_exec,
-        amrex::Real const time)
+        amrex::ParserExecutor<3> const permittivity_exec)
     {
         auto const dx = geom.CellSizeArray();
         auto const problo = geom.ProbLoArray();
@@ -215,7 +214,7 @@ namespace
                 amrex::ignore_unused(j, k);
 #endif
                 if (shape_exec(x, y, z) >= 0.0_rt) {
-                    eps(i, j, k) = permittivity_exec(x, y, z, time);
+                    eps(i, j, k) = permittivity_exec(x, y, z);
                 }
             });
         }
@@ -249,8 +248,7 @@ namespace
         amrex::MultiFab& epsilon,
         amrex::MultiFab const& stl_sdf,
         amrex::Geometry const& geom,
-        amrex::ParserExecutor<4> const permittivity_exec,
-        amrex::Real const time)
+        amrex::ParserExecutor<3> const permittivity_exec)
     {
 #if defined(WARPX_DIM_3D)
         auto const dx = geom.CellSizeArray();
@@ -280,7 +278,7 @@ namespace
                 amrex::ignore_unused(i, j, k);
 #endif
                 if (d(i, j, k) <= 0.0_rt) {
-                    eps(i, j, k) = permittivity_exec(x, y, z, time);
+                    eps(i, j, k) = permittivity_exec(x, y, z);
                 }
             });
         }
@@ -302,7 +300,7 @@ DielectricMaterials::ReadParameters ()
         "warpx.epsilon_function(x,y,z) has been replaced by the dielectric "
         "material interface. Use dielectrics.names and "
         "<dielectric_name>.permittivity or "
-        "<dielectric_name>.permittivity_function(x,y,z,t).");
+        "<dielectric_name>.permittivity_function(x,y,z).");
 
     amrex::ParmParse const pp_dielectrics("dielectrics");
     std::vector<std::string> names;
@@ -331,7 +329,6 @@ DielectricMaterials::ReadParameters ()
     pp_dielectrics.query("stl_use_bvh", default_stl_use_bvh);
 
     m_materials.clear();
-    m_has_time_dependent_permittivity = false;
     m_materials.reserve(names.size());
     for (auto const& name : names) {
         ReadMaterial(name, default_stl_use_bvh);
@@ -389,7 +386,7 @@ DielectricMaterials::ReadMaterial (std::string const& name, int default_stl_use_
         utils::parser::queryWithParser(pp_material, "permittivity", material.permittivity);
     bool const has_function =
         pp_material.query(
-            "permittivity_function(x,y,z,t)", material.permittivity_function);
+            "permittivity_function(x,y,z)", material.permittivity_function);
     std::string permittivity_file;
     bool const has_file = pp_material.query("permittivity_from_file", permittivity_file);
 
@@ -397,7 +394,7 @@ DielectricMaterials::ReadMaterial (std::string const& name, int default_stl_use_
         static_cast<int>(has_constant) + static_cast<int>(has_function) +
             static_cast<int>(has_file) == 1,
         "Dielectric material '" + name + "' must specify exactly one of "
-        "permittivity, permittivity_function(x,y,z,t), or permittivity_from_file.");
+        "permittivity, permittivity_function(x,y,z), or permittivity_from_file.");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !has_file,
@@ -406,7 +403,6 @@ DielectricMaterials::ReadMaterial (std::string const& name, int default_stl_use_
 
     if (has_function) {
         material.permittivity_type = PermittivityType::Function;
-        m_has_time_dependent_permittivity = true;
     } else {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             std::isfinite(material.permittivity) && material.permittivity >= 1.0_rt,
@@ -491,20 +487,7 @@ DielectricMaterials::InitLevelData (WarpX& warpx, int const lev)
         "Dielectric material mask was not allocated before initialization.");
 
     FillSignedDistanceAndMask(*sdf, *material_id, warpx.Geom(lev));
-    FillEpsilon(*epsilon, warpx.Geom(lev), warpx.gett_new(lev));
-}
-
-void
-DielectricMaterials::UpdateEpsilon (WarpX& warpx, int const max_level, amrex::Real const time)
-{
-    if (!hasTimeDependentPermittivity()) { return; }
-
-    using warpx::fields::FieldType;
-
-    auto& fields = warpx.GetMultiFabRegister();
-    for (int lev = 0; lev <= max_level; ++lev) {
-        FillEpsilon(*fields.get(FieldType::dielectric_epsilon, lev), warpx.Geom(lev), time);
-    }
+    FillEpsilon(*epsilon, warpx.Geom(lev));
 }
 
 amrex::iMultiFab const*
@@ -613,10 +596,8 @@ DielectricMaterials::MergeSignedDistanceAndMask (
 void
 DielectricMaterials::FillEpsilon (
     amrex::MultiFab& epsilon,
-    amrex::Geometry const& geom,
-    amrex::Real const time) const
+    amrex::Geometry const& geom) const
 {
-    // Start from vacuum on every fill so time-dependent updates remove stale material values.
     epsilon.setVal(1.0_rt);
 
     for (auto const& material : m_materials) {
@@ -638,10 +619,10 @@ DielectricMaterials::FillEpsilon (
                     epsilon, geom, shape_exec, material.permittivity);
             } else {
                 auto permittivity_parser = utils::parser::makeParser(
-                    material.permittivity_function, {"x", "y", "z", "t"});
-                auto permittivity_exec = permittivity_parser.compile<4>();
+                    material.permittivity_function, {"x", "y", "z"});
+                auto permittivity_exec = permittivity_parser.compile<3>();
                 SetImplicitFunctionPermittivity(
-                    epsilon, geom, shape_exec, permittivity_exec, time);
+                    epsilon, geom, shape_exec, permittivity_exec);
                 // Function-valued permittivity is validated after evaluating every covered cell.
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }
@@ -650,9 +631,9 @@ DielectricMaterials::FillEpsilon (
                 SetSTLConstantPermittivity(epsilon, *stl_sdf, material.permittivity);
             } else {
                 auto permittivity_parser = utils::parser::makeParser(
-                    material.permittivity_function, {"x", "y", "z", "t"});
-                auto permittivity_exec = permittivity_parser.compile<4>();
-                SetSTLFunctionPermittivity(epsilon, *stl_sdf, geom, permittivity_exec, time);
+                    material.permittivity_function, {"x", "y", "z"});
+                auto permittivity_exec = permittivity_parser.compile<3>();
+                SetSTLFunctionPermittivity(epsilon, *stl_sdf, geom, permittivity_exec);
                 // Function-valued permittivity is validated after evaluating every covered cell.
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }

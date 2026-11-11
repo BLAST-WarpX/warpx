@@ -1278,11 +1278,12 @@ Each dielectric material must also define exactly one permittivity source.
     Constant relative permittivity inside the material. The value must be finite
     and greater than or equal to ``1.0``.
 
-.. pp:param:: <dielectric_name>.permittivity_function(x,y,z,t)
+.. pp:param:: <dielectric_name>.permittivity_function(x,y,z)
     :type: ``string``
 
     Relative permittivity inside the material as a function of ``x``, ``y``,
-    ``z``, and ``t``. In 2D XZ and RZ simulations, ``y`` is set to zero. All
+    and ``z``. It is evaluated once at initialization (and after regridding).
+    In 2D XZ and RZ simulations, ``y`` is set to zero. All
     evaluated values must be finite and greater than or equal to ``1.0``.
 
 .. pp:param:: <dielectric_name>.permittivity_from_file

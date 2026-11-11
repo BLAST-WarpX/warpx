@@ -81,7 +81,6 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
 #else
         std::optional<ablastr::fields::ConstMultiLevelScalarField> dielectric_epsilon;
         if (warpx.HasDielectricMaterials()) {
-            warpx.GetDielectricMaterials().UpdateEpsilon(warpx, max_level, warpx.gett_new(0));
             ablastr::fields::ConstMultiLevelScalarField epsilon;
             for (int lev = 0; lev <= max_level; ++lev) {
                 epsilon.push_back(fields.get(FieldType::dielectric_epsilon, lev));
