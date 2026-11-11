@@ -54,10 +54,11 @@ namespace {
 
 void WarpX::InitCompositeXZParticleCoupling ()
 {
-    // A vacuum restart can retain the interface option with no kinetic species.
-    if (mypc->nContainers() == 0) { return; }
+    // Independent sources deposit on their native grids. Only kinetic species
+    // use the finest-spacing current and gather below.
+    if (mypc->nSpecies() == 0) { return; }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        mypc->nSpecies() == mypc->nContainers() && nox >= 1 && nox <= 3 &&
+        nox >= 1 && nox <= 3 &&
         (current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
          current_deposition_algo == CurrentDepositionAlgo::Villasenor),
         "Fixed-shape XZ coupling requires ordinary kinetic species and charge-conserving deposition.");
