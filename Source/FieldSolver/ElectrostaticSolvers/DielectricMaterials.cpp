@@ -537,7 +537,9 @@ DielectricMaterials::FillParserSignedDistance (
     DielectricParserIF const parser_if(parser.compile<3>());
     auto gshop = amrex::EB2::makeShop(parser_if, parser);
 
-    int const box_type = gshop.getBoxType(geom.Domain(), geom, amrex::RunOn::Cpu);
+    // getBoxType samples the implicit function at the nodes of the box
+    amrex::Box const nodal_domain = amrex::surroundingNodes(geom.Domain());
+    int const box_type = gshop.getBoxType(nodal_domain, geom, amrex::RunOn::Cpu, nodal_domain);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         box_type != decltype(gshop)::allcovered,
         "Dielectric material " + material.name +
