@@ -13,8 +13,11 @@
 #
 # Available runners: https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
 #
+variables:
+  CMAKE_BUILD_PARALLEL_LEVEL: "16"
+
 .install-dependencies:
-  timeout: 90 minutes
+  timeout: 120 minutes
   before_script:
     - hostname
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
@@ -68,13 +71,16 @@ NVIDIA-H100:
           -DWarpX_FFT=ON                                   \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       GPU_TESTS=(
         test_1d_langmuir_multi
+        test_2d_langmuir_multi_mr_direct
+        test_2d_langmuir_multi_mr_direct_shared_mem
         test_2d_refined_injection
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
@@ -127,13 +133,16 @@ AMD-MI300:
           -DWarpX_PRECISION=DOUBLE                     \
           -DWarpX_PARTICLE_PRECISION=DOUBLE            \
           -DWarpX_FFT=ON
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       GPU_TESTS=(
         test_1d_langmuir_multi
+        test_2d_langmuir_multi_mr_direct
+        test_2d_langmuir_multi_mr_direct_shared_mem
         test_2d_refined_injection
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
@@ -184,7 +193,8 @@ Intel-PVC:
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then

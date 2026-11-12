@@ -67,7 +67,7 @@ def test_charge_deposition_conserves_total_charge(particle_shape):
 
     # allocates a nodal MultiFab, resets it, deposits, sums the guard cells and
     # applies the boundary/volume treatment
-    rho = electrons.get_charge_density(lev=0, local=False)
+    rho = electrons.get_charge_density(lev=0, local=False, finalize=True)
 
     # integrate rho over the domain: sum the unique nodes, times the cell volume.
     # Passing the periodicity matters, as rho is nodal and the nodes on the periodic
@@ -94,7 +94,7 @@ def test_charge_deposition_is_negative_for_electrons():
     add_uniform_particles(sim, "electrons")
 
     electrons = sim.particles.get("electrons")
-    rho = electrons.get_charge_density(lev=0, local=False)
+    rho = electrons.get_charge_density(lev=0, local=False, finalize=True)
 
     assert rho.max(0) <= 0.0
     assert rho.min(0) < 0.0

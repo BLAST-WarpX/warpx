@@ -7,6 +7,7 @@
 #include "Python/pyWarpX.H"
 
 #include <Particles/WarpXParticleContainer.H>
+#include <WarpX.H>
 
 
 void init_WarpXParIter (py::module& m)
@@ -117,25 +118,69 @@ void init_WarpXParticleContainer (py::module& m)
                 {
                     const long np = pti.numParticles();
                     auto& wp = pti.GetAttribs(PIdx::w);
-                    pc.DepositCharge(pti, wp, nullptr, rho, 0, 0, np, 0, lev, lev);
+                    int* ion_lev = nullptr;
+                    if (pc.DoFieldIonization()) {
+                        ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
+                    }
+                    pc.DepositCharge(pti, wp, ion_lev, rho, 0, 0, np, 0, lev, lev);
                 }
             },
-            py::arg("rho"), py::arg("lev")
+            py::arg("rho"), py::arg("lev"),
+            R"pbdoc(Deposit the raw particle charge into ``rho`` (adding to its current values).
+
+This does not sum guard cells or apply boundary conditions (see ``sync_rho``).
+In cylindrical and spherical geometries, it also does not apply the inverse
+radial volume scaling: the result is the charge density multiplied by the
+radial volume factor, not a physical charge density.
+
+Parameters
+----------
+rho: MultiFab
+  Field in which to deposit the charge
+lev: int
+  Mesh refinement level for deposition)pbdoc"
         )
         .def("get_charge_density",
-            [](WarpXParticleContainer& pc, int lev, bool local)
+            [](WarpXParticleContainer& pc, int lev, bool local, bool finalize)
             {
-                return pc.GetChargeDensity(lev, local);
+                return pc.GetChargeDensityOnLevel(lev, local, finalize);
             },
-            py::arg("lev"), py::arg("local")
+            py::arg("lev"), py::arg("local"), py::arg("finalize") = true,
+            R"pbdoc(Deposit the charge density of this species into a new MultiFab on level ``lev``.
+
+No filter is applied, and contributions from other mesh refinement levels are not included.
+
+Parameters
+----------
+lev: int
+  Mesh refinement level for deposition
+local: bool
+  If False, sum the guard cells into the valid cells.
+  If True, keep the local deposits (requires ``finalize=False``).
+finalize: bool
+  If True, apply boundary conditions and, in cylindrical and spherical geometries,
+  fold the charge deposited at negative radius and apply the inverse radial volume
+  scaling, so that the result is a physical charge density.
+
+Returns
+-------
+MultiFab
+  The deposited charge density)pbdoc"
         )
         .def("deposit_current",
             [](WarpXParticleContainer& pc, std::string mf_name, int lev, double dt, double relative_time)
             {
-                pc.DepositCurrent(mf_name, lev, dt, relative_time);
+                pc.DepositCurrentOnLevel(mf_name, lev, dt, relative_time);
+                auto& warpx = WarpX::GetInstance();
+                auto const current = warpx.m_fields.get_alldirs(mf_name, lev);
+                // Apply boundary conditions to current, then apply volume scaling
+                warpx.FinalizeJOnLevel(lev, current[0], current[1], current[2], PatchType::fine);
             },
             py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time"),
-            R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions
+            R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions.
+In cylindrical and spherical geometries, also fold the current deposited at negative
+radius and apply the inverse radial volume scaling, so that the result on level ``lev``
+is a physical current density.
 
 Parameters
 ----------

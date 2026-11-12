@@ -110,6 +110,9 @@ There are several support classes use to specify components of the evolve scheme
 .. autopydantic_model:: pywarpx.picmi.PETScPreconditioner
     :inherited-members: BaseModel
 
+.. autopydantic_model:: pywarpx.picmi.AlgMGPreconditioner
+    :inherited-members: BaseModel
+
 Constants
 ---------
 
