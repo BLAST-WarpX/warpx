@@ -993,7 +993,11 @@ Setting up the field mesh
     With kinetic species, temporary current arrays span the domain at the
     fine spacing. WarpX adds the projected kinetic current to independent
     native sources, including current supplied by an ``afterdeposition``
-    callback. A species-free vacuum run skips the kinetic allocation.
+    callback. Prescribed antenna markers whose current stencil may overlap
+    the interface use the same finest-spacing deposit. Markers farther from
+    the interface retain their native deposition, including its treatment of
+    material and outer boundaries. A vacuum run with no particles or antenna
+    skips the temporary allocation.
 
 .. pp:param:: warpx.composite_yee_fixed_shape_gather
     :type: bool

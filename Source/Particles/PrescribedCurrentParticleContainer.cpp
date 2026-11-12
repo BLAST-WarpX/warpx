@@ -371,6 +371,52 @@ PrescribedCurrentParticleContainer::PostRestart () {
     InitData();
 }
 
+#ifdef WARPX_DIM_3D
+void
+PrescribedCurrentParticleContainer::SetInterfaceCurrentMask (
+    BoxArray const& collar, Array4<int const> mask)
+{
+    // A marker starts at a leaf-cell center and its waveform excursion is
+    // bounded to 0.05 fine cells. Its parent-cell index therefore stays fixed.
+    auto const lo = Geom(0).ProbLoArray();
+    auto const inv = Geom(0).InvCellSizeArray();
+    for (auto const& drive : m_drives) {
+        IntVect lower, upper;
+        for (int d = 0; d < 3; ++d) {
+            lower[d] = int(std::floor((drive.lo[d] - lo[d]) * inv[d]));
+            upper[d] = int(std::ceil((drive.hi[d] - lo[d]) * inv[d])) - 1;
+        }
+        if (collar.intersects(Box(lower, upper))) {
+            m_interface_current_mask = mask;
+            return;
+        }
+    }
+}
+
+void
+PrescribedCurrentParticleContainer::SelectInterfaceWeights (
+    WarpXParIter const& it, bool on_interface, RealVector& weights) const
+{
+    auto const n = it.numParticles();
+    weights.resize(n);
+    auto* const selected = weights.dataPtr();
+    auto const* const original = it.GetAttribs(PIdx::w).dataPtr();
+    auto const position = GetParticlePosition<PIdx>(it);
+    auto const lo = Geom(0).ProbLoArray();
+    auto const inv = Geom(0).InvCellSizeArray();
+    auto const mask = m_interface_current_mask;
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (long ip) noexcept {
+        ParticleReal x, y, z;
+        position(ip, x, y, z);
+        int const i = int(amrex::Math::floor((x-lo[0])*inv[0]));
+        int const j = int(amrex::Math::floor((y-lo[1])*inv[1]));
+        int const k = int(amrex::Math::floor((z-lo[2])*inv[2]));
+        bool const at_face = mask.contains(i,j,k) && mask(i,j,k) != 0;
+        selected[ip] = (at_face == on_interface) ? original[ip] : 0._prt;
+    });
+}
+#endif
+
 void
 PrescribedCurrentParticleContainer::Evolve (
     ablastr::fields::MultiFabRegister& fields, int lev,
@@ -534,6 +580,14 @@ PrescribedCurrentParticleContainer::Evolve (
             SetPosition(ip, x, y, z);
         });
 
+        auto const* current_weights = &wp;
+#ifdef WARPX_DIM_3D
+        RealVector native_weights;
+        if (!skip_deposition && HasInterfaceCurrent()) {
+            SelectInterfaceWeights(pti, false, native_weights);
+            current_weights = &native_weights;
+        }
+#endif
         if (!skip_deposition && !m_defer_trajectory_current) {
             const Real relative_time = -0.5_rt * dt;
             int const* const ion_lev = nullptr;
@@ -543,7 +597,7 @@ PrescribedCurrentParticleContainer::Evolve (
                 fields.get(current_fp_string, Direction{1}, lev);
             amrex::MultiFab* jz =
                 fields.get(current_fp_string, Direction{2}, lev);
-            DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz, 0, np,
+            DepositCurrent(pti, *current_weights, uxp, uyp, uzp, ion_lev, jx, jy, jz, 0, np,
                            thread_num, lev, lev, dt, relative_time, push_type, WarpX::nox);
         }
 

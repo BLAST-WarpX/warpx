@@ -768,6 +768,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::For( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
         {reduce_shape_runtime_flag},
         np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
+            if (wp[ip] == 0._prt) { return; }
             // --- Get particle quantities
             Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                  + uyp[ip]*uyp[ip]*inv_c2
@@ -2239,6 +2240,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
+            if (wp[ip] == 0._prt) { return; }
             constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
             const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                                + uyp[ip]*uyp[ip]*inv_c2

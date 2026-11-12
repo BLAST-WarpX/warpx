@@ -11,6 +11,7 @@
 #include "Particles/Deposition/CurrentDeposition.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
+#include "Particles/PrescribedCurrentParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Utils/TextMsg.H"
 
@@ -115,14 +116,24 @@ template <typename F>
 void
 for_tiles (WarpX& w, F const& f) {
     auto& pcs = w.GetPartContainer();
-    for (int s = 0; s < pcs.nSpecies(); ++s) {
+    for (int s = 0; s < pcs.nContainers(); ++s) {
         auto& pc = pcs.GetParticleContainer(s);
+        auto const* antenna = s < pcs.nSpecies() ? nullptr :
+            dynamic_cast<PrescribedCurrentParticleContainer const*>(&pc);
+        if (antenna && !antenna->HasInterfaceCurrent()) { continue; }
         if (!pc.isPushed() || pc.do_not_deposit || pc.getCharge() == 0._rt) {
             continue;
         }
         for (int lev = 0; lev <= 1; ++lev) {
             for (WarpXParIter it(pc, lev); it.isValid(); ++it) {
-                f(it, pc.getCharge());
+                if (antenna) {
+                    WarpXParticleContainer::RealVector weights;
+                    antenna->SelectInterfaceWeights(it, true, weights);
+                    f(it, pc.getCharge(), weights.dataPtr());
+                    amrex::Gpu::streamSynchronize();
+                } else {
+                    f(it, pc.getCharge(), it.GetAttribs(PIdx::w).dataPtr());
+                }
             }
         }
     }
@@ -130,11 +141,11 @@ for_tiles (WarpX& w, F const& f) {
 
 template <int order>
 void
-deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
+deposit (WarpXParIter const& it, amrex::ParticleReal const* weight,
+         Real q, Real dt, amrex::Box const& box,
          amrex::XDim3 const& dinv, amrex::XDim3 const& lower,
          std::array<amrex::Array4<Real>, 3> const& j) {
     auto const pos = GetParticlePosition<PIdx>(it);
-    auto const* weight = it.GetAttribs(PIdx::w).dataPtr();
     auto const* ux = it.GetAttribs(PIdx::ux).dataPtr();
     auto const* uy = it.GetAttribs(PIdx::uy).dataPtr();
     auto const* uz = it.GetAttribs(PIdx::uz).dataPtr();
@@ -159,8 +170,6 @@ deposit (WarpXParIter const& it, Real q, Real dt, amrex::Box const& box,
 
 FixedShapeCurrent::FixedShapeCurrent (WarpX& w) {
     auto& pcs = w.GetPartContainer();
-    // Prescribed-current antennas deposit on their native levels. Only the
-    // physical species in for_tiles use the virtual kinetic current grid.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         pcs.nLasers() == 0 &&
             (WarpX::nox == 1 || WarpX::nox == 3) && WarpX::nox == WarpX::noy &&
@@ -190,6 +199,25 @@ FixedShapeCurrent::FixedShapeCurrent (WarpX& w) {
     auto const passes = WarpX::use_filter ? WarpX::filter_npass_each_dir : IntVect(0);
     auto const source_halo = open_axes * (IntVect(WarpX::nox + 1) + passes);
     auto const ratio = w.refRatio(0);
+    if (pcs.nContainers() > pcs.nSpecies()) {
+        auto interior = amrex::coarsen(w.boxArray(1), ratio);
+        auto exterior = amrex::complementIn(w.Geom(0).Domain(), interior);
+        // Include the native shape, one step of motion, and the filter on
+        // either side of the physical join. Internal fine FAB seams are native.
+        auto const reach = IntVect((WarpX::nox + 1) / 2 + 1) + passes;
+        auto collar = amrex::intersect(interior.grow(reach), exterior.grow(reach));
+        collar.removeOverlap();
+        antenna_interface.define(amrex::BoxArray(w.Geom(0).Domain()), dm, 1, 0);
+        antenna_interface.setVal(0);
+        for (int k = 0; k < collar.size(); ++k) {
+            antenna_interface.setVal(1, collar[k], 0);
+        }
+        for (int s = pcs.nSpecies(); s < pcs.nContainers(); ++s) {
+            auto* antenna = dynamic_cast<PrescribedCurrentParticleContainer*>(&pcs.GetParticleContainer(s));
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(antenna, "Unsupported non-kinetic source on the conforming Yee mesh.");
+            antenna->SetInterfaceCurrentMask(collar, antenna_interface.const_array(0));
+        }
+    }
     auto const gather_halo = amrex::coarsen(open_axes * (WarpX::nox + 1) + ratio - IntVect(1), ratio);
     auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
     for (int d = 0; d < 3; ++d) {
@@ -247,10 +275,11 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
     amrex::ReduceOps<amrex::ReduceOpLogicalOr> reduction;
     amrex::ReduceData<int> outside(reduction);
     using Result = decltype(outside)::Type;
-    for_tiles(w, [&] (WarpXParIter const& it, Real) {
+    for_tiles(w, [&] (WarpXParIter const& it, Real, amrex::ParticleReal const* weight) {
         auto const pos = GetParticlePosition<PIdx>(it);
         reduction.eval(
             it.numParticles(), outside, [=] AMREX_GPU_DEVICE(int n) noexcept -> Result {
+                if (weight[n] == 0._prt) { return {0}; }
                 amrex::ParticleReal x, y, z;
                 pos(n, x, y, z);
                 // A source beginning on the physical mesh can leave by at
@@ -277,11 +306,11 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
         raw[d]->setVal(0._rt);
         j[d] = raw[d]->array(0);
     }
-    for_tiles(w, [&] (WarpXParIter const& it, Real q) {
+    for_tiles(w, [&] (WarpXParIter const& it, Real q, amrex::ParticleReal const* weight) {
         if (WarpX::nox == 3) {
-            deposit<3>(it, q, dt, source_box, dinv, lower, j);
+            deposit<3>(it, weight, q, dt, source_box, dinv, lower, j);
         } else {
-            deposit<1>(it, q, dt, source_box, dinv, lower, j);
+            deposit<1>(it, weight, q, dt, source_box, dinv, lower, j);
         }
     });
     auto const fine = w.m_fields.get_alldirs(FieldType::current_fp, 1);
@@ -294,7 +323,7 @@ FixedShapeCurrent::Assemble (WarpX& w, Real dt) {
         }
         auto const& source = filtered[d] ? *filtered[d] : *raw[d];
         // Native sources have already been synchronized and filtered. Add the
-        // kinetic contribution on each leaf after projecting the virtual current.
+        // trajectory contribution on each leaf after projecting the virtual current.
         fine[d]->ParallelAdd(source);
         auto const arr = source.const_array(0);
         auto const mask = fine_owns[d]->const_array(0);

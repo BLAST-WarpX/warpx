@@ -188,3 +188,45 @@ if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
         test_3d_conforming_yee_stepped_absorber
     )
 endif()
+
+# Prescribed currents overlap both x faces of the fine patch.
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_uniform_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_transverse_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 1"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_isotropic_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 2"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_esirkepov_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 2 --esirkepov"
+    OFF
+    OFF
+    OFF
+)

@@ -26,6 +26,7 @@ class FixedShapeCurrent {
     std::array<std::unique_ptr<amrex::MultiFab>, 3> filtered;
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> fine_owns;
     amrex::iMultiFab valid_centers;
+    amrex::iMultiFab antenna_interface;
     std::array<std::array<std::unique_ptr<amrex::MultiFab>, 3>, 2>
         coarse_gather;
     std::array<std::array<amrex::MultiFab*, 3>, 2> force{};

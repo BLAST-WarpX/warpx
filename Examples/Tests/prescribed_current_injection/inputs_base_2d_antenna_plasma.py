@@ -107,7 +107,11 @@ def leaf_integral(family, direction, lower, upper):
         return integral(family, direction, 0, lower, upper)
     return sum(
         integral(family, direction, level, max(lower, left), min(upper, right))
-        for level, left, right in ((0, 0.0, 0.032), (1, 0.032, 0.064), (0, 0.064, 0.096))
+        for level, left, right in (
+            (0, 0.0, 0.032),
+            (1, 0.032, 0.064),
+            (0, 0.064, 0.096),
+        )
         if max(lower, left) < min(upper, right)
     )
 

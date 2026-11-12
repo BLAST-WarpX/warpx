@@ -86,6 +86,15 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
         return true;
     }
 
+#ifdef WARPX_DIM_3D
+    /** Route markers whose native current stencil may cross a coarse/fine face. */
+    void SetInterfaceCurrentMask (amrex::BoxArray const& collar,
+                                  amrex::Array4<int const> mask);
+    [[nodiscard]] bool HasInterfaceCurrent () const { return bool(m_interface_current_mask); }
+    void SelectInterfaceWeights (WarpXParIter const& it, bool on_interface,
+                                 RealVector& weights) const;
+#endif
+
     /** Whether the impressed-current antenna is enabled in the inputs. */
     static bool is_enabled ();
 
@@ -106,6 +115,9 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
     amrex::Real m_vel_coeff = 0.; //!< C such that speed = C * I(t) [m/s/A]
     bool m_enabled = true;
     bool m_defer_trajectory_current = false;
+#ifdef WARPX_DIM_3D
+    amrex::Array4<int const> m_interface_current_mask;
+#endif
 
     //! Set the velocity scale from the largest waveform sample.
     void compute_velocity_scale ();
