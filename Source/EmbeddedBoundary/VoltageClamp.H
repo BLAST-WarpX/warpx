@@ -68,9 +68,19 @@ namespace warpx::embedded_boundary::voltage_clamp
      */
     amrex::Real SolveGrounded (amrex::Real rtol, int max_iter);
 
+    /** Fixed nodes a selector picks, and how many of them frozen edges join to a PEC
+     *  wall (the wall-connected ground). A conductor is joined as a whole, so equal
+     *  counts mean the selector picks only grounded conductors, which get no unit
+     *  solve; a nonzero smaller second count means it mixes them with free ones.
+     *
+     * \param[in] selector parser expression in (x, y, z), as for SolveUnitPotential
+     * \return {number of selected fixed nodes, number of those on the ground}
+     */
+    std::vector<amrex::Real> GroundOverlap (std::string const& selector);
+
     /** Abort unless every fixed node belongs to exactly one of the n conductors, or
-     *  to a conductor that frozen edges join to a PEC wall (part of the ground, not
-     *  listed). Call once after the unit solves.
+     *  to a conductor that frozen edges join to a PEC wall (part of the ground, no
+     *  unit solve). Call once after the unit solves.
      *
      * \param[in] n number of conductors
      */

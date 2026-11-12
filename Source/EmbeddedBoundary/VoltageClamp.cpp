@@ -67,6 +67,8 @@ namespace
     char const* const rho_measure = "voltage_clamp_measure_rho";
     // Union of the fixed nodes of all conductors
     char const* const fixed_nodes = "voltage_clamp_fixed";
+    // Nodes joined to a PEC wall by frozen edges (the wall-connected ground)
+    char const* const wall_reference = "voltage_clamp_wall_reference";
 
     amrex::BoxArray NodalBoxArray (WarpX const& warpx)
     {
@@ -286,8 +288,9 @@ namespace
                 // edges (one value per conductor) and equal on periodic copies.
                 // Wall nodes are the grounded reference (phi = 0 in every solve), so a
                 // selected conductor must not touch a wall: it would need phi = 1 and
-                // phi = 0 at once (physically, it is shorted to ground). An unselected
-                // conductor joined to a wall is part of the ground (see CheckSelection).
+                // phi = 0 at once (physically, it is shorted to ground). A conductor
+                // joined to a wall is part of the ground and gets no unit solve (the
+                // Python driver skips it, see GroundOverlap and CheckSelection).
                 bad(i,j,kk) = fixed && (
                     (s != 0._rt && s != 1._rt) || (wall && s != 0._rt) ||
                     (i < dhi[0] && sc.ur(i,j,kk) == 0 && s != s_at(i+1, j)) ||
@@ -298,7 +301,7 @@ namespace
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(invalid.max(0) == 0,
             "The voltage-clamp selector must be 0 or 1 on every fixed node and constant "
             "on each conductor; a conductor joined to a PEC domain wall is part of the "
-            "ground and must not be selected");
+            "ground and has no unit solve");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(source != nullptr ||
             weight.sum_unique(0, false, period) > 0._rt,
             "The voltage-clamp selector does not select any fixed node");
@@ -400,7 +403,7 @@ namespace
 
     /* Wall-connected ground: reference = 1 on the nodes that frozen edges join to a PEC
      * wall. The frozen edges carry no field, so such a conductor is at the wall
-     * potential: it is part of the grounded reference and is not listed. The search
+     * potential: it is part of the grounded reference and has no unit solve. The search
      * runs once at setup, on a copy of the frozen-edge graph on every rank (two
      * integers per node). */
     void MarkWallReference (WarpX& warpx, amrex::MultiFab& reference)
@@ -480,6 +483,16 @@ namespace
         amrex::Gpu::streamSynchronize();
     }
 
+    // The wall-connected ground, searched once and kept
+    amrex::MultiFab const& WallReference (WarpX& warpx)
+    {
+        if (!warpx.m_fields.has(wall_reference, lev)) {
+            AllocNodal(warpx, wall_reference);
+            MarkWallReference(warpx, *warpx.m_fields.get(wall_reference, lev));
+        }
+        return *warpx.m_fields.get(wall_reference, lev);
+    }
+
     std::unique_ptr<amrex::MultiFab> NodalDivE (WarpX& warpx, std::string const& name)
     {
         // The divergence stencil reads guard cells; syncing them from valid data
@@ -535,6 +548,38 @@ amrex::Real SolveGrounded (amrex::Real rtol, int max_iter)
     return SolveStaircase(-1, "0", rho.get(), rtol, max_iter);
 }
 
+std::vector<amrex::Real> GroundOverlap (std::string const& selector)
+{
+    auto& warpx = WarpX::GetInstance();
+    CheckSupported(warpx);
+    auto const& geom = warpx.Geom(lev);
+    auto const period = geom.periodicity();
+    // The fixed-node test reads update flags in the guard cells (see SolveStaircase)
+    auto& update = warpx.GetEBUpdateEFlag_fp()[lev];
+    update[0]->FillBoundary(period);
+    update[2]->FillBoundary(period);
+    auto const& reference = WallReference(warpx);
+    amrex::Parser const parser = utils::parser::makeParser(selector, {"x", "y", "z"});
+    auto const select = parser.compile<3>();
+    auto const dx = geom.CellSizeArray();
+    amrex::Real const zlo = geom.ProbLo(1);
+    // Indicators of the selected fixed nodes and of those among them on the ground
+    amrex::MultiFab count(reference.boxArray(), reference.DistributionMap(), 2, 0);
+    for (amrex::MFIter mfi(count); mfi.isValid(); ++mfi) {
+        auto const sc = MakeStaircase(warpx, mfi);
+        auto const ref = reference.const_array(mfi);
+        auto const c = count.array(mfi);
+        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            bool const selected = sc.fixed(i,j,k) &&
+                select(i*dx[0], 0._rt, zlo + j*dx[1]) == 1._rt;
+            c(i,j,k,0) = selected ? 1._rt : 0._rt;
+            c(i,j,k,1) = selected ? ref(i,j,k) : 0._rt;
+        });
+    }
+    return {count.sum_unique(0, false, period), count.sum_unique(1, false, period)};
+}
+
 void CheckSelection (int n)
 {
     auto& warpx = WarpX::GetInstance();
@@ -545,9 +590,8 @@ void CheckSelection (int n)
     for (int k = 0; k < n; ++k) {
         amrex::MultiFab::Add(sum, *warpx.m_fields.get(WeightName(k), lev), 0, 0, 1, 0);
     }
-    // ... or to the wall-connected ground, which is not listed
-    amrex::MultiFab reference(sum.boxArray(), sum.DistributionMap(), 1, 0);
-    MarkWallReference(warpx, reference);
+    // ... or to the wall-connected ground, which has no unit solve
+    auto const& reference = WallReference(warpx);
     // Also record all fixed and wall nodes, for the observer
     AllocNodal(warpx, fixed_nodes);
     amrex::MultiFab& fixed_mask = *warpx.m_fields.get(fixed_nodes, lev);
@@ -567,7 +611,7 @@ void CheckSelection (int n)
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(invalid.max(0) == 0,
         "Every fixed node must belong to exactly one conductor, or to a conductor joined "
-        "to a PEC wall (the ground); list grounded conductors that do not touch a wall");
+        "to a PEC wall (the ground); list every conductor that does not touch a wall");
 }
 
 std::vector<amrex::Real> GaussCharge (int n, std::string const& efield_name)

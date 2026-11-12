@@ -292,6 +292,14 @@ void init_WarpX (py::module& m)
             "voltage_clamp_gauss_charge(n, \"voltage_clamp_E_grounded\") then gives the "
             "induced charge independently of the reciprocity value in voltage_clamp_charge_state."
         )
+        .def("voltage_clamp_ground_overlap",
+            [] (WarpX&, std::string const& selector) {
+                return voltage_clamp::GroundOverlap(selector);
+            },
+            py::arg("selector"),
+            "Number of fixed nodes the selector picks, and how many of them are joined "
+            "to a PEC wall (the ground)."
+        )
         .def("voltage_clamp_check_selection",
             [] (WarpX&, int n) { voltage_clamp::CheckSelection(n); },
             py::arg("n"),
