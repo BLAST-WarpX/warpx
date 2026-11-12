@@ -126,6 +126,23 @@ Every conductor must be listed, grounded ones with potential 0, except conductor
 A misassigned or missing node aborts at setup with a message.
 ``measure_voltage_state()`` returns the observer voltages and charges.
 
+.. _usage-electrode-voltage-clamp-setup-solves:
+
+Setup solves
+^^^^^^^^^^^^
+
+The unit potentials are multigrid (MLMG) solves, one per conductor, run once at setup.
+They use the multigrid options of the electrostatic solver, :pp:param:`warpx.self_fields_max_coarsening_level` and the bottom-solver options next to it, set from Python before ``initialize_warpx()``, e.g. ``pywarpx.warpx.self_fields_max_coarsening_level = 2``.
+Unless :pp:param:`warpx.self_fields_max_coarsening_level` is set, the clamp coarsens only once, because deeper multigrid levels lose thin conductors and the solve then fails to converge.
+This favors a solve that always converges over a fast one.
+
+The two kinds of options interact.
+Fewer multigrid levels leave a larger problem to the bottom solver on the coarsest level.
+On large grids, the bottom solver can then stop at its iteration limit (:pp:param:`warpx.self_fields_bottom_max_iters`) and, with :pp:param:`warpx.self_fields_bottom_verbosity` on, report that it failed to converge.
+This is harmless as long as the multigrid solve itself converges, since every multigrid iteration starts a new bottom solve.
+If the multigrid solve needs many more iterations or does not converge, raise :pp:param:`warpx.self_fields_bottom_max_iters`, or allow one more coarsening level.
+A deeper cap or another bottom solver (:pp:param:`warpx.self_fields_bottom_solver`) can also be faster on large grids; check that the solve still converges for the thinnest conductor, since the depth at which it fails depends on the geometry.
+
 What it does not do
 -------------------
 
@@ -137,9 +154,6 @@ What it does not do
 * It is available from Python only; there is no inputs-file interface yet.
 * Cartesian geometries (XZ, 3D), PMC and open (absorbing) field boundaries are not supported yet.
 * Each correction costs one charge deposition, one nodal divergence and a few reductions; the unit potentials are solved once, at setup.
-  These setup solves use the multigrid options of the electrostatic solver (:pp:param:`warpx.self_fields_max_coarsening_level` and the bottom-solver options next to it), set from Python before ``initialize_warpx()``, e.g. ``pywarpx.warpx.self_fields_max_coarsening_level = 2``.
-  Unless :pp:param:`warpx.self_fields_max_coarsening_level` is set, they coarsen only once, because deeper multigrid levels lose thin conductors and the solve then fails to converge.
-  This favors a solve that always converges over a fast one; for large grids, a deeper cap or another bottom solver (:pp:param:`warpx.self_fields_bottom_solver`) can be faster.
 
 Examples and tests
 ------------------
