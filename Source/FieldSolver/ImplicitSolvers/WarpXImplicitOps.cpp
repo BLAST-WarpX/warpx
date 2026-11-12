@@ -252,7 +252,7 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 }
 
 void
-WarpX::FinishImplicitParticleUpdate (amrex::Real time)
+WarpX::FinishImplicitParticleUpdate (amrex::Real time, amrex::Real a_dt)
 {
     using namespace amrex::literals;
 
@@ -263,9 +263,13 @@ WarpX::FinishImplicitParticleUpdate (amrex::Real time)
     // photon particles call Evolve; all other particles extrapolate position
     // and momentum.
 
+    // Explicit particle updates (e.g., photons) need the actual implicit substep duration.
+    // Preserve the per-level timestep ratios when scaling the outer timestep.
+    amrex::Real const dt_scale = a_dt/dt[0];
+
     for (int lev = 0; lev <= finest_level; ++lev) {
         for (auto const& pc : *mypc) {
-            pc->FinishImplicitParticleUpdate(m_fields, lev, time, dt[lev]);
+            pc->FinishImplicitParticleUpdate(m_fields, lev, time, dt[lev]*dt_scale);
         }
     }
 
