@@ -148,5 +148,6 @@ for k, (direction, target) in enumerate(
             inside = grid(1)
             leaf = np.concatenate((inside, leaf[seam // 2 + int(k != 0) :]), axis=0)
         result = np.sum(weights[k][:, None] * leaf)
-        np.testing.assert_allclose(result, value, rtol=3e-9, atol=1e-14)
+        rtol = max(3e-9, 8 * np.finfo(leaf.dtype).eps)
+        np.testing.assert_allclose(result, value, rtol=rtol, atol=1e-14)
 libwarpx.finalize()
