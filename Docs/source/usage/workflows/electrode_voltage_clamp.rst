@@ -71,7 +71,8 @@ Supported configurations
   Axial boundaries: both periodic or both PEC.
 * Listed conductors must be separate bodies.
 * A conductor that touches a PEC domain boundary is part of the ground: the staircase ties it to the wall, so it cannot hold another voltage.
-  Such conductors (for example a curved outer wall) are found at setup and must not be listed; listing one aborts.
+  Such conductors (for example a curved outer wall) are found at setup; they may be listed with potential 0 or left out, and they get no unit solve.
+  Listing one with another potential aborts.
   Touching is decided on the staircase, which joins a conductor to the wall across a gap smaller than one cell.
 * List every connected body as its own conductor, even if two bodies should share a voltage.
   The staircase keeps each connected body an equipotential, so the clamp holds each listed conductor exactly; for disconnected pieces listed as one conductor it holds only their combined charge, and the pieces can drift apart.
@@ -122,7 +123,9 @@ For example, a rod and two end rings, split at the midplane:
        {"name": "ring_hi", "region": "(x>0.04)*(z>=0)", "potential": -500.0},
    ]
 
-Every conductor must be listed, grounded ones with potential 0, except conductors that touch a PEC domain boundary: they are part of the ground and are not listed.
+Every conductor must be listed, grounded ones with potential 0; conductors that touch a PEC domain boundary may also be left out, since they are part of the ground.
+So all bodies of a CAD model can be listed, with the wall-joined ones at potential 0.
+``measure_voltage_state()`` reports those at 0 V, with their charges not measured (NaN), and ``capacitance`` has rows only for the other conductors.
 A misassigned or missing node aborts at setup with a message.
 ``measure_voltage_state()`` returns the observer voltages and charges.
 
@@ -162,7 +165,7 @@ Examples and tests
 
 * vacuum: capacitance matrix against the discrete coaxial formula, static clamped field;
 * a coaxial space-charge diode with and without the clamp, including the grounded-charge cross-check;
-* the diode on two ranks with the anode joined to the outer wall, so that only the cathode is listed;
+* the diode on two ranks with the anode joined to the outer wall, listed with potential 0 (and rejected at 100 V);
 * checkpoint/restart during emission.
 
 .. bibliography::

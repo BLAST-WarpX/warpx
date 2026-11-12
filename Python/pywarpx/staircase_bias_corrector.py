@@ -28,7 +28,9 @@ class StaircaseBiasCorrector:
         expression in (x, y, z) that is 1 on one whole conductor and 0 elsewhere; in
         RZ it is evaluated at (r, 0, z), so ``x`` is the radius. Every conductor must
         be listed, grounded ones with potential 0, except conductors joined to the
-        PEC wall: they are part of the ground and must not be listed.
+        PEC wall, which may be left out: they are part of the ground. A listed one
+        must have potential 0; it gets no unit solve and no row in the capacitance
+        matrix.
     tolerance, max_iterations : optional
         Relative tolerance and iteration cap of the unit-potential solves (MLMG). They
         set how exactly the capacitance matrix and the voltage readback agree.
@@ -67,6 +69,9 @@ class StaircaseBiasCorrector:
         self.regions = [e["region"] for e in electrodes]
         self.v_target = np.array([float(e["potential"]) for e in electrodes])
         self.n = len(electrodes)
+        # Listed conductors with a unit solve (set up in setup_after_init); the others
+        # are joined to the grounded PEC wall
+        self.solved = None
         self.capacitance = None
         self._active = False
         self._last_step = None
@@ -83,10 +88,40 @@ class StaircaseBiasCorrector:
                 "The voltage clamp is implemented for RZ builds with embedded "
                 "boundaries only"
             )
-        for k, region in enumerate(self.regions):
-            wx.voltage_clamp_solve_unit(k, region, self.tolerance, self.max_iterations)
-        wx.voltage_clamp_check_selection(self.n)
-        self.capacitance = np.asarray(wx.voltage_clamp_capacitance(self.n))
+        self.solved = []
+        for index, (name, region, potential) in enumerate(
+            zip(self.names, self.regions, self.v_target)
+        ):
+            selected, on_ground = wx.voltage_clamp_ground_overlap(region)
+            if selected == 0:
+                raise ValueError(
+                    f"The region of electrode {name!r} selects no conductor (no fixed "
+                    "node of the staircase)"
+                )
+            if on_ground > 0:
+                # Part of the wall-connected ground: no unit solve
+                if on_ground < selected:
+                    raise ValueError(
+                        f"The region of electrode {name!r} covers conductors joined to "
+                        "a PEC wall (the ground) and free ones; list them separately"
+                    )
+                if potential != 0.0:
+                    raise ValueError(
+                        f"Electrode {name!r} is joined to a grounded PEC wall, so it "
+                        f"cannot be held at {potential} V"
+                    )
+                continue
+            wx.voltage_clamp_solve_unit(
+                len(self.solved), region, self.tolerance, self.max_iterations
+            )
+            self.solved.append(index)
+        if not self.solved:
+            raise ValueError(
+                "Every listed electrode is joined to a grounded PEC wall: nothing to clamp"
+            )
+        n = len(self.solved)
+        wx.voltage_clamp_check_selection(n)
+        self.capacitance = np.asarray(wx.voltage_clamp_capacitance(n))
         # A near-singular C means a conductor without a grounded reference, or one
         # listed twice: V = C^-1 Q would then be meaningless.
         if np.linalg.cond(self.capacitance) > MAX_CAPACITANCE_CONDITION:
@@ -110,7 +145,7 @@ class StaircaseBiasCorrector:
                 "The initial charge density must be zero; a charged start needs a "
                 "matched space-charge field"
             )
-        wx.voltage_clamp_add_unit_fields(list(self.v_target))
+        wx.voltage_clamp_add_unit_fields(list(self.v_target[self.solved]))
         self._active = True
 
     def resume_from_checkpoint(self):
@@ -120,15 +155,26 @@ class StaircaseBiasCorrector:
         self._active = True
 
     def measure_voltage_state(self):
-        """Conductor voltages, from the field charge and the plasma-induced charge."""
+        """Conductor voltages, from the field charge and the plasma-induced charge.
+
+        One entry per listed electrode. Electrodes joined to the grounded PEC wall
+        read 0 V; their charges are not measured (NaN).
+        """
         field_charge, grounded = (
-            np.asarray(q) for q in self._warpx().voltage_clamp_charge_state(self.n)
+            np.asarray(q)
+            for q in self._warpx().voltage_clamp_charge_state(len(self.solved))
         )
-        return {
-            "voltage": np.linalg.solve(self.capacitance, field_charge - grounded),
-            "field_charge": field_charge,
-            "grounded_charge": grounded,
+        state = {
+            "voltage": np.zeros(self.n),
+            "field_charge": np.full(self.n, np.nan),
+            "grounded_charge": np.full(self.n, np.nan),
         }
+        state["voltage"][self.solved] = np.linalg.solve(
+            self.capacitance, field_charge - grounded
+        )
+        state["field_charge"][self.solved] = field_charge
+        state["grounded_charge"][self.solved] = grounded
+        return state
 
     def correct_after_step(self):
         """Install with ``callbacks.installafterstep``, after particle scraping."""
@@ -140,6 +186,6 @@ class StaircaseBiasCorrector:
         if step % self.correction_interval or step == self._last_step:
             return
         voltage = self.measure_voltage_state()["voltage"]
-        dv = self.v_target - voltage
+        dv = (self.v_target - voltage)[self.solved]
         self._warpx().voltage_clamp_add_unit_fields(list(dv))
         self._last_step = step

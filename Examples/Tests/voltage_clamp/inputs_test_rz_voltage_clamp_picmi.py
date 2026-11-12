@@ -7,7 +7,8 @@
 """Voltage clamp for embedded-boundary conductors (RZ, Yee, Esirkepov, periodic z).
 
 A rod (cathode) and a sleeve (anode) inside a grounded PEC wall. With --sleeve joined
-the sleeve reaches the wall, so it is part of the ground and only the rod is listed.
+the sleeve reaches the wall, so it is part of the ground: it is listed with potential 0
+and gets no unit solve.
 
 --case vacuum:  capacitance against the discrete coaxial formula, and the clamped
                 vacuum field stays static.
@@ -52,9 +53,10 @@ rod = f"({R_ROD}*{R_ROD}-{r2})"
 sleeve = f"(({r2}-{R_SLEEVE_IN}*{R_SLEEVE_IN})*({R_SLEEVE_OUT}*{R_SLEEVE_OUT}-{r2}))"
 implicit = f"-({rod})*({sleeve})"
 # The selector only has to separate the two conductors; x is the radius in RZ
-electrodes = [{"name": "cathode", "region": "(x<0.03)", "potential": V_CATHODE}]
-if args.sleeve == "separate":
-    electrodes.append({"name": "anode", "region": "(x>0.03)", "potential": 0.0})
+electrodes = [
+    {"name": "cathode", "region": "(x<0.03)", "potential": V_CATHODE},
+    {"name": "anode", "region": "(x>0.03)", "potential": 0.0},
+]
 dr, dz = R_WALL / NR, LENGTH / NZ
 
 # --- Run control
@@ -139,8 +141,25 @@ clamp = StaircaseBiasCorrector(
     correction_interval=CORRECTION_INTERVAL_VACUUM if args.case == "vacuum" else 1,
     electrodes=electrodes,
 )
+if args.sleeve == "joined":
+    # A conductor joined to the grounded wall cannot be held at another voltage, a
+    # region must not mix it with a free conductor, and a region must select a
+    # conductor; the first listed electrode is checked before any unit solve
+    rejected = {
+        "joined to a grounded PEC wall": dict(electrodes[1], potential=100.0),
+        "list them separately": dict(electrodes[1], region="1"),
+        "selects no conductor": dict(electrodes[1], region="0"),
+    }
+    for message, bad in rejected.items():
+        try:
+            StaircaseBiasCorrector(sim, 1, [bad, electrodes[0]]).setup_after_init()
+            raise AssertionError(f"Electrode {bad} was accepted")
+        except ValueError as error:
+            assert message in str(error), error
 clamp.setup_after_init()
-n = clamp.n
+# Number of conductors with a unit solve, for the low-level calls below
+n = len(clamp.solved)
+assert n == (1 if args.sleeve == "joined" else 2)
 
 
 def field(name, direction=None):
@@ -346,7 +365,7 @@ def inject():
 
 def record():
     voltage = clamp.measure_voltage_state()["voltage"]
-    gap = float(voltage[0] - (voltage[1] if n > 1 else 0.0))
+    gap = float(voltage[0] - voltage[1])  # the anode reads 0 V when joined to the wall
     worst["line - observer"] = max(worst["line - observer"], abs(gap_voltage() - gap))
     worst["observer - target"] = max(worst["observer - target"], abs(gap - V_CATHODE))
     step = warpx.getistep(0)
@@ -375,7 +394,7 @@ summary = f"diode arm={args.arm} steps={n_steps}: gap {final_gap:.4f} V; " + "; 
 )
 if args.arm == "on":
     grounded_error = np.max(np.abs(grounded_check())) / np.sum(
-        np.abs(clamp.measure_voltage_state()["grounded_charge"])
+        np.abs(clamp.measure_voltage_state()["grounded_charge"][clamp.solved])
     )
     checks["observer held target"] = worst["observer - target"] < TARGET_ATOL
     checks["gap held"] = abs(final_gap - V_CATHODE) < GAP_ATOL
