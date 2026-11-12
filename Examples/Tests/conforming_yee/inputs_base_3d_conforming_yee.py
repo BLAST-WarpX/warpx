@@ -155,11 +155,12 @@ assert initial > 0
 start = libwarpx.warpx.getistep(0)
 peak = 0.0
 for step in range(start, steps, 30):
-    libwarpx.warpx.evolve(30)
+    libwarpx.warpx.evolve(min(30, steps - step))
     energy, peak_fine = measure()
     peak = max(peak, peak_fine)
     if not args.absorber:
         np.testing.assert_allclose(energy, initial, rtol=2e-12, atol=0)
+assert libwarpx.warpx.getistep(0) == steps
 assert peak > 0.01, "The pulse never reached the refined grid"
 if args.absorber:
     chk = Path(f"diags/checkpoint{steps:06d}")
