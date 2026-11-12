@@ -27,7 +27,7 @@ last_fn = sys.argv[2]
 
 # Tolerances for the relative change in momentum and energy.
 p_tolerance = 5.0e-15
-KE_tolerance = 1.0e-14
+KE_tolerance = 5.0e-15
 
 ds0 = yt.load(first_fn)
 ds1 = yt.load(last_fn)
