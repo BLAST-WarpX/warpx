@@ -15,6 +15,8 @@
 #include "Python/callbacks.H"
 #include "WarpX.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 using namespace amrex;
 
 void LabFrameExplicitES::InitData() {
@@ -67,6 +69,15 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
 
     // Compute the potential phi, by solving the Poisson equation
     if (IsPythonCallbackInstalled("poissonsolver")) {
+
+        if (warpx.HasDielectricMaterials()) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Dielectrics",
+                "A Python poissonsolver callback is installed, so the built-in Poisson "
+                "solver is not used and the permittivity of dielectrics.names is not "
+                "applied. The callback must account for dielectric_epsilon itself.",
+                ablastr::warn_manager::WarnPriority::high);
+        }
 
         // Use the Python level solver (user specified)
         ExecutePythonCallback("poissonsolver");

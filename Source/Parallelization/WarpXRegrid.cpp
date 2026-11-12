@@ -230,10 +230,6 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
             m_field_factory[lev] = std::make_unique<FArrayBoxFactory>();
         }
 
-        if (HasDielectricMaterials()) {
-            m_dielectric_materials->InitLevelData(*this, lev);
-        }
-
 #ifdef WARPX_USE_FFT
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
             if (spectral_solver_fp[lev] != nullptr) {

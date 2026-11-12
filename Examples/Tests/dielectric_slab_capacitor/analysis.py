@@ -30,8 +30,11 @@ gap = 0.1
 tVac = gap / 2.0
 epsilon_r = 10.0
 
-Ediel = voltage / (epsilon_r * (gap - tVac) + tVac)
-Evac = voltage / ((gap - tVac) + tVac / epsilon_r)
+# Series capacitor: vacuum layer of thickness tVac, dielectric layer of
+# thickness (gap - tVac). Continuity of D gives Evac = epsilon_r * Ediel and
+# voltage = Evac * tVac + Ediel * (gap - tVac).
+Ediel = voltage / (epsilon_r * tVac + (gap - tVac))
+Evac = voltage / (tVac + (gap - tVac) / epsilon_r)
 
 z = np.linspace(0.0, gap, nz)
 Eth = (z > tVac) * Ediel + (z <= tVac) * Evac

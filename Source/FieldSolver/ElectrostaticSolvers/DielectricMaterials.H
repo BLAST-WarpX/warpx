@@ -88,13 +88,16 @@ private:
 
     void ReadMaterial (std::string const& name, int default_stl_use_bvh);
 
-    void FillSignedDistanceAndMask (
+    void FillLevelFields (
         amrex::MultiFab& sdf,
         amrex::iMultiFab& material_id,
+        amrex::MultiFab& epsilon,
         amrex::Geometry const& geom) const;
 
-    void FillEpsilon (
+    void SetMaterialPermittivity (
         amrex::MultiFab& epsilon,
+        amrex::MultiFab const& object_sdf,
+        Material const& material,
         amrex::Geometry const& geom) const;
 
     void FillParserSignedDistance (

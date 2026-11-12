@@ -92,14 +92,16 @@ namespace
         amrex::MultiFab const& epsilon,
         std::string const& material_name)
     {
+        // Only check valid cells: permittivity_function(x,y,z) is evaluated only there,
+        // and ghost cells outside the domain are never used by the Poisson solver.
         bool const local = true;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            epsilon.is_finite(0, 1, epsilon.nGrowVect(), local),
+            epsilon.is_finite(0, 1, amrex::IntVect(0), local),
             "Dielectric material '" + material_name +
             "' has non-finite values from permittivity_function(x,y,z). "
             "Relative permittivity must be finite and greater than or equal to 1.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            epsilon.min(0, epsilon.nGrowVect().min(), local) >= 1.0_rt,
+            epsilon.min(0, 0, local) >= 1.0_rt,
             "Dielectric material '" + material_name +
             "' has values less than 1 from permittivity_function(x,y,z). "
             "Relative permittivity must be finite and greater than or equal to 1.");
@@ -138,12 +140,19 @@ namespace
         }
     }
 
+    /** Set the cell-centered permittivity in the valid cells covered by one material.
+     *
+     * A cell is covered when the average of the material's nodal signed distance over the
+     * cell corners is <= 0, i.e. the same signed distance that defines the material mask.
+     * Ghost cells are left untouched and must be filled with FillBoundary afterwards.
+     */
+    template <typename PermittivityFunc>
     void
-    SetImplicitConstantPermittivity (
+    SetPermittivityFromSignedDistance (
         amrex::MultiFab& epsilon,
+        amrex::MultiFab const& object_sdf,
         amrex::Geometry const& geom,
-        amrex::ParserExecutor<3> const shape_exec,
-        amrex::Real const permittivity)
+        PermittivityFunc const permittivity_func)
     {
         auto const dx = geom.CellSizeArray();
         auto const problo = geom.ProbLoArray();
@@ -152,137 +161,48 @@ namespace
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
         for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Box const& bx = mfi.tilebox();
             amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
+            amrex::Array4<amrex::Real const> const& d = object_sdf.const_array(mfi);
 
             amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
             {
 #if defined(WARPX_DIM_3D)
+                amrex::Real const d_cc = 0.125_rt * (
+                    d(i, j  , k  ) + d(i+1, j  , k  ) + d(i, j+1, k  ) + d(i+1, j+1, k  ) +
+                    d(i, j  , k+1) + d(i+1, j  , k+1) + d(i, j+1, k+1) + d(i+1, j+1, k+1));
                 amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
                 amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
                 amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                amrex::Real const d_cc = 0.25_rt * (
+                    d(i, j, k) + d(i+1, j, k) + d(i, j+1, k) + d(i+1, j+1, k));
                 amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
                 amrex::Real const y = 0.0_rt;
                 amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
-                amrex::ignore_unused(k);
 #else
+                amrex::Real const d_cc = 0.5_rt * (d(i, j, k) + d(i+1, j, k));
                 amrex::Real const x = 0.0_rt;
                 amrex::Real const y = 0.0_rt;
                 amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
-                amrex::ignore_unused(j, k);
 #endif
-                if (shape_exec(x, y, z) >= 0.0_rt) {
-                    eps(i, j, k) = permittivity;
+                if (d_cc <= 0.0_rt) {
+                    eps(i, j, k) = permittivity_func(x, y, z);
                 }
             });
         }
     }
 
-    void
-    SetImplicitFunctionPermittivity (
-        amrex::MultiFab& epsilon,
-        amrex::Geometry const& geom,
-        amrex::ParserExecutor<3> const shape_exec,
-        amrex::ParserExecutor<3> const permittivity_exec)
+    struct ConstantPermittivity
     {
-        auto const dx = geom.CellSizeArray();
-        auto const problo = geom.ProbLoArray();
+        amrex::Real value;
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            amrex::Box const& bx = mfi.growntilebox();
-            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-#if defined(WARPX_DIM_3D)
-                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
-                amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                amrex::Real const y = 0.0_rt;
-                amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
-                amrex::ignore_unused(k);
-#else
-                amrex::Real const x = 0.0_rt;
-                amrex::Real const y = 0.0_rt;
-                amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
-                amrex::ignore_unused(j, k);
-#endif
-                if (shape_exec(x, y, z) >= 0.0_rt) {
-                    eps(i, j, k) = permittivity_exec(x, y, z);
-                }
-            });
+        AMREX_GPU_HOST_DEVICE
+        amrex::Real operator() (amrex::Real, amrex::Real, amrex::Real) const noexcept
+        {
+            return value;
         }
-    }
-
-    void
-    SetSTLConstantPermittivity (
-        amrex::MultiFab& epsilon,
-        amrex::MultiFab const& stl_sdf,
-        amrex::Real const permittivity)
-    {
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            amrex::Box const& bx = mfi.growntilebox();
-            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-            amrex::Array4<amrex::Real const> const& d = stl_sdf.const_array(mfi);
-
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-                if (d(i, j, k) <= 0.0_rt) {
-                    eps(i, j, k) = permittivity;
-                }
-            });
-        }
-    }
-
-    void
-    SetSTLFunctionPermittivity (
-        amrex::MultiFab& epsilon,
-        amrex::MultiFab const& stl_sdf,
-        amrex::Geometry const& geom,
-        amrex::ParserExecutor<3> const permittivity_exec)
-    {
-#if defined(WARPX_DIM_3D)
-        auto const dx = geom.CellSizeArray();
-        auto const problo = geom.ProbLoArray();
-#else
-        amrex::ignore_unused(geom);
-#endif
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            amrex::Box const& bx = mfi.growntilebox();
-            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-            amrex::Array4<amrex::Real const> const& d = stl_sdf.const_array(mfi);
-
-            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-            {
-#if defined(WARPX_DIM_3D)
-                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
-                amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
-#else
-                amrex::Real const x = 0.0_rt;
-                amrex::Real const y = 0.0_rt;
-                amrex::Real const z = 0.0_rt;
-                amrex::ignore_unused(i, j, k);
-#endif
-                if (d(i, j, k) <= 0.0_rt) {
-                    eps(i, j, k) = permittivity_exec(x, y, z);
-                }
-            });
-        }
-    }
+    };
 
 }
 
@@ -447,10 +367,22 @@ DielectricMaterials::RemakeLevelData (
 {
     if (!hasDielectrics()) { return; }
 
-    amrex::IntVect const ng_sdf(2);
-    amrex::BoxArray const nodal_ba = amrex::convert(ba, amrex::IntVect::TheNodeVector());
+    // Move the existing material mask to the new distribution mapping. The epsilon and
+    // signed-distance fields are redistributed by the MultiFab register, so the geometry
+    // does not need to be rebuilt.
+    auto const& old_material_id = m_material_id[lev];
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        old_material_id != nullptr && old_material_id->boxArray() ==
+            amrex::convert(ba, amrex::IntVect::TheNodeVector()),
+        "Dielectric materials only support remaking a level with the same BoxArray.");
+
+    amrex::IntVect const ng_sdf = old_material_id->nGrowVect();
+    std::unique_ptr<amrex::iMultiFab> new_material_id;
     warpx.AllocInitMultiFab(
-        m_material_id[lev], nodal_ba, dm, 1, ng_sdf, lev, "dielectric_material_id", 0);
+        new_material_id, old_material_id->boxArray(), dm, 1, ng_sdf, lev,
+        "dielectric_material_id", 0);
+    new_material_id->Redistribute(*old_material_id, 0, 0, 1, ng_sdf);
+    m_material_id[lev] = std::move(new_material_id);
 }
 
 void
@@ -486,8 +418,7 @@ DielectricMaterials::InitLevelData (WarpX& warpx, int const lev)
         material_id != nullptr,
         "Dielectric material mask was not allocated before initialization.");
 
-    FillSignedDistanceAndMask(*sdf, *material_id, warpx.Geom(lev));
-    FillEpsilon(*epsilon, warpx.Geom(lev));
+    FillLevelFields(*sdf, *material_id, *epsilon, warpx.Geom(lev));
 }
 
 amrex::iMultiFab const*
@@ -498,13 +429,15 @@ DielectricMaterials::MaterialID (int const lev) const
 }
 
 void
-DielectricMaterials::FillSignedDistanceAndMask (
+DielectricMaterials::FillLevelFields (
     amrex::MultiFab& sdf,
     amrex::iMultiFab& material_id,
+    amrex::MultiFab& epsilon,
     amrex::Geometry const& geom) const
 {
     sdf.setVal(0.0_rt);
     material_id.setVal(0);
+    epsilon.setVal(1.0_rt);
 
     int object_id = 1;
     for (auto const& material : m_materials) {
@@ -518,12 +451,16 @@ DielectricMaterials::FillSignedDistanceAndMask (
         }
 
         MergeSignedDistanceAndMask(sdf, material_id, object_sdf, object_id);
+        // Derive epsilon from the same object signed distance as the mask, so that the
+        // geometry is built only once per material and the mask and epsilon agree.
+        SetMaterialPermittivity(epsilon, object_sdf, material, geom);
         amrex::Gpu::streamSynchronize();
         ++object_id;
     }
 
     sdf.FillBoundary(geom.periodicity());
     ablastr::utils::communication::FillBoundary(material_id, geom.periodicity());
+    epsilon.FillBoundary(geom.periodicity());
 }
 
 void
@@ -596,51 +533,21 @@ DielectricMaterials::MergeSignedDistanceAndMask (
 }
 
 void
-DielectricMaterials::FillEpsilon (
+DielectricMaterials::SetMaterialPermittivity (
     amrex::MultiFab& epsilon,
+    amrex::MultiFab const& object_sdf,
+    Material const& material,
     amrex::Geometry const& geom) const
 {
-    epsilon.setVal(1.0_rt);
-
-    for (auto const& material : m_materials) {
-        // STL materials need a grid signed-distance function; parser materials evaluate directly.
-        std::unique_ptr<amrex::MultiFab> stl_sdf;
-        if (material.shape_type == ShapeType::STL) {
-            stl_sdf = std::make_unique<amrex::MultiFab>(
-                epsilon.boxArray(), epsilon.DistributionMap(), 1, epsilon.nGrowVect());
-            FillSTLSignedDistance(*stl_sdf, material, geom);
-        }
-
-        if (material.shape_type == ShapeType::ImplicitFunction) {
-            auto shape_parser = utils::parser::makeParser(
-                material.implicit_function, {"x", "y", "z"});
-            auto shape_exec = shape_parser.compile<3>();
-
-            if (material.permittivity_type == PermittivityType::Constant) {
-                SetImplicitConstantPermittivity(
-                    epsilon, geom, shape_exec, material.permittivity);
-            } else {
-                auto permittivity_parser = utils::parser::makeParser(
-                    material.permittivity_function, {"x", "y", "z"});
-                auto permittivity_exec = permittivity_parser.compile<3>();
-                SetImplicitFunctionPermittivity(
-                    epsilon, geom, shape_exec, permittivity_exec);
-                // Function-valued permittivity is validated after evaluating every covered cell.
-                AssertPermittivityFunctionValues(epsilon, material.name);
-            }
-        } else {
-            if (material.permittivity_type == PermittivityType::Constant) {
-                SetSTLConstantPermittivity(epsilon, *stl_sdf, material.permittivity);
-            } else {
-                auto permittivity_parser = utils::parser::makeParser(
-                    material.permittivity_function, {"x", "y", "z"});
-                auto permittivity_exec = permittivity_parser.compile<3>();
-                SetSTLFunctionPermittivity(epsilon, *stl_sdf, geom, permittivity_exec);
-                // Function-valued permittivity is validated after evaluating every covered cell.
-                AssertPermittivityFunctionValues(epsilon, material.name);
-            }
-        }
+    if (material.permittivity_type == PermittivityType::Constant) {
+        SetPermittivityFromSignedDistance(
+            epsilon, object_sdf, geom, ConstantPermittivity{material.permittivity});
+    } else {
+        auto permittivity_parser = utils::parser::makeParser(
+            material.permittivity_function, {"x", "y", "z"});
+        auto const permittivity_exec = permittivity_parser.compile<3>();
+        SetPermittivityFromSignedDistance(epsilon, object_sdf, geom, permittivity_exec);
+        // Function-valued permittivity is validated after evaluating every covered cell.
+        AssertPermittivityFunctionValues(epsilon, material.name);
     }
-
-    epsilon.FillBoundary(geom.periodicity());
 }
