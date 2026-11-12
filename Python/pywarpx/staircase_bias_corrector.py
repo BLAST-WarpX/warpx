@@ -36,8 +36,10 @@ class StaircaseBiasCorrector:
         options, shared with the electrostatic solver. Unless
         ``warpx.self_fields_max_coarsening_level`` is set, these solves coarsen only
         once: deeper coarsening loses thin conductors and the solve fails to converge.
-        They run once, at setup, so this favors robustness over speed; a deeper cap or
-        another bottom solver can be faster for thick conductors.
+        They run once, at setup, so this favors robustness over speed. Fewer levels
+        leave a larger bottom problem: on large grids, raise
+        ``warpx.self_fields_bottom_max_iters`` if the solve slows down; a deeper cap or
+        another bottom solver can be faster for thick conductors. See the user docs.
 
     Call ``setup_after_init()`` after ``sim.initialize_warpx()``, then
     ``initialize_vacuum_bias()`` for a new run or ``resume_from_checkpoint()`` on a
