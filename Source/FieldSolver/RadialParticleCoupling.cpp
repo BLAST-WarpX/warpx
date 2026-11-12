@@ -51,7 +51,7 @@ check_guarded_restart (WarpX& w) {
     op.eval(1, data,
             [] AMREX_GPU_DEVICE(int) noexcept -> Result { return {0}; });
     auto& pcs = w.GetPartContainer();
-    for (int s = 0; s < pcs.nSpecies(); ++s) {
+    for (int s = 0; s < pcs.nContainers(); ++s) {
         auto& pc = pcs.GetParticleContainer(s);
         for (int lev = 0; lev <= 1; ++lev) {
             for (WarpXParIter it(pc, lev); it.isValid(); ++it) {
@@ -68,7 +68,7 @@ check_guarded_restart (WarpX& w) {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         amrex::get<0>(data.value()) == 0,
         "A guarded radial checkpoint can enable fixed-shape coupling only with "
-        "every kinetic stencil still inside the fine bore.");
+        "every trajectory stencil still inside the fine bore.");
 }
 
 template <int order>
@@ -129,7 +129,16 @@ initialize (WarpX& w, std::string const& restart) {
         "energy-conserving "
         "gather, linear through cubic Esirkepov deposition and at most axial "
         "filtering.");
-    if (!kinetic) { return; }
+    bool const antenna_trajectories = populations.nContainers() > populations.nSpecies() &&
+        WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov &&
+        WarpX::nox >= 1 && WarpX::nox <= 3;
+    if (!kinetic && !antenna_trajectories) { return; }
+    for (int s = populations.nSpecies(); s < populations.nContainers(); ++s) {
+        auto& pc = populations.GetParticleContainer(s);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            pc.DeferTrajectoryCurrent(),
+            "Radial fixed-shape coupling requires an explicit fixed-charge trajectory for this source.");
+    }
     if (from_guarded) {
         check_guarded_restart(w);
     }
@@ -232,7 +241,7 @@ deposit (WarpX& w, Real dt) {
         field->setVal(0._rt);
     }
     auto& pcs = w.GetPartContainer();
-    for (int s = 0; s < pcs.nSpecies(); ++s) {
+    for (int s = 0; s < pcs.nContainers(); ++s) {
         auto& pc = pcs.GetParticleContainer(s);
         if (!pc.isPushed() || pc.do_not_deposit || pc.getCharge() == 0._rt) {
             continue;

@@ -125,3 +125,33 @@ add_warpx_test(
     OFF
     OFF
 )
+
+add_warpx_test(
+    test_rz_prescribed_current_joined_uniform_picmi
+    RZ
+    1
+    "inputs_base_rz_joined_antenna.py --uniform"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_prescribed_current_joined_vacuum_picmi
+    RZ
+    1
+    "inputs_base_rz_joined_antenna.py"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_prescribed_current_joined_plasma_picmi
+    RZ
+    1
+    "inputs_base_rz_joined_antenna.py --plasma"
+    OFF
+    OFF
+    OFF
+)

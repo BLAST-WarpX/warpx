@@ -1042,10 +1042,12 @@ Setting up the field mesh
     solve still takes place on the inner and outer Yee meshes.
 
     The option supports particle shapes one through three, the energy-conserving
-    gather and axial current filtering. Prescribed antenna currents continue to
-    use their native grid and must have zero support in the interface collar.
+    gather and axial current filtering. An Esirkepov waveform antenna uses the
+    same cylindrical current transfer, including when it spans the radial join.
+    Independently supplied native currents must have zero support in the
+    interface collar.
     A fixed-shape checkpoint records the particle shape and filter. A checkpoint
-    from the guarded radial interface can enable this option when every kinetic
+    from the guarded radial interface can enable this option when every trajectory
     stencil is still contained in the fine bore.
 
     Charge balance in the geometric Yee dual cells through the axis uses
