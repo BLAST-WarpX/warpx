@@ -51,7 +51,11 @@ check_guarded_restart (WarpX& w) {
     op.eval(1, data,
             [] AMREX_GPU_DEVICE(int) noexcept -> Result { return {0}; });
     auto& pcs = w.GetPartContainer();
-    for (int s = 0; s < pcs.nContainers(); ++s) {
+    // The checkpoint stores the kinetic markers. Prescribed markers are rebuilt
+    // from the input and have supplied no current at step zero. After a push,
+    // their deposited current is part of the saved field history.
+    int const count = w.getistep(0) == 0 ? pcs.nSpecies() : pcs.nContainers();
+    for (int s = 0; s < count; ++s) {
         auto& pc = pcs.GetParticleContainer(s);
         for (int lev = 0; lev <= 1; ++lev) {
             for (WarpXParIter it(pc, lev); it.isValid(); ++it) {

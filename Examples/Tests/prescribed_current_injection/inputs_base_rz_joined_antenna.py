@@ -10,6 +10,10 @@ from pywarpx import geometry, libwarpx
 parser = argparse.ArgumentParser()
 parser.add_argument("--uniform", action="store_true")
 parser.add_argument("--plasma", action="store_true")
+parser.add_argument("--parent-coil", action="store_true")
+parser.add_argument("--parent-particle", action="store_true")
+parser.add_argument("--guarded-seed", action="store_true")
+parser.add_argument("--restart", type=Path)
 args = parser.parse_args()
 geometry.dims = "RZ"
 h, dz, dt = 0.001, 0.001, 1e-12
@@ -55,18 +59,28 @@ if not args.uniform:
         "warpx.fine_tag_lo=0 0",
         "warpx.fine_tag_hi=0.032 0.032",
         "warpx.conforming_radial_interface=1",
-        "warpx.conforming_radial_fixed_shape=1",
+        f"warpx.conforming_radial_fixed_shape={int(not args.guarded_seed)}",
+    ]
+if args.restart:
+    settings.append(f"amr.restart={args.restart}")
+if args.guarded_seed:
+    settings += [
+        "diagnostics.diags_names=chk",
+        "chk.diag_type=Full",
+        "chk.format=checkpoint",
+        "chk.intervals=0:1:1",
+        "chk.file_prefix=diags/chk",
     ]
 if args.plasma:
     settings += [
         "particles.species_names=ions",
         "ions.species_type=proton",
         "ions.injection_style=singleparticle",
-        "ions.single_particle_pos=0.015 0 0.022",
+        f"ions.single_particle_pos={0.05 if args.parent_particle else 0.015} 0 0.022",
         "ions.single_particle_u=0 0 0.02",
         "ions.single_particle_weight=1e9",
     ]
-ri, ro = 0.028, 0.036
+ri, ro = (0.044, 0.052) if args.parent_coil else (0.028, 0.036)
 length_z = 0.008
 for k in range(3):
     p = f"warpx.current_injection.pair_{k}.drive."
@@ -86,6 +100,13 @@ for k in range(3):
 
 libwarpx.initialize(settings)
 libwarpx.warpx.evolve(1)
+if args.guarded_seed:
+    for step in (0, 1):
+        chk = Path(f"diags/chk{step:06d}")
+        assert (chk / "WarpXHeader").is_file()
+        assert not (chk / "RadialFixedShape").exists()
+    libwarpx.finalize()
+    raise SystemExit(0)
 fields = libwarpx.warpx.multifab_register()
 seam = 32
 nodes = h * (
