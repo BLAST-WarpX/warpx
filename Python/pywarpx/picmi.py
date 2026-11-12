@@ -3385,6 +3385,65 @@ class HybridResistiveDragCollisions(CollisionBase):
         collision.species = [self.species.name]
 
 
+class BremsstrahlungCollisions(CollisionBase):
+    """
+    Custom class to handle setup of binary Bremsstrahlung collisions in WarpX.
+    If collision initialization is added to picmistandard this can be changed to
+    inherit that functionality.
+    """
+
+    name: str = Field(description="Name of instance (used in the inputs file)")
+
+    species: list[picmistandard.PICMI_AnySpecies] = Field(
+        min_length=2,
+        max_length=2,
+        description="The species involved in the collision. Must be of length 2. The electron species must be given first, followed by the target species.",
+    )
+
+    product_species: picmistandard.PICMI_AnySpecies = Field(
+        description="The species produced, must by photons"
+    )
+
+    Z: int = Field(description="The number of electrons on the target")
+
+    multiplier: float | None = Field(
+        default=None,
+        description="Multiplier for the collision probability. Any resulting photons will have the electron weight divided the multiplier. The default is 1. This must be greater than or equal to 1.",
+    )
+
+    koT1_cut: float | None = Field(
+        default=None,
+        description="Minimum energy of the photons created. This is relative to the electron energy, defaulting to 1.e-4.",
+    )
+
+    create_photons: bool | None = Field(
+        default=None,
+        description="Whether photons particles are created during the collisions. Defaults to True.",
+    )
+
+    ndt_supercycle: int | None = Field(
+        default=None,
+        description="Run collision once every ndt_supercycle PIC time steps (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1. Mutually exclusive with ndt_subcycle. Default is 1.",
+    )
+
+    ndt_subcycle: int | None = Field(
+        default=None,
+        description="Run collision ndt_subcycle times per PIC time step (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1. Mutually exclusive with ndt_supercycle.",
+    )
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "bremsstrahlung"
+        collision.species = [species.name for species in self.species]
+        collision.product_species = [self.product_species.name]
+        collision.Z = self.Z
+        collision.multiplier = self.multiplier
+        collision.koT1_cut = self.koT1_cut
+        collision.create_photons = self.create_photons
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
+
+
 class InverseBremsstrahlungCollisions(CollisionBase):
     """
     Custom class to handle setup of inverse Bremsstrahlung collisions in WarpX. If
@@ -3739,6 +3798,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None,
         description="Whether to use a collocated grid (all fields defined at the cell nodes), a staggered grid (fields defined on a Yee grid), or a hybrid grid (fields and currents are interpolated back and forth between a staggered grid and a collocated grid, must be used with momentum-conserving field gathering algorithm).",
     )
+    grid: picmistandard.PICMI_AnyGrid | None = Field(
+        default=None,
+        description="When the solver is not specified, this provides a way to specify the grid",
+    )
     do_current_centering: bool | None = Field(
         default=None,
         description="If true, the current is deposited on a nodal grid and then centered to a staggered grid (Yee grid), using finite-order interpolation. Default: warpx.do_current_centering=0 with collocated or staggered grids, warpx.do_current_centering=1 with hybrid grids.",
@@ -4033,7 +4096,15 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.self_fields_max_iters = self.self_fields_max_iters
         pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
 
-        self.solver.solver_initialize_inputs()
+        if self.solver is not None:
+            self.solver.solver_initialize_inputs()
+        elif self.grid is not None:
+            pywarpx.algo.maxwell_solver = "none"
+            self.grid.grid_initialize_inputs()
+        else:
+            raise RuntimeError(
+                "Either a solver or a grid must be specified in Simulation"
+            )
 
         # Initialize warpx.field_centering_no<x,y,z> and warpx.current_centering_no<x,y,z>
         # if set by the user in the input (need to access grid info from solver attribute)
