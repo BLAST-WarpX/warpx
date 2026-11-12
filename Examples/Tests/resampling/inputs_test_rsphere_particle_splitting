@@ -28,9 +28,9 @@ warpx.do_dive_cleaning = 1
 warpx.serialize_initial_conditions = 1
 
 ############################################
-# Time step
+# CFL
 ############################################
-warpx.const_dt = 1.e-14
+warpx.cfl = 1
 
 ############################################
 # Particle species
