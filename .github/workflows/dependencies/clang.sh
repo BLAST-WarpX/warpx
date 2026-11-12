@@ -6,9 +6,7 @@
 
 set -eu -o pipefail
 
-# `man apt.conf`: number of retries to perform (if non-zero,
-# APT will retry failed files the given number of times).
-echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
+"$(dirname "$0")/ubuntu_apt.sh"
 
 sudo apt-get update
 sudo apt-get install -y \

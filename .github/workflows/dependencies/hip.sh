@@ -7,10 +7,7 @@
 
 set -eu -o pipefail
 
-# `man apt.conf`:
-#   Number of retries to perform. If this is non-zero APT will retry
-#   failed files the given number of times.
-echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
+"$(dirname "$0")/ubuntu_apt.sh"
 
 # Ref.: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/native-install/ubuntu.html
 

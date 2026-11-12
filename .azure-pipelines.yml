@@ -98,7 +98,7 @@ jobs:
       set -euo pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
       df -h
-      echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
+      .github/workflows/dependencies/ubuntu_apt.sh
       sudo apt update
       sudo apt install -y ccache curl gcc gfortran git g++ ninja-build \
         openmpi-bin libopenmpi-dev \
@@ -234,9 +234,11 @@ jobs:
       # set options
       set -euo pipefail
       # find and print backtrace
-      find build/bin/ -type f -name "Backtrace*" \
-        -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
-        -exec cat {} \;
+      if [[ -d build/bin ]]; then
+        find build/bin/ -type f -name "Backtrace*" \
+          -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
+          -exec cat {} \;
+      fi
     displayName: 'Logs'
     condition: always()
 
