@@ -1,5 +1,5 @@
 # Two stationary cubic particles occupy opposite sides of the fine patch face.
-max_step = 1
+max_step = 0
 amr.max_level = 1
 amr.ref_ratio = 2
 amr.max_grid_size = 16
