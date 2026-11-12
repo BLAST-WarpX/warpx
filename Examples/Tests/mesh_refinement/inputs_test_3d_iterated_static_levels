@@ -1,0 +1,22 @@
+max_step = 1
+geometry.dims = 3
+geometry.prob_lo = 0 0 0
+geometry.prob_hi = 1 1 1
+amr.n_cell = 16 16 16
+amr.max_level = 2
+amr.ref_ratio = 2 2
+amr.max_grid_size = 16
+amr.blocking_factor = 4
+amr.n_error_buf = 0
+warpx.fine_tag_lo = 0.25 0.25 0.25
+warpx.fine_tag_hi = 0.75 0.75 0.75
+
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+algo.maxwell_solver = yee
+warpx.const_dt = 1.e-12
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = 1
+diag1.fields_to_plot = Bz
