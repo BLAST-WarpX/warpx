@@ -126,7 +126,8 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/,
-                                 int /*particle_shape*/) override {}
+                                 int /*particle_shape*/,
+                                 bool /*use_stored_old_position*/) override {}
 
     /**
      * \brief No-op override: photons are massless and carry no charge, so

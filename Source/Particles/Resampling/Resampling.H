@@ -88,9 +88,13 @@ public:
         const amrex::Geometry& geom_lev, WarpXParIter& pti,
         int lev, WarpXParticleContainer* pc) const;
 
+    /** True when this species uses the particle_splitting resampling algorithm. */
+    [[nodiscard]] bool isParticleSplitting () const { return m_is_particle_splitting; }
+
 private:
     ResamplingTrigger m_resampling_trigger;
     std::unique_ptr<ResamplingAlgorithm> m_resampling_algorithm;
+    bool m_is_particle_splitting = false;
 };
 
 #endif //WARPX_RESAMPLING_H_

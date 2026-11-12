@@ -2361,6 +2361,17 @@ Particle initialization
             The number of cell divisions to use in the :math:`\phi` direction
             when clustering the particle velocities.
 
+    * ``particle_splitting`` Split heavy macroparticles into lighter children.
+
+      Current remapping is currently supported only for Cartesian and RZ geometries using Esirkepov current deposition.
+
+        * ``<species_name>.do_remapping_current`` (`0` or `1`) optional (default `1`)
+            Controls whether the additional current associated with child-particle remapping is deposited.
+            If `1`, the remapping current is deposited when regular deposition is enabled for the species.
+            If `0`, child particles are created without depositing any additional remapping current.
+
+        * ``<species_name>.resampling_min_ppc`` (`int`) optional (default `1`)
+
 .. pp:param:: <species_name>.resampling_min_ppc
     :type: ``int``
     :default: ``1``

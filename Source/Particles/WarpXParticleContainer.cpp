@@ -455,7 +455,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                                         long const offset, long const np_to_deposit,
                                         int const thread_num, const int lev, int const depos_lev,
                                         amrex::Real const dt, amrex::Real const relative_time, PushType push_type,
-                                        int const particle_shape)
+                                        int const particle_shape, bool use_stored_old_position)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
                                      (depos_lev==(lev  )),
@@ -751,6 +751,25 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                     eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
                 }
 
+#if !defined(WARPX_DIM_1D_Z)
+                const ParticleReal* xp_old_data = (use_stored_old_position && HasRealComp("prev_x")) ?
+                    pti.GetAttribs("prev_x").dataPtr() + offset : nullptr;
+#else
+                const ParticleReal* xp_old_data = nullptr;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
+                const ParticleReal* yp_old_data = (use_stored_old_position && HasRealComp("prev_y")) ?
+                    pti.GetAttribs("prev_y").dataPtr() + offset : nullptr;
+#else
+                const ParticleReal* yp_old_data = nullptr;
+#endif
+#if defined(WARPX_ZINDEX) || defined(WARPX_DIM_RSPHERE)
+                const ParticleReal* zp_old_data = (use_stored_old_position && HasRealComp("prev_z")) ?
+                    pti.GetAttribs("prev_z").dataPtr() + offset : nullptr;
+#else
+                const ParticleReal* zp_old_data = nullptr;
+#endif
+
                 if      (particle_shape == 1){
                     doEsirkepovDepositionShapeN<1>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -758,7 +777,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes,
-                        eb_reduce_particle_shape, EB::enabled() );
+                        eb_reduce_particle_shape, EB::enabled(),
+                        xp_old_data, yp_old_data, zp_old_data );
                 } else if (particle_shape == 2){
                     doEsirkepovDepositionShapeN<2>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -766,7 +786,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes,
-                        eb_reduce_particle_shape, EB::enabled() );
+                        eb_reduce_particle_shape, EB::enabled(),
+                        xp_old_data, yp_old_data, zp_old_data );
                 } else if (particle_shape == 3){
                     doEsirkepovDepositionShapeN<3>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -774,7 +795,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes,
-                        eb_reduce_particle_shape, EB::enabled() );
+                        eb_reduce_particle_shape, EB::enabled(),
+                        xp_old_data, yp_old_data, zp_old_data );
                 } else if (particle_shape == 4){
                     doEsirkepovDepositionShapeN<4>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -782,7 +804,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes,
-                        eb_reduce_particle_shape, EB::enabled() );
+                        eb_reduce_particle_shape, EB::enabled(),
+                        xp_old_data, yp_old_data, zp_old_data );
                 }
 
             } else if (push_type == PushType::Implicit) {

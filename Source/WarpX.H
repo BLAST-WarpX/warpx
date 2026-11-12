@@ -671,6 +671,12 @@ public:
                                   amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
 
+    /** Split particles and add remapping current over the virtual parent-child segments.
+     *  The remapping adds a 'virtual' current to the physical current without resetting its existing values.
+     */
+    void SplitParticlesAndDepositRemappingCurrent (int timestep, amrex::Real dt,
+                                                   bool deposit_virtual_j = true);
+
     /** Perform essential particle house keeping at boundaries
      *
      * Inject, communicate, scrape and sort particles.

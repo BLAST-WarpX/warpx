@@ -253,6 +253,12 @@ public:
                          MomentumPushType momentum_push_type=MomentumPushType::Full,
                          ImplicitOptions const * implicit_options = nullptr) = 0;
 
+    virtual void DepositChargeComponent (
+        ablastr::fields::MultiFabRegister& fields, int lev, int rho_comp)
+    {
+        amrex::ignore_unused(fields, lev, rho_comp);
+    }
+
     /**
      * \brief Finish the implicit particle update at the end of a time step.
      *
@@ -423,7 +429,8 @@ public:
                                 amrex::Real dt,
                                 amrex::Real relative_time,
                                 PushType push_type,
-                                int particle_shape);
+                                int particle_shape,
+                                bool use_stored_old_position = false);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *
@@ -673,6 +680,15 @@ public:
      * called because resample() is only called for PhysicalParticleContainers.
      */
     virtual void resample (const amrex::Vector<amrex::Geometry>& /*geom*/, const int /*timestep*/, bool /*verbose*/) {}
+
+    /** True when this species uses particle-splitting remapping. */
+    [[nodiscard]] virtual bool doParticleSplitting () const { return false; }
+
+    /** Split and add remap current on new children only. Does not reset J. */
+    virtual void splitAndDepositRemappingCurrent (
+        ablastr::fields::MultiLevelVectorField const& /*J*/,
+        const amrex::Vector<amrex::Geometry>& /*geom*/,
+        int /*timestep*/, amrex::Real /*dt*/, bool /*verbose*/, bool /*deposit_virtual_j*/) {}
 
     /**
      * When using runtime components, AMReX requires to touch all tiles
