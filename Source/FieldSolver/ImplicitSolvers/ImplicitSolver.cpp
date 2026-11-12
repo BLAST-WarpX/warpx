@@ -28,7 +28,7 @@ void ImplicitSolver::FinishImplicitParticleUpdate (
     amrex::Real const time,
     int const step)
 {
-    m_WarpX->FinishImplicitParticleUpdate(time);
+    m_WarpX->FinishImplicitParticleUpdate(time, m_dt);
 
     std::map<std::string, amrex::Long> local_suborbit_counts;
     for (auto const& pc : m_WarpX->GetPartContainer()) {

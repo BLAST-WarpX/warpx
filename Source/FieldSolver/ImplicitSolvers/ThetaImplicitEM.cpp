@@ -680,4 +680,5 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
     } // end loop over boxes
 #endif
 
+    m_WarpX->ApplyPECInsulatorToPCMasks(lev);
 }
