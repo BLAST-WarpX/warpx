@@ -782,21 +782,25 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             GetPosition(ip, xp, yp, zp);
 
             // computes current and old position in grid units
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Keep small differences between the two absolute radii accurate in single precision.
             double const xp_new = xp + (relative_time + 0.5*dt)*uxp[ip]*gaminv;
             double const yp_new = yp + (relative_time + 0.5*dt)*uyp[ip]*gaminv;
-            double const xp_mid = xp_new - 0.5*dt*uxp[ip]*gaminv;
-            double const yp_mid = yp_new - 0.5*dt*uyp[ip]*gaminv;
             double const xp_old = xp_new - static_cast<double>(dt)*uxp[ip]*gaminv;
             double const yp_old = yp_new - static_cast<double>(dt)*uyp[ip]*gaminv;
+#if defined(WARPX_DIM_RSPHERE)
+            double const zp_new = zp + (relative_time + 0.5*dt)*uzp[ip]*gaminv;
+            double const zp_old = zp_new - static_cast<double>(dt)*uzp[ip]*gaminv;
+            double const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
+            double const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
+#else
+            double const xp_mid = xp_new - 0.5*dt*uxp[ip]*gaminv;
+            double const yp_mid = yp_new - 0.5*dt*uyp[ip]*gaminv;
             double const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
             double const rp_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
             double const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
             const amrex::Real costheta_mid = (rp_mid > 0. ? static_cast<Real>(xp_mid/rp_mid) : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0. ? static_cast<Real>(yp_mid/rp_mid) : 0._rt);
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
-            double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0. ? static_cast<Real>(xp_new/rp_new) : 1._rt);
             const amrex::Real sintheta_new = (rp_new > 0. ? static_cast<Real>(yp_new/rp_new) : 0._rt);
@@ -806,17 +810,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const Complex xy_mid0 = Complex{costheta_mid, sintheta_mid};
             const Complex xy_old0 = Complex{costheta_old, sintheta_old};
 #endif
-#elif defined(WARPX_DIM_RSPHERE)
-            Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
-            Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
-            Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
-            Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
-            Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
-            Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new + zp_new*zp_new);
-            Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old + zp_old*zp_old);
-
-            // Keep these double to avoid bug in single precision
+#endif
             double const x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #else

@@ -30,3 +30,23 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_rcylinder_subcell_radial_current  # name
+    RCYLINDER  # dims
+    1  # nprocs
+    "inputs_base_radial_subcell_current geometry.dims=RCYLINDER"  # inputs
+    "analysis_subcell_radial_current.py diags/diag1000001"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rsphere_subcell_radial_current  # name
+    RSPHERE  # dims
+    1  # nprocs
+    "inputs_base_radial_subcell_current geometry.dims=RSPHERE"  # inputs
+    "analysis_subcell_radial_current.py diags/diag1000001"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
