@@ -20,3 +20,13 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_rz_subcell_radial_current_picmi  # name
+    RZ  # dims
+    1  # nprocs
+    inputs_test_rz_subcell_radial_current_picmi.py  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
