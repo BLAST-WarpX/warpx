@@ -516,7 +516,7 @@ class QeiRelaxation(ElectronEnergyCase):
     # configured, which this test also exercises (T_ions is dumped below).
     set_temperature_deposition = False
     load_B = True
-    diag_data_list = ["B", "J", "rho", "Te", "T_ions"]
+    diag_data_list = ["B", "J", "rho", "Te", "Pe", "T_ions"]
 
     def configure(self):
         if self.test:
