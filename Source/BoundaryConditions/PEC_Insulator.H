@@ -5,6 +5,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_Parser.H>
 #include <AMReX_Vector.H>
 
 #include <AMReX_BaseFwd.H>
@@ -88,6 +89,12 @@ public:
                                        amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> const & field_boundary_hi,
                                        amrex::IntVect const & ng_fieldgather, amrex::Geometry const & geom,
                                        int lev, PatchType patch_type, amrex::Vector<amrex::IntVect> const & ref_ratios);
+
+    /** Return the device-callable insulator area parser; side 0 is low, side 1 is high. */
+    [[nodiscard]] amrex::ParserExecutor<2> GetInsulatorAreaParser (int idim, int iside) const
+    {
+        return (iside == 0) ? m_area_parsers_lo[idim] : m_area_parsers_hi[idim];
+    }
 
     /**
      * \brief Zeros the scalar on the boundary

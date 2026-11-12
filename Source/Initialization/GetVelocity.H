@@ -31,6 +31,8 @@ struct GetVelocityVector
     amrex::Real m_ux_mean{0}, m_uy_mean{0}, m_uz_mean{0};
     /** Velocity parser function, if m_type == VelParserFunctionVector */
     amrex::ParserExecutor<3> m_ux_mean_parser, m_uy_mean_parser, m_uz_mean_parser;
+    /** Space-time momentum parsers for NFluxPerCell injection. */
+    amrex::ParserExecutor<4> m_ux_time_parser, m_uy_time_parser, m_uz_time_parser;
 
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
@@ -50,20 +52,27 @@ struct GetVelocityVector
      *
      * \param[in] x x-coordinate of given location
      * \param[in] y y-coordinate of given location
-     * \param[in] z z-cooridnate of given location
+     * \param[in] z z-coordinate of given location
+     * \param[in] t Simulation time for space-time injection parsers; otherwise ignored
      *
      *\return value of velocity at (x,y,z).
      *        m_ux_mean, m_uy_mean, m_uz_mean if m_type is VelConstantVector
      *        m_ux_mean_parser(x,y,z), m_uy_mean_parser(x,y,z), m_uz_mean_parser(x,y,z) if m_type is VelParserFunctionVector
      */
     AMREX_GPU_HOST_DEVICE
-    amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
+    amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z,
+                            amrex::Real const t = 0.0) const noexcept
     {
         switch (m_type)
         {
             case (VelConstantVector):
             {
                 return amrex::XDim3{ m_ux_mean, m_uy_mean, m_uz_mean };
+            }
+            case (VelParserFunctionVectorTime):
+            {
+                return amrex::XDim3{m_ux_time_parser(x,y,z,t), m_uy_time_parser(x,y,z,t),
+                                   m_uz_time_parser(x,y,z,t)};
             }
             case (VelParserFunctionVector):
             {

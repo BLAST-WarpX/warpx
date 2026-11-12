@@ -20,6 +20,11 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
         m_uy_mean = vel.m_uy_mean;
         m_uz_mean = vel.m_uz_mean;
     }
+    else if (m_type == VelParserFunctionVectorTime) {
+        m_ux_time_parser = vel.m_ptr_ux_mean_parser->compile<4>();
+        m_uy_time_parser = vel.m_ptr_uy_mean_parser->compile<4>();
+        m_uz_time_parser = vel.m_ptr_uz_mean_parser->compile<4>();
+    }
     else if (m_type == VelParserFunctionVector) {
         m_ux_mean_parser = vel.m_ptr_ux_mean_parser->compile<3>();
         m_uy_mean_parser = vel.m_ptr_uy_mean_parser->compile<3>();
