@@ -165,20 +165,39 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PYTHON)
         if(particle STREQUAL "parent")
             string(APPEND flags " --parent-particle")
         endif()
-        add_warpx_test(${seed} RZ 1
-            "inputs_base_rz_joined_antenna.py ${flags} --guarded-seed" OFF OFF OFF)
-        add_warpx_test(${seed}_restart RZ 1
+        add_warpx_test(
+            test_rz_prescribed_current_guarded_${particle}_picmi
+            RZ
+            1
+            "inputs_base_rz_joined_antenna.py ${flags} --guarded-seed"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_rz_prescribed_current_guarded_${particle}_picmi_restart
+            RZ
+            1
             "inputs_base_rz_joined_antenna.py ${flags} --restart ../${seed}/diags/chk000000"
-            OFF OFF ${seed})
+            OFF
+            OFF
+            ${seed}
+        )
         if(particle STREQUAL "parent")
             set_tests_properties(${seed}_restart.run PROPERTIES
                 PASS_REGULAR_EXPRESSION "A guarded radial checkpoint can enable fixed-shape coupling only")
         endif()
     endforeach()
     set(seed test_rz_prescribed_current_guarded_bore_picmi)
-    add_warpx_test(test_rz_prescribed_current_guarded_active_coil_picmi_restart RZ 1
+    add_warpx_test(
+        test_rz_prescribed_current_guarded_active_coil_picmi_restart
+        RZ
+        1
         "inputs_base_rz_joined_antenna.py --plasma --parent-coil --restart ../${seed}/diags/chk000001"
-        OFF OFF ${seed})
+        OFF
+        OFF
+        ${seed}
+    )
     set_tests_properties(test_rz_prescribed_current_guarded_active_coil_picmi_restart.run PROPERTIES
         PASS_REGULAR_EXPRESSION "A guarded radial checkpoint can enable fixed-shape coupling only")
 endif()
