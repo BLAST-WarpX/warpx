@@ -1,0 +1,70 @@
+# Cartesian 3D magnetic diffusion with a PEC x_lo wall, a pec_insulator x_hi
+# B_y feed, periodic y/z, and a spherical stair-step embedded conductor.
+
+max_step = 3
+amr.n_cell = 16 16 16
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 8
+
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 1.0 1.0 1.0
+
+boundary.field_lo = pec periodic periodic
+boundary.field_hi = pec_insulator periodic periodic
+boundary.particle_lo = reflecting periodic periodic
+boundary.particle_hi = absorbing periodic periodic
+
+insulator.area_x_hi(y,z) = 1.0
+insulator.By_x_hi(y,z,t) = min(t/1.0e-9, 1.0)*1.0e-4
+
+# WarpX/AMReX convention: positive values are covered.
+warpx.eb_implicit_function = "0.04 - ((x-0.5)**2 + (y-0.5)**2 + (z-0.5)**2)"
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.0
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 1 1 1
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 0.0 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_constant_eta = 129.0
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-9
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 1
+
+diagnostics.diags_names = diag1
+diag1.intervals = 3
+diag1.diag_type = Full
+diag1.fields_to_plot = Bx By Bz
+diag1.format = plotfile

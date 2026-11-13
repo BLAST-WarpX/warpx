@@ -1,0 +1,75 @@
+# Cartesian 1D_Z curl-curl regression. The transverse magnetic components
+# diffuse through a spatially varying resistivity; longitudinal Bz is in the
+# null space of curl-curl and exercises the identity block.
+
+max_step = 3
+amr.n_cell = 32
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 16
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 5.0e-10
+warpx.cfl = -1.0
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+my_constants.n0 = 1.0e26
+my_constants.B0 = 1.0e-4
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 4
+protons.profile = parse_density_function
+protons.density_function(x,y,z) = "n0*(1.0 + 0.25*sin(2*pi*z))"
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "B0*cos(2*pi*z)"
+warpx.By_external_grid_function(x,y,z) = "0.7*B0*sin(4*pi*z)"
+warpx.Bz_external_grid_function(x,y,z) = "0.3*B0"
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.5 + 0.5*rho/1.602176634e7"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-10
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 3
+diag1.diag_type = Full
+diag1.fields_to_plot = By Bx Bz
+diag1.format = plotfile
+
+warpx.reduced_diags_names = field_energy
+field_energy.type = FieldEnergy
+field_energy.intervals = 3
+field_energy.precision = 18
+field_energy.path = diags/reduced_files/

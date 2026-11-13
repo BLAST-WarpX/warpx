@@ -1,0 +1,84 @@
+# RCYLINDER hybrid implicit magnetic-diffusion MILD-eta PETSc test (T2 + T3).
+# IDENTICAL physics to inputs_test_rcylinder_hybrid_mag_diffusion_mild (same eta=1e-2,
+# dt, grid, PEC r_hi, theta=1, rtol=1e-10), differing ONLY in the linear solver:
+# PETSc KSP (MATSHELL matvec = the same matrix-free operator) with the assembled
+# frozen-η curl-curl Pmat. The analysis
+# (analysis_rcyl_parity.py) compares this deck's final Bt plotfile to the AMReX
+# GMRES reference plotfile produced by test_rcylinder_hybrid_mag_diffusion_mild (its
+# ctest dependency) and asserts L2 relative error < 1e-6 -- a strong solver-
+# parity oracle that the two Krylov drivers agree on the well-posed PEC-r_hi
+# system. r_hi = PEC excludes the Bt~r null mode (see the harsh test header) so
+# the solution is unique and the parity is meaningful (verified ~1e-10 manually).
+
+max_step = 5
+amr.n_cell = 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 2.0e-2
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "1.0e-2"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 500
+hybrid_pic_model.mag_diff_verbose = 0
+# PETSc KSP + assembled frozen-η cylindrical curl-curl Pmat. The matrix-free
+# matvec remains the true cylindrical operator.
+hybrid_pic_model.mag_diff_linear_solver = petsc
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile
+
+# Reduced B-energy for the PETSc parity test (analysis_rcyl_parity.py compares
+# this to the AMReX run's value). Br=Bz=0 so this is ~ integral(Bt^2) dV.
+warpx.reduced_diags_names = field_energy
+field_energy.type = FieldEnergy
+field_energy.intervals = 5
+field_energy.precision = 18
+field_energy.path = diags/reduced_files/

@@ -1,0 +1,81 @@
+# RZ hybrid magnetic diffusion with an axial (z) pec_insulator B_t feed.
+#
+# Compatible Dirichlet data admit the cylindrical mode B_t proportional to r:
+#   - z_lo pec_insulator: B_t = B0 * (r/R)
+#   - r_hi pec_insulator: B_t = B0
+#   - z_hi PEC endwall
+# The expected steady state is B_t ≈ B0 * r/R, approximately uniform in z.
+# analysis_rz_zfeed.py checks deep axial fill of that profile.
+
+max_step = 5
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+# r=0 axis (None); r_hi Dirichlet B_t (pec_insulator); z_lo B∝r feed; z_hi PEC.
+boundary.field_lo = none pec_insulator
+boundary.field_hi = pec_insulator pec
+boundary.particle_lo = none absorbing
+boundary.particle_hi = absorbing absorbing
+
+# z_lo endwall feed: B_t = B0 * (r/R), ramped over 1 ns. Parser args on a z face
+# are (x,y)=(r,z); on z_lo, y is fixed and x=r varies.
+insulator.area_z_lo(x,y) = 1.0
+insulator.By_z_lo(x,y,t) = min(t/1.0e-9, 1.0)*1.0e-4*(x/0.02)
+
+# r_hi sidewall: B_t = B0 so the cylindrical null mode B_t = B0*r/R matches.
+# Parser args on an r face are (y,z); y is the dummy transverse coord in RZ.
+insulator.area_x_hi(y,z) = 1.0
+insulator.By_x_hi(y,z,t) = min(t/1.0e-9, 1.0)*1.0e-4
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 0.0 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_constant_eta = 129.0
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile
