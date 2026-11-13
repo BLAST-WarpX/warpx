@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_test_3d_virtual_photons
+
+# override parameters: fully-ionized helium-4 (charge = 2*q_e),
+# to test a charge different from +/-q_e
+beam.species_type = helium4
+beam.q_tot = beam_N*2*q_e
+my_constants.mc2_eV = (4.00260325413*m_u-2*m_e)*clight*clight/q_e
