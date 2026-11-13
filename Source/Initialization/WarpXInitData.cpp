@@ -962,8 +962,8 @@ WarpX::InitData ()
         mypc->m_B_ext_particle_s != "none" || mypc->m_E_ext_particle_s != "none");
 
     const bool is_any_boundary_pml =(
-        (std::find(do_pml_Lo[0].begin(), do_pml_Lo[0].end(), true ) != do_pml_Lo[0].end()) ||
-        (std::find(do_pml_Hi[0].begin(), do_pml_Hi[0].end(), true ) != do_pml_Hi[0].end()));
+        (std::ranges::find(do_pml_Lo[0], true ) != do_pml_Lo[0].end()) ||
+        (std::ranges::find(do_pml_Hi[0], true ) != do_pml_Hi[0].end()));
 
     ::CheckKnownEMSolverIssues(
         electromagnetic_solver_id, current_deposition_algo,

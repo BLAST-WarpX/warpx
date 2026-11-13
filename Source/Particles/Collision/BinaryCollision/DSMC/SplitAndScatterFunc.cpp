@@ -53,7 +53,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             // TODO: check number of product species
 
             // For ionization:
-            if (std::find(scattering_processes.begin(), scattering_processes.end(), "ionization") != scattering_processes.end()) {
+            if (std::ranges::find(scattering_processes, "ionization") != scattering_processes.end()) {
                 m_num_product_species = 4;
                 m_num_products_host.push_back(1); // slot 0: first reactant (incident/non-target) species; 1 scattered particle per ionization event
                 m_num_products_host.push_back(0); // slot 1: other reactant (target) species; consumed by reaction, no new reaction-produced particle
@@ -62,8 +62,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             }
 
             // For charge exchange or two-product reaction:
-            if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end() ||
-                std::find(scattering_processes.begin(), scattering_processes.end(), "two_product_reaction") != scattering_processes.end()) {
+            if (std::ranges::find(scattering_processes, "charge_exchange") != scattering_processes.end() ||
+                std::ranges::find(scattering_processes, "two_product_reaction") != scattering_processes.end()) {
                 m_num_product_species = 4;
                 m_num_products_host.push_back(0); // slot 0: first reactant species; consumed by reaction, no new reaction-produced particles
                 m_num_products_host.push_back(0); // slot 1: other reactant species; consumed by reaction, no new reaction-produced particles

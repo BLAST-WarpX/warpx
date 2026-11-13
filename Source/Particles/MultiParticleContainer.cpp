@@ -313,7 +313,7 @@ MultiParticleContainer::ReadParameters ()
             std::vector<std::string> tmp;
             pp_particles.queryarr("deposit_on_main_grid", tmp);
             for (auto const& name : tmp) {
-                auto it = std::find(species_names.begin(), species_names.end(), name);
+                auto it = std::ranges::find(species_names, name);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     it != species_names.end(),
                     "species '" + name
@@ -326,7 +326,7 @@ MultiParticleContainer::ReadParameters ()
             std::vector<std::string> tmp_gather;
             pp_particles.queryarr("gather_from_main_grid", tmp_gather);
             for (auto const& name : tmp_gather) {
-                auto it = std::find(species_names.begin(), species_names.end(), name);
+                auto it = std::ranges::find(species_names, name);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     it != species_names.end(),
                     "species '" + name
@@ -342,7 +342,7 @@ MultiParticleContainer::ReadParameters ()
             pp_particles.queryarr("rigid_injected_species", rigid_injected_species);
             if (!rigid_injected_species.empty()) {
                 for (auto const& name : rigid_injected_species) {
-                    auto it = std::find(species_names.begin(), species_names.end(), name);
+                    auto it = std::ranges::find(species_names, name);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         it != species_names.end(),
                         "species '" + name
@@ -398,7 +398,7 @@ MultiParticleContainer::ReadParameters ()
         std::vector<std::string> tmp;
         pp_lasers.queryarr("deposit_on_main_grid", tmp);
         for (auto const& name : tmp) {
-            auto it = std::find(lasers_names.begin(), lasers_names.end(), name);
+            auto it = std::ranges::find(lasers_names, name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 it != lasers_names.end(),
                 "laser '" + name
@@ -445,7 +445,7 @@ WarpXParticleContainer&
 MultiParticleContainer::GetParticleContainerFromName (const std::string& name) const
 {
     auto species_and_lasers_names = GetSpeciesAndLasersNames();
-    auto it = std::find(species_and_lasers_names.begin(), species_and_lasers_names.end(), name);
+    auto it = std::ranges::find(species_and_lasers_names, name);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         it != species_and_lasers_names.end(),
         "unknown species name");
