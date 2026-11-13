@@ -1,0 +1,33 @@
+stop_time = 1.5e-13
+amr.n_cell =  32 64
+amr.max_grid_size = 256
+amr.blocking_factor = 16
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo     = -50.e-6   -10.e-6
+geometry.prob_hi     =  50.e-6     0.e-6
+
+# Boundary condition
+boundary.field_lo = periodic pml
+boundary.field_hi = periodic pml
+
+warpx.cfl = .999
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # in units of the speed of light
+warpx.serialize_initial_conditions = 1
+warpx.use_filter = 0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+# beam
+beam.injection_style = external_file
+beam.injection_file = "beam_particle.h5"
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 280
+diag1.format = openpmd
+diag1.openpmd_backend = h5
+diag1.diag_type = Full
