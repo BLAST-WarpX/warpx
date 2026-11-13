@@ -87,8 +87,8 @@ private:
      * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
      */
     void InitializeFieldFunctorsRZopenPMD (int lev) override;
-    /** Append m_all_field_functors[lev] with all modes of all components of E B and j
-     * and add name to varnames.
+    /** Append m_all_field_functors[lev] with all modes of all components of E B and j.
+     * The matching names are added to m_varnames once, by AddRZModeNamesToDiags.
      * \param[in] lev level on which source multifabs are defined.
      */
     void AddRZModesToDiags (int lev);
