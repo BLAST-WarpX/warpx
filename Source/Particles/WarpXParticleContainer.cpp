@@ -756,7 +756,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
                         jx_arr, jy_arr, jz_arr,
-                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin,
+                        domain_double, do_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes,
                         eb_reduce_particle_shape, EB::enabled() );
                 } else if (particle_shape == 2){
@@ -764,7 +765,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
                         jx_arr, jy_arr, jz_arr,
-                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin,
+                        domain_double, do_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes,
                         eb_reduce_particle_shape, EB::enabled() );
                 } else if (particle_shape == 3){
@@ -772,7 +774,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
                         jx_arr, jy_arr, jz_arr,
-                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin,
+                        domain_double, do_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes,
                         eb_reduce_particle_shape, EB::enabled() );
                 } else if (particle_shape == 4){
@@ -780,7 +783,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
                         uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
                         jx_arr, jy_arr, jz_arr,
-                        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
+                        np_to_deposit, dt, relative_time, dinv, xyzmin,
+                        domain_double, do_cropping, lo, q,
                         WarpX::n_rz_azimuthal_modes,
                         eb_reduce_particle_shape, EB::enabled() );
                 }
