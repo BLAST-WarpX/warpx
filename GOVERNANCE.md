@@ -64,12 +64,21 @@ See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-technical-com
 
 ### Role
 
-The technical committee (TC) is the core governance body, where under normal operations most ideas are discussed and decisions are made.
-Individual TC members can approve and merge code changes.
-Usually, they seek approval by another maintainer for their own changes, too.
-TC members lead - and weigh in on - technical discussions and, if needed, can call for a vote between TC members for a technical decision.
-TC members merge/close PRs and issues, and moderate (including block/mute) bad actors.
+The technical committee (TC) is the core governance body, where, under normal operations, most ideas are discussed and decisions are made.
+TC members lead and weigh in on technical discussions and, if needed, can call for a vote among TC members on a technical decision.
+TC members also moderate bad actors, including blocking or muting them.
 The TC can propose governance changes to the SC.
+
+Individual TC members can approve, merge, and close pull requests, and close issues.
+For their own pull requests, they usually also seek approval from another TC member.
+To help manage the large number of open pull requests and issues, TC members are expected to:
+
+1. request reviewers and an initial assignee to the pull requests and issues they open themselves;
+2. regularly monitor unassigned pull requests and issues, opened by anyone, and assign themselves as reviewers and/or assignees whenever they judge it appropriate;
+3. contribute to pull request reviews, issues, and discussions on GitHub, and bring those that require coordination with the broader WarpX community to its attention (e.g., at the weekly developer meetings, by email, or on Slack).
+
+The assignee of a pull request or issue is the TC member responsible for moving it forward: making sure it receives timely reviews and responses, following up when it stalls, and keeping track of it until it is resolved (merging or closing a pull request, resolving or closing an issue).
+The assignee need not do all the work or be the only reviewer, and can hand the role to another TC member if needed.
 
 
 ### Decision Process
