@@ -11,6 +11,7 @@ This section collects typical user workflows and best practices for WarpX.
 
    workflows/python_extend
    workflows/domain_decomposition
+   workflows/estimate_simulation_memory
    workflows/plot_distribution_mapping
    workflows/debugging
    workflows/generate_lookup_tables_with_tools
