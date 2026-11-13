@@ -151,7 +151,7 @@ void ThetaImplicitEM::FinishStep (const amrex::Real start_time, const int a_step
     // Advance particles from t_{n+1/2} to t_{n+1}
     FinishImplicitParticleUpdate(new_time, a_step);
     if (m_nsubsteps > 1) {
-        m_WarpX->HandleParticlesAtBoundaries(a_step, new_time, 0);
+        m_WarpX->HandleParticlesAtBoundaries(a_step, new_time, m_dt, 0);
     }
 
     // Particles at t_{n+1}

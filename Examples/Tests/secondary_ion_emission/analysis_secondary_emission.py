@@ -21,7 +21,7 @@ ts = OpenPMDTimeSeries(filename)
 
 it = ts.iterations
 
-# Check the number of electrons after the last step
+# Check the number of electrons at the last step
 x, y, z = ts.get_particle(["x", "y", "z"], species="electrons", iteration=it[-1])
 
 N_sec_e = np.size(z)
@@ -60,19 +60,14 @@ b_q = 2.0 * (ion_x0[:N_eb] * vx0[:N_eb] + ion_z0[:N_eb] * vz0[:N_eb])
 c_q = ion_x0[:N_eb] ** 2 + ion_z0[:N_eb] ** 2 - R**2
 t_impact[:N_eb] = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 
-# For ions hitting the domain boundary, the position of the electron will
-# be the particle's last position with the boundary normal position put on
-# the boundary. So the time of impact is the end of the step.
-t_impact[N_eb:] = ts.t[-2]
+# ions hitting the domain boundary
+t_impact[N_eb] = (rmax - ion_x0[N_eb])/vx0[N_eb] # Upper radial boundary
+t_impact[N_eb + 1] = (zmin - ion_z0[N_eb+1])/vz0[N_eb+1]  # Lower z boundary
+t_impact[N_eb + 2] = (zmax - ion_z0[N_eb+2])/vz0[N_eb+2]  # Upper z boundary
 
 x_impact = ion_x0 + vx0 * t_impact
 y_impact = np.zeros_like(x_impact)
 z_impact = ion_z0 + vz0 * t_impact
-
-# Put the boundary normal position on the boundary
-x_impact[N_eb] = rmax  # Upper radial boundary
-z_impact[N_eb + 1] = zmin  # Lower z boundary
-z_impact[N_eb + 2] = zmax  # Upper z boundary
 
 tolerance = 0.02
 

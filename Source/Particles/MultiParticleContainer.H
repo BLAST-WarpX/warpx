@@ -374,7 +374,7 @@ public:
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
-    void doSecondaryEmission (amrex::Real cur_time, int finest_level, bool do_eb);
+    void doSecondaryEmission (amrex::Real cur_time, amrex::Real dt, int finest_level, bool do_eb);
 
     void InitSecondaryEmissionBoundaryBuffer ();
 

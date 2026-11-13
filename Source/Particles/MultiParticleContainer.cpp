@@ -118,65 +118,118 @@ namespace
         int m_normal_index;
         amrex::ParticleReal m_uth;
         GetParticlePosition<PIdx> m_GetPosition;
+        amrex::Real m_dt;
+        amrex::ParticleReal m_mass;
+        amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> m_do_cropping;
 
         template <typename DstData, typename SrcData>
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
         void operator() (DstData& dst, SrcData& src, int i_src, int i_dst,
                          amrex::RandomEngine const& engine) const noexcept
         {
-            amrex::ParticleReal& ux = dst.m_rdata[PIdx::ux][i_dst];
-            amrex::ParticleReal& uy = dst.m_rdata[PIdx::uy][i_dst];
-            amrex::ParticleReal& uz = dst.m_rdata[PIdx::uz][i_dst];
+            amrex::ParticleReal & ux = dst.m_rdata[PIdx::ux][i_dst];
+            amrex::ParticleReal & uy = dst.m_rdata[PIdx::uy][i_dst];
+            amrex::ParticleReal & uz = dst.m_rdata[PIdx::uz][i_dst];
 
             if (m_boundary < 2*AMREX_SPACEDIM) {
                 int const idim = m_boundary / 2;
                 int const iside = m_boundary % 2;
 
-                amrex::ParticleReal const x = iside == 0 ? m_rlo[idim]: m_rhi[idim];
+                // Get the absorbed particle position
+                amrex::ParticleReal x_n, y_n, z_n;
+                m_GetPosition(i_src, x_n, y_n, z_n);
+                amrex::ParticleReal x_nm1 = x_n;
+                amrex::ParticleReal y_nm1 = y_n;
+                amrex::ParticleReal z_nm1 = z_n;
+
+                // Propogate the position backwards in time to find the previous position
+                UpdatePosition(x_nm1, y_nm1, z_nm1, ux, uy, uz, -m_dt, m_mass);
+
+                // Crop to the round off lo or hi (so that the new particle is
+                // considered inside the domain)
+#if defined(WARPX_DIM_3D)
+                ParticleUtils::crop_at_boundary(x_nm1, y_nm1, z_nm1, x_n, y_n, z_n,
+                                                m_rlo[0], m_rhi[0], m_do_cropping[0]);
+                ParticleUtils::crop_at_boundary(y_nm1, z_nm1, x_nm1, y_n, z_n, x_n,
+                                                m_rlo[1], m_rhi[1], m_do_cropping[1]);
+                ParticleUtils::crop_at_boundary(z_nm1, x_nm1, y_nm1, z_n, x_n, y_n,
+                                                m_rlo[2], m_rhi[2], m_do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                ParticleUtils::crop_at_boundary(x_nm1, z_nm1, x_n, z_n,
+                                                m_rlo[0], m_rhi[0], m_do_cropping[0]);
+                ParticleUtils::crop_at_boundary(z_nm1, x_nm1, z_n, x_n,
+                                                m_rlo[1], m_rhi[1], m_do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+                ParticleUtils::crop_at_boundary(z_n, m_rlo[0], m_rhi[0], m_do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                ParticleUtils::crop_at_boundary(x_n, m_rlo[0], m_rhi[0], m_do_cropping[0]);
+#endif
 
 #if defined(WARPX_DIM_3D)
-                if (idim == 0) { dst.m_rdata[PIdx::x][i_dst] = x; }
-                if (idim == 1) { dst.m_rdata[PIdx::y][i_dst] = x; }
-                if (idim == 2) { dst.m_rdata[PIdx::z][i_dst] = x; }
+                dst.m_rdata[PIdx::x][i_dst] = x_n;
+                dst.m_rdata[PIdx::y][i_dst] = y_n;
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_XZ)
+                dst.m_rdata[PIdx::x][i_dst] = x_n;
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_1D_Z)
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_RZ)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_RCYLINDER)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+#elif defined(WARPX_DIM_RSPHERE)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n + z_n*z_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+                dst.m_rdata[PIdx::phi][i_dst] = std::atan2(z_n, std::sqrt(x_n*x_n + y_n*y_n));
+#endif
+
+                // momentum_index is the momentum normal to the boundary
+#if defined(WARPX_DIM_3D)
                 int const momentum_index = PIdx::ux + idim;
 #elif defined(WARPX_DIM_XZ)
-                if (idim == 0) { dst.m_rdata[PIdx::x][i_dst] = x; }
-                if (idim == 1) { dst.m_rdata[PIdx::z][i_dst] = x; }
                 int const momentum_index = (idim == 0) ? PIdx::ux : PIdx::uz;
 #elif defined(WARPX_DIM_RZ)
-                if (idim == 0) { dst.m_rdata[PIdx::r][i_dst] = x; }
-                if (idim == 1) { dst.m_rdata[PIdx::z][i_dst] = x; }
                 int const momentum_index = (idim == 0) ? PIdx::ux : PIdx::uz;
 #elif defined(WARPX_DIM_1D_Z)
-                dst.m_rdata[PIdx::z][i_dst] = x;
                 int const momentum_index = PIdx::uz;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                dst.m_rdata[PIdx::r][i_dst] = x;
                 int const momentum_index = PIdx::ux;
 #endif
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::ParticleReal r, theta, phi;
-                m_GetPosition.AsStored(i_src, r, theta, phi);
-                ParticleUtils::transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
-#endif
+                // Only the sign of the normal velocity is used
                 dst.m_rdata[momentum_index][i_dst] = iside == 0 ? -1._prt : 1._prt;
+
 #if defined(WARPX_DIM_3D)
                 if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
-                if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uy, uz, ux, m_uth, engine); }
-                if (idim == 2) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
+                else if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uy, uz, ux, m_uth, engine); }
+                else if (idim == 2) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
-                if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
+                else if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
 #elif defined(WARPX_DIM_1D_Z)
                 ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine);
 #endif
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const theta = dst.m_rdata[PIdx::theta][i_dst];
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const phi = dst.m_rdata[PIdx::phi][i_dst];
+#else
+                amrex::ParticleReal const phi = 0._prt;
+#endif
                 ParticleUtils::transform_momentum_to_cartesian(ux, uy, uz, theta, phi);
 #endif
+
             } else {
+                // Note that for EB, the particle position has already been mapped to the
+                // boundary surface
+
                 amrex::ParticleReal const nx = src.m_runtime_rdata[m_normal_index][i_src];
                 amrex::ParticleReal const ny = src.m_runtime_rdata[m_normal_index+1][i_src];
                 amrex::ParticleReal const nz = src.m_runtime_rdata[m_normal_index+2][i_src];
@@ -1187,7 +1240,8 @@ MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer ()
 }
 
 void
-MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int const finest_level, bool const do_eb)
+MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::Real const dt,
+                                             int const finest_level, bool const do_eb)
 {
     if (!m_do_secondary_emission) { return; }
 
@@ -1244,6 +1298,22 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int con
                     product_pc.DefineAndReturnParticleTile(lev, pti.index(), pti.LocalTileIndex());
                 }
 
+                amrex::Box domain_box = warpx.Geom(lev).Domain();
+
+                // Make sure that domain_box includes the upper boundary node
+                domain_box.surroundingNodes();
+
+                auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
+                auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
+
+                amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> do_cropping;
+                for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+                    do_cropping[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PEC
+                                         || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator);
+                    do_cropping[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PEC
+                                         || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator);
+                }
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1251,11 +1321,11 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, int con
                     auto& src_tile = source_pc->ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     if (src_tile.numParticles() == 0) { continue; }
 
-                    auto GetPosition = GetParticlePosition<PIdx>(pti);
+                    const auto GetPosition = GetParticlePosition<PIdx>(pti);
                     auto const transform = SecondaryEmissionTransform{
                         boundary, geom.ProbLoArray(), geom.ProbHiArray(),
                         geom.RoundOffLo(), geom.RoundOffHi(),
-                        normal_index, uth, GetPosition};
+                        normal_index, uth, GetPosition, dt, product_pc.getMass(), do_cropping};
 
                     auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     const auto np_dst = dst_tile.numParticles();
