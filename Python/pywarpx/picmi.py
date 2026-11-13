@@ -4503,6 +4503,28 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 elif dataname == "A":
                     for field_name in A_fields_list:
                         fields_to_plot.add(field_name)
+                elif dataname in E_fields_list:
+                    fields_to_plot.add(dataname)
+                elif dataname in B_fields_list:
+                    fields_to_plot.add(dataname)
+                elif dataname in A_fields_list:
+                    fields_to_plot.add(dataname)
+                elif dataname in [
+                    "rho",
+                    "phi",
+                    "F",
+                    "G",
+                    "divE",
+                    "divB",
+                    "proc_num",
+                    "part_per_cell",
+                    "eb_covered",
+                    # Electron temperature/pressure of the hybrid-PIC
+                    # (Ohm's law) solver; only valid with that solver.
+                    "Te",
+                    "Pe",
+                ]:
+                    fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
                 elif dataname in J_displacement_fields_list:
@@ -5213,6 +5235,9 @@ class ReducedDiagnostic(
         "ChargeOnEB": {
             "weighting_function": "weighting_function(x,y,z)",
         },
+        "ChargeFluxEB": {
+            "weighting_function": "weighting_function(x,y,z)",
+        },
     }
     _expression_fields: ClassVar[tuple[str, ...]] = (
         "histogram_function",
@@ -5243,6 +5268,7 @@ class ReducedDiagnostic(
         "FieldProbe",
         "FieldReduction",
         "ChargeOnEB",
+        "ChargeFluxEB",
     ] = Field(
         description="The type of reduced diagnostic. See the link above for all the different types of reduced diagnostics available."
     )
@@ -5345,10 +5371,10 @@ class ReducedDiagnostic(
         description="For diagnostic type 'FieldReduction', the type of reduction",
     )
 
-    # ChargeOnEB
+    # ChargeOnEB and ChargeFluxEB
     weighting_function: Expression | None = Field(
         default=None,
-        description="For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge",
+        description="For diagnostic type 'ChargeOnEB' and 'ChargeFluxEB', the function to weight contributions to the total charge (flux)",
     )
 
     # FieldProbe
