@@ -1,0 +1,14 @@
+FILE = inputs_base_refined_charge_density
+geometry.dims = 2
+geometry.prob_lo = 0 0
+geometry.prob_hi = 0.064 0.064
+amr.n_cell = 32 32
+warpx.fine_tag_lo = 0.016 0.016
+warpx.fine_tag_hi = 0.048 0.048
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+warpx.filter_npass_each_dir = 1 1
+ions.single_particle_pos = 0.0158 0 0.0325
+electrons.single_particle_pos = 0.0162 0 0.0325

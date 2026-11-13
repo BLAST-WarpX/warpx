@@ -1,0 +1,33 @@
+# Two stationary cubic particles occupy opposite sides of the fine patch face.
+max_step = 0
+amr.max_level = 1
+amr.ref_ratio = 2
+amr.max_grid_size = 16
+amr.blocking_factor = 4
+amr.n_error_buf = 0
+algo.maxwell_solver = yee
+algo.field_gathering = energy-conserving
+algo.current_deposition = esirkepov
+algo.particle_shape = 3
+warpx.use_filter = 1
+warpx.do_initial_div_cleaning = 0
+warpx.const_dt = 1.e-12
+warpx.n_current_deposition_buffer = 0
+warpx.n_field_gather_buffer = 0
+
+particles.species_names = ions electrons
+ions.species_type = proton
+ions.injection_style = singleparticle
+ions.single_particle_u = 0 0 0
+ions.single_particle_weight = 1.e9
+electrons.species_type = electron
+electrons.injection_style = singleparticle
+electrons.single_particle_u = 0 0 0
+electrons.single_particle_weight = 0.75e9
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = 0:1:1
+diag1.format = plotfile
+diag1.fields_to_plot = rho rho_ions rho_electrons
+diag1.write_species = 0

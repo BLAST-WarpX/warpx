@@ -1,0 +1,14 @@
+FILE = inputs_base_refined_charge_density
+geometry.dims = RZ
+geometry.prob_lo = 0 0
+geometry.prob_hi = 0.064 0.064
+amr.n_cell = 32 32
+warpx.fine_tag_lo = 0 0
+warpx.fine_tag_hi = 0.032 0.064
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+warpx.filter_npass_each_dir = 0 1
+ions.single_particle_pos = 0.0322 0 0.0325
+electrons.single_particle_pos = 0.0318 0 0.0325
