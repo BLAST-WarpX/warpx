@@ -61,9 +61,9 @@ c_q = ion_x0[:N_eb] ** 2 + ion_z0[:N_eb] ** 2 - R**2
 t_impact[:N_eb] = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 
 # ions hitting the domain boundary
-t_impact[N_eb] = (rmax - ion_x0[N_eb])/vx0[N_eb] # Upper radial boundary
-t_impact[N_eb + 1] = (zmin - ion_z0[N_eb+1])/vz0[N_eb+1]  # Lower z boundary
-t_impact[N_eb + 2] = (zmax - ion_z0[N_eb+2])/vz0[N_eb+2]  # Upper z boundary
+t_impact[N_eb] = (rmax - ion_x0[N_eb]) / vx0[N_eb]  # Upper radial boundary
+t_impact[N_eb + 1] = (zmin - ion_z0[N_eb + 1]) / vz0[N_eb + 1]  # Lower z boundary
+t_impact[N_eb + 2] = (zmax - ion_z0[N_eb + 2]) / vz0[N_eb + 2]  # Upper z boundary
 
 x_impact = ion_x0 + vx0 * t_impact
 y_impact = np.zeros_like(x_impact)
