@@ -2339,6 +2339,10 @@ void
 WarpX::MakeNewLevelFromScratch (int lev, Real time, const BoxArray& new_grids,
                                 const DistributionMapping& new_dmap)
 {
+    // AMReX can replace a preliminary grid while nesting the initial levels.
+    if (LevelDefined(lev)) {
+        ClearLevel(lev);
+    }
     AllocLevelData(lev, new_grids, new_dmap);
     InitLevelData(lev, time);
 }
