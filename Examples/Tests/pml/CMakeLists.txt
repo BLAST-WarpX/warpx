@@ -67,6 +67,22 @@ add_warpx_test(
     test_2d_pml_x_yee  # dependency
 )
 
+foreach(refined IN ITEMS 0 1)
+    foreach(regular IN ITEMS 0 1)
+        foreach(pml IN ITEMS 0 1)
+            add_warpx_test(
+                test_3d_pml_independent_cleaning_${refined}_${regular}_${pml}
+                3
+                1
+                "inputs_base_3d_pml_independent_cleaning.py --refined ${refined} --regular ${regular} --pml ${pml}"
+                OFF  # analysis (analytic field assertions in the script)
+                OFF  # checksum
+                OFF  # dependency
+            )
+        endforeach()
+    endforeach()
+endforeach()
+
 if(WarpX_FFT)
     add_warpx_test(
         test_3d_pml_psatd_dive_divb_cleaning  # name
