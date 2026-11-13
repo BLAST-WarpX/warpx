@@ -50,7 +50,7 @@ We invite you to contribute to WarpX in any form following our [Code of Conduct]
 
 ## Governance
 
-WarpX is hosted by the High Performance Software Foundation (HPSF), at the [established project](https://hpsf.io/projects>) level.
+WarpX is hosted by the High Performance Software Foundation (HPSF), at the [established project](https://hpsf.io/projects) level.
 
 <div align="center">
 <a href="https://hpsf.io/">
