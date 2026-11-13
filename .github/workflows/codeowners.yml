@@ -1,0 +1,52 @@
+name: 👥 Code Owners
+
+# GitHub requests reviews automatically only from code owners with write
+# access. This workflow also requests reviews from the other owners listed in
+# .github/CODEOWNERS where possible (members of the GitHub organization, e.g.,
+# with triage access) and pings the remaining ones in a comment.
+#
+# It runs after .github/workflows/codeowners-pr.yml succeeded for a pull
+# request. `workflow_run` runs this workflow from the default branch, with a
+# token that can request reviews and comment, also on pull requests from forks.
+# Never check out or run code of the pull request in this workflow: the script
+# finds the pull request and reads CODEOWNERS from its base branch through the
+# GitHub API. The head repository and branch are user-controlled strings: pass
+# them through `env`, never into `run:` directly.
+
+on:
+  workflow_run:
+    workflows: [CodeOwnersPR]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  codeowners:
+    name: Request reviews or ping code owners
+    if: >-
+      github.repository == 'BLAST-WarpX/warpx' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read        # check out the script, read CODEOWNERS
+      issues: write         # comment on the pull request
+      pull-requests: write  # request reviewers
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # the default branch (default for workflow_run), not the PR
+          persist-credentials: false
+          sparse-checkout: .github/workflows/scripts
+      - name: Request reviews or ping code owners
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: python3 .github/workflows/scripts/codeowners_reviewers.py
