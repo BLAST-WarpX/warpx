@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_test_2d_embedded_boundary_rotated_cube
+
+# test input parameters: split the domain so that the cut-cell region
+# crosses box seams (exercises the cross-box face-extension borrowing)
+amr.max_grid_size = 16
