@@ -119,10 +119,8 @@ public:
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
-#ifdef WARPX_USE_OPENPMD
-    //! openPMD::Series to load from in external_file injection
-    std::any m_openpmd_input_series;
-#endif
+    //! Path to the openPMD injection file (available on all ranks for distributed reading)
+    std::string m_injection_file_path;
 
     amrex::Real surface_flux_pos; // surface location
     amrex::Real flux_tmin = -1.; // Time after which we start injecting particles
