@@ -41,9 +41,9 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
         // (i.e. not in the incident species list), i.e. if it contains ionization, charge exchange or two-product reaction
         amrex::Vector<std::string> scattering_processes;
         pp_collision_name.queryarr("scattering_processes", scattering_processes);
-        const bool reaction_produces_new_species = std::any_of(scattering_processes.begin(), scattering_processes.end(), [](const std::string& process) {
-            return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction";
-        });
+        const bool reaction_produces_new_species =
+            std::ranges::any_of(scattering_processes, [](const std::string& process) {
+                return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction";});
 
         if (reaction_produces_new_species) {
 

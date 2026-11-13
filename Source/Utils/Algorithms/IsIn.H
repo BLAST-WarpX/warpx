@@ -51,7 +51,7 @@ namespace utils::algorithms
                const std::vector<TE>& elems)
     requires std::convertible_to<TE,TV>
     {
-        return std::any_of(elems.begin(), elems.end(),
+        return std::ranges::any_of(elems,
             [&](const auto& elem){return is_in(vect, elem);});
     }
 }
