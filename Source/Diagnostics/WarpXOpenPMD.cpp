@@ -1472,7 +1472,7 @@ WarpXOpenPMDPlot::SetupMeshComp (openPMD::Mesh& mesh,
     ::detail::setOpenPMDUnit( mesh, mesh_comp, unit_field_name,
                               WarpX::GetInstance().GetPartContainer().GetSpeciesNames() );
     auto relative_cell_pos = ablastr::utils::getRelativeCellPosition(mf);     // AMReX Fortran index order
-    std::reverse( relative_cell_pos.begin(), relative_cell_pos.end() ); // now in C order
+    std::ranges::reverse(relative_cell_pos); // now in C order
     mesh_comp.setPosition( relative_cell_pos );
 }
 

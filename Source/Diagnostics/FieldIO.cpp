@@ -41,7 +41,7 @@ getVec( const IntVect& v, bool reverse)
   // Fortran-order array (like an AMReX FArrayBox)
   // but u is intended to be used with a C-order API (like openPMD)
   if (reverse) {
-    std::reverse( u.begin(), u.end() );
+    std::ranges::reverse(u);
   }
 
   return u;
@@ -65,7 +65,7 @@ getVec( const Real* v , bool reverse)
   // Fortran-order array (like an AMReX FArrayBox)
   // but u is intended to be used with a C-order API (like openPMD-api)
   if (reverse) {
-    std::reverse( u.begin(), u.end() );
+    std::ranges::reverse(u);
   }
 
   return u;
@@ -90,7 +90,7 @@ getReversedVec( const IntVect& v )
   // Reverse the order of elements, if v corresponds to the indices of a
   // Fortran-order array (like an AMReX FArrayBox)
   // but u is intended to be used with a C-order API (like openPMD)
-  std::reverse( u.begin(), u.end() );
+  std::ranges::reverse(u);
 
   return u;
 }
@@ -114,7 +114,7 @@ getReversedVec( const Real* v )
   // Reverse the order of elements, if v corresponds to the indices of a
   // Fortran-order array (like an AMReX FArrayBox)
   // but u is intended to be used with a C-order API (like openPMD)
-  std::reverse( u.begin(), u.end() );
+  std::ranges::reverse(u);
 
   return u;
 }
