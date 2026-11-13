@@ -48,6 +48,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -122,9 +123,17 @@ public:
 
     /**
      * \brief Deposit mass matrices.
+     *
+     * \param[in,out] fields the field register holding the mass matrices, which are
+     *                reset before the deposition
+     * \param[in] lev mesh refinement level for the deposition
+     * \param[in] dt time step for the particle level
+     * \param[in] implicit_options implicit solver options, including the mass matrices
+     *            stencil and the order of the particle shape factors used for the deposition
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                              int lev, amrex::Real dt);
+                              int lev, amrex::Real dt,
+                              ImplicitOptions const& implicit_options);
 
     /**
     * \brief This pushes the particle positions by one time step for all the species in the
@@ -141,7 +150,8 @@ public:
     void PushP (int lev, amrex::Real dt,
                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                 const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
-                MomentumPushType momentum_push_type);
+                MomentumPushType momentum_push_type,
+                std::optional<FieldGatherOrders> gather_orders = std::nullopt);
 
     /**
     * \brief This returns a MultiFAB filled with zeros. It is used to return the charge density
@@ -152,9 +162,11 @@ public:
     std::unique_ptr<amrex::MultiFab> GetZeroChargeDensity(int lev);
 
     /**
-     * \brief Deposit charge density.
+     * \brief Deposit charge from all species without synchronization (i.e. summing guard
+     * cells and transferring charge across mesh-refinement levels) and without finalization
+     * (i.e. applying physical boundary conditions and radial volume scaling).
      *
-     * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
+     * \param[in,out] rho Charge deposits, one MultiFab per mesh refinement level.
      * \param[in] relative_time Time at which to deposit rho, relative to the time of the
      *                          current positions of the particles. When different than 0,
      *                          the particle position will be temporarily modified to match
@@ -176,11 +188,14 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time,
-                    PushType push_type = PushType::Explicit);
+                    PushType push_type = PushType::Explicit,
+                    std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit temperature to species MFs. This is done for each
@@ -199,7 +214,16 @@ public:
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr
     /// to it. The charge density is accumulated over all the particles in the MultiParticleContainer
 
-    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
+    /**
+     * \brief Deposit charge from all species on one level with optional summation and finalization.
+     *
+     * \param[in] lev Mesh refinement level for deposition.
+     * \param[in] local If false, sum overlapping valid- and guard-cell deposits.
+     * \param[in] finalize If true, apply physical boundary conditions and radial volume
+     *                     scaling to return physical charge density; requires local=false.
+     *                     If false, leave boundary handling and radial scaling to the caller.
+     */
+    std::unique_ptr<amrex::MultiFab> GetChargeDensityOnLevel (int lev, bool local, bool finalize);
 
     std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();
@@ -225,7 +249,6 @@ public:
     */
     void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
 
-#ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every
      * timestep in Evolve and is used to create Schwinger electron-positron pairs.
      * Within this function we loop over all cells to calculate the number of
@@ -240,7 +263,6 @@ public:
      * object (to make the link between Real and int quantities).
      */
     [[nodiscard]] amrex::Box ComputeSchwingerGlobalBox () const;
-#endif
 
     void Restart (const std::string& dir);
 
@@ -434,27 +456,6 @@ protected:
 
     std::vector<PCTypes> species_types;
 
-    template<typename ...Args>
-    [[nodiscard]]
-    amrex::MFItInfo getMFItInfo (const WarpXParticleContainer& pc_src,
-                                 Args const&... pc_dsts) const noexcept
-    {
-        amrex::MFItInfo info;
-
-        MFItInfoCheckTiling(pc_src, pc_dsts...);
-
-        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-            info.EnableTiling(WarpXParticleContainer::tile_size);
-        }
-
-#ifdef AMREX_USE_OMP
-        info.SetDynamic(true);
-#endif
-
-        return info;
-    }
-
-
 #ifdef WARPX_QED
     // The QED engines
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
@@ -512,6 +513,37 @@ protected:
      */
     void BreitWheelerGenerateTable();
 
+#endif
+
+private:
+
+    // physical particles (+ laser)
+    amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
+
+    void ReadParameters ();
+
+    /** Guards ReadParameters against running twice for this instance.
+     */
+    bool m_params_initialized = false;
+
+    void mapSpeciesProduct ();
+
+    bool m_do_back_transformed_particles = false;
+
+    /**
+    * Should be called right after mapSpeciesProduct in InitData.
+    * It checks the physical correctness of product particle species
+    * selected by the user for ionization process.
+    */
+    void CheckIonizationProductSpecies();
+
+    /**
+    * Should be called right after mapSpeciesProduct in InitData.
+    * It checks the physical correctness of product particle species
+    * selected by the user for QED processes.
+    */
+    void CheckQEDProductSpecies();
+
     /** Whether or not to activate Schwinger process */
     bool m_do_qed_schwinger = false;
     /** Name of Schwinger electron product species */
@@ -539,54 +571,6 @@ protected:
     amrex::Real m_qed_schwinger_zmin = std::numeric_limits<amrex::Real>::lowest();
     amrex::Real m_qed_schwinger_zmax = std::numeric_limits<amrex::Real>::max();
 
-#endif
-
-private:
-
-    // physical particles (+ laser)
-    amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
-
-    void ReadParameters ();
-
-    /** Guards ReadParameters against running twice for this instance.
-     */
-    bool m_params_initialized = false;
-
-    void mapSpeciesProduct ();
-
-    bool m_do_back_transformed_particles = false;
-
-    void MFItInfoCheckTiling(const WarpXParticleContainer& /*pc_src*/) const noexcept
-    {}
-
-    template<typename First, typename ...Args>
-    void MFItInfoCheckTiling(const WarpXParticleContainer& pc_src,
-                             First const& pc_dst, Args const&... others) const noexcept
-    {
-        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc_dst.do_tiling,
-                "For particle creation processes, either all or none of the "
-                "particle species must use tiling.");
-        }
-
-        MFItInfoCheckTiling(pc_src, others...);
-    }
-
-    /**
-    * Should be called right after mapSpeciesProduct in InitData.
-    * It checks the physical correctness of product particle species
-    * selected by the user for ionization process.
-    */
-    void CheckIonizationProductSpecies();
-
-#ifdef WARPX_QED
-    /**
-    * Should be called right after mapSpeciesProduct in InitData.
-    * It checks the physical correctness of product particle species
-    * selected by the user for QED processes.
-    */
-    void CheckQEDProductSpecies();
-#endif
 
 
 };

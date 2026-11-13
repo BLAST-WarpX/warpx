@@ -50,8 +50,13 @@ We invite you to contribute to WarpX in any form following our [Code of Conduct]
 
 ## Governance
 
-WarpX is hosted by the High Performance Software Foundation (HPSF).
-If your organization wants to help steer the evolution of the HPC software ecosystem, visit [hpsf.io](https://hpsf.io) and consider joining!
+WarpX is hosted by the High Performance Software Foundation (HPSF), at the [established project](https://hpsf.io/projects) level.
+
+<div align="center">
+<a href="https://hpsf.io/">
+<img src="https://github.com/amrex-codes/amrex-codes.github.io/blob/main/images/HPSF_Project_Badge_Established.png" alt="HPSF Badge" style="width:96px;height:96px;">
+</a>
+</div>
 
 The WarpX open governance model is described in [GOVERNANCE.md](GOVERNANCE.md).
 

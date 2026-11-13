@@ -22,6 +22,8 @@ In addition, WarpX is a *highly-parallel and highly-optimized code*:
     - Multi-platform code that can run on Linux, macOS and Windows.
     - Can be run and :ref:`extended via its Python interface <usage-python-extend>`, e.g., to couple to other codes or AI/ML frameworks.
 
+WarpX is an `established <https://hpsf.io/projects>`__ open source project of the `High Performance Software Foundation (HPSF) <https://hpsf.io>`__ under the `Linux Foundation <https://www.linuxfoundation.org>`__ and developed under :ref:`open community governance <governance>`.
+
 .. _contact:
 
 Contact us

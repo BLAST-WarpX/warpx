@@ -58,16 +58,20 @@ public:
 
     void PrintParameters () const override;
 
+    int DoSolve (amrex::Real  /* start_time */,
+                 int          /* a_step */,
+                 bool /* verbose_step */) override { return 0; }
+
     int OneStep (amrex::Real  start_time,
                  amrex::Real  a_dt,
                  int          a_step,
                  bool verbose_step) override;
 
-    void ComputeRHS ( WarpXSolverVec&  a_RHS,
-                const WarpXSolverVec&  a_E,
-                      amrex::Real      start_time,
-                      int              a_nl_iter,
-                      bool             a_from_jacobian ) override;
+    void ComputeRHS (WarpXSolverVec& a_RHS,
+               const WarpXSolverVec& a_E,
+                     amrex::Real     start_time,
+                     int             a_nl_iter,
+                     bool            a_from_jacobian) override;
 
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.

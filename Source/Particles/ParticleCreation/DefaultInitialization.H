@@ -158,7 +158,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             auto attr_ptr = ptile.GetStructOfArrays().GetRealData(j).data();
 #ifdef WARPX_QED
             // Current runtime comp is quantum synchrotron optical depth
-            auto const it_qsr = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthQSR");
+            auto const it_qsr = std::ranges::find(particle_comps, "opticalDepthQSR");
             if (it_qsr != particle_comps.end() &&
                 std::distance(particle_comps.begin(), it_qsr) == j)
             {
@@ -185,7 +185,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             }
 
             // Current runtime comp is Breit-Wheeler optical depth
-            auto const it_bw = std::find(particle_comps.begin(), particle_comps.end(), "opticalDepthBW");
+            auto const it_bw = std::ranges::find(particle_comps, "opticalDepthBW");
             if (it_bw != particle_comps.end() &&
                 std::distance(particle_comps.begin(), it_bw) == j)
             {
@@ -215,7 +215,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             for (int ia = 0; ia < n_user_real_attribs; ++ia)
             {
                 // Current runtime comp is ia-th user defined attribute
-                auto const it_ura = std::find(particle_comps.begin(), particle_comps.end(), user_real_attribs[ia]);
+                auto const it_ura = std::ranges::find(particle_comps, user_real_attribs[ia]);
                 if (it_ura != particle_comps.end() &&
                     std::distance(particle_comps.begin(), it_ura) == j)
                 {
@@ -250,7 +250,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             auto attr_ptr = ptile.GetStructOfArrays().GetIntData(j).data();
 
             // Current runtime comp is ionization level
-            auto const it_ioniz = std::find(particle_icomps.begin(), particle_icomps.end(), "ionizationLevel");
+            auto const it_ioniz = std::ranges::find(particle_icomps, "ionizationLevel");
             if (it_ioniz != particle_icomps.end() &&
                 std::distance(particle_icomps.begin(), it_ioniz) == j)
             {
@@ -270,7 +270,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             for (int ia = 0; ia < n_user_int_attribs; ++ia)
             {
                 // Current runtime comp is ia-th user defined attribute
-                auto const it_uia = std::find(particle_icomps.begin(), particle_icomps.end(), user_int_attribs[ia]);
+                auto const it_uia = std::ranges::find(particle_icomps, user_int_attribs[ia]);
                 if (it_uia != particle_icomps.end() &&
                     std::distance(particle_icomps.begin(), it_uia) == j)
                 {

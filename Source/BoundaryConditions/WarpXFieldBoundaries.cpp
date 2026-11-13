@@ -30,8 +30,8 @@ namespace
     {
         const auto isFT = [](const auto& b){
             return b == FT;};
-        return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), isFT) ||
-               std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), isFT);
+        return std::ranges::any_of(field_boundary_lo, isFT) ||
+               std::ranges::any_of(field_boundary_hi, isFT);
     }
 
     /** Returns true if any particle boundary is set to ParticleBoundaryType PT, else returns false.*/
@@ -42,8 +42,8 @@ namespace
     {
         const auto isPT = [](const auto& b){
             return b == PT;};
-        return std::any_of(particle_boundary_lo.begin(), particle_boundary_lo.end(), isPT) ||
-               std::any_of(particle_boundary_hi.begin(), particle_boundary_hi.end(), isPT);
+        return std::ranges::any_of(particle_boundary_lo, isPT) ||
+               std::ranges::any_of(particle_boundary_hi, isPT);
     }
 
 }
@@ -255,22 +255,31 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
 }
 
 void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
-                                   PatchType patch_type)
+                                   PatchType patch_type, int scomp, int ncomp)
 {
+    if (ncomp < 0) { ncomp = rho->nComp() - scomp; }
+    AMREX_ALWAYS_ASSERT(scomp >= 0 && ncomp > 0 && scomp + ncomp <= rho->nComp());
+
+    // View only the requested components without copying field data.
+    // Component n of this view refers to component scomp+n of rho;
+    // boundary updates through the view modify the original rho.
+    // Subcycling finalizes the two coarse time components at different stages.
+    MultiFab rho_components(*rho, amrex::make_alias, scomp, ncomp);
+
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi))
     {
-        PEC::ApplyReflectiveBoundarytoRhofield(rho,
+        PEC::ApplyReflectiveBoundarytoRhofield(&rho_components,
             field_boundary_lo, field_boundary_hi,
             particle_boundary_lo, particle_boundary_hi,
             Geom(lev), lev, patch_type, ref_ratio);
     }
 
     if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
-        pec_insulator_boundary->ZeroParallelScalarInConductor(rho,
+        pec_insulator_boundary->ZeroParallelScalarInConductor(&rho_components,
             field_boundary_lo, field_boundary_hi,
             Geom(lev), lev, patch_type, ref_ratio);
     }
@@ -391,6 +400,42 @@ WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex
     }
 }
 #endif
+
+void WarpX::ApplyPECInsulatorToPCMasks (const int lev)
+{
+    if (!::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
+        return;
+    }
+
+    const auto masks = m_fields.get_alldirs(FieldType::curl2_BC_mask, lev);
+    for (int field_dir = 0; field_dir < 3; ++field_dir) {
+        auto& mask = *masks[field_dir];
+        if (mask.nComp() == 0) { continue; }
+
+        // Each derivative direction has two mask entries (diagonal, neighbor),
+        // or three when it also has a mixed derivative. Select only this boundary's entries.
+        const int nterms = (mask.nComp() == 3 || mask.nComp() == 6) ? 3 : 2;
+        for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
+            if (mask.ixType().cellCentered(bdry_dir)) { continue; }
+            if (field_boundary_lo[bdry_dir] != FieldBoundaryType::PEC_Insulator &&
+                field_boundary_hi[bdry_dir] != FieldBoundaryType::PEC_Insulator) { continue; }
+
+            const int first_comp = mask.nComp() == 6
+                ? 3 * (bdry_dir != (field_dir + 1) % 3)
+                : (mask.nComp() == 4 ? 2 * bdry_dir : 0);
+            amrex::MultiFab boundary_mask(mask, amrex::make_alias, first_comp, nterms);
+            amrex::Array<FieldBoundaryType, AMREX_SPACEDIM> bc_lo, bc_hi;
+            bc_lo.fill(FieldBoundaryType::None);
+            bc_hi.fill(FieldBoundaryType::None);
+            bc_lo[bdry_dir] = field_boundary_lo[bdry_dir];
+            bc_hi[bdry_dir] = field_boundary_hi[bdry_dir];
+
+            // Reuse the field BC's parser and staggered coordinates; the alias copies no data.
+            pec_insulator_boundary->ZeroParallelScalarInConductor(
+                &boundary_mask, bc_lo, bc_hi, Geom(lev), lev, PatchType::fine, ref_ratio);
+        }
+    }
+}
 
 void WarpX::ApplyElectronPressureBoundary (const int lev, PatchType patch_type)
 {

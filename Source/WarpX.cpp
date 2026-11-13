@@ -184,8 +184,8 @@ namespace
     {
         constexpr auto is_pml = [](const FieldBoundaryType fbt) {return (fbt == FieldBoundaryType::PML);};
         const auto is_any_pml =
-            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
-            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
+            std::ranges::any_of(field_boundary_lo, is_pml) ||
+            std::ranges::any_of(field_boundary_hi, is_pml);
         return is_any_pml;
     }
 
@@ -401,8 +401,10 @@ WarpX::WarpX ()
     Afield_dotMask.resize(nlevs_max);
     phi_dotMask.resize(nlevs_max);
 
-    m_eb_update_E.resize(nlevs_max);
-    m_eb_update_B.resize(nlevs_max);
+    m_eb_update_E_fp.resize(nlevs_max);
+    m_eb_update_B_fp.resize(nlevs_max);
+    m_eb_update_E_cp.resize(nlevs_max);
+    m_eb_update_B_cp.resize(nlevs_max);
     m_eb_reduce_particle_shape.resize(nlevs_max);
 
     m_flag_info_face.resize(nlevs_max);
@@ -596,16 +598,16 @@ WarpX::ReadParameters ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
         (
-            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
-            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})
+            std::ranges::none_of(field_boundary_lo, [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
+            std::ranges::none_of(field_boundary_hi, [](auto fb){ return fb == FieldBoundaryType::PEC;})
         ),
         "PEC boundary not implemented for PSATD, yet!");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
         (
-            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
-            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})
+            std::ranges::none_of(field_boundary_lo, [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
+            std::ranges::none_of(field_boundary_hi, [](auto fb){ return fb == FieldBoundaryType::PMC;})
         ),
         "PMC boundary not implemented for PSATD, yet!");
 
@@ -702,6 +704,18 @@ WarpX::ReadParameters ()
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
             ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
+        std::vector<std::string> tiny_profiler_flush_interval_vec = {"-1"};
+        pp_warpx.queryarr("tiny_profiler_flush_interval", tiny_profiler_flush_interval_vec);
+        m_tiny_profiler_flush_interval =
+            ablastr::utils::text::IntervalsParser(tiny_profiler_flush_interval_vec);
+#if !defined(AMREX_TINY_PROFILING) || defined(BL_PROFILING)
+        if (m_tiny_profiler_flush_interval.isActivated()) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Profiling",
+                "warpx.tiny_profiler_flush_interval is ignored because WarpX was not built with the tiny profiler.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
+#endif
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
@@ -790,8 +804,8 @@ WarpX::ReadParameters ()
 #endif
 
         const bool is_any_boundary_open =
-            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
-            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
+            std::ranges::any_of(field_boundary_lo, [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
+            std::ranges::any_of(field_boundary_hi, [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
 
         if(is_any_boundary_open){
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -983,18 +997,18 @@ WarpX::ReadParameters ()
         }
 
         const auto at_least_one_boundary_is_pml =
-            (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
+            (std::ranges::any_of(WarpX::field_boundary_lo,
                 [](const auto& cc){return cc == FieldBoundaryType::PML;})
             ||
-            std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
+            std::ranges::any_of(WarpX::field_boundary_hi,
                 [](const auto& cc){return cc == FieldBoundaryType::PML;})
             );
 
         const auto at_least_one_boundary_is_silver_mueller =
-            (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
+            (std::ranges::any_of(WarpX::field_boundary_lo,
                 [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             ||
-            std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
+            std::ranges::any_of(WarpX::field_boundary_hi,
                 [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             );
 
@@ -1273,6 +1287,24 @@ WarpX::ReadParameters ()
 
         }
 #endif
+
+        // Ensure code aborts if "none" is used for particles anywhere else than at r=0
+        // for cylindrical and spherical geometries
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            const bool none_allowed_lo = (idim == 0) && (Geom(0).ProbLo(0) == 0);
+#else
+            const bool none_allowed_lo = false;
+#endif
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                none_allowed_lo || WarpX::particle_boundary_lo[idim] != ParticleBoundaryType::None,
+                "Error : Particle boundary ``none`` is only allowed at r=0 "
+                "in cylindrical and spherical geometries (boundary.particle_lo).");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::particle_boundary_hi[idim] != ParticleBoundaryType::None,
+                "Error : Particle boundary ``none`` is only allowed at r=0 "
+                "in cylindrical and spherical geometries (boundary.particle_hi).");
+        }
 
 #if defined(WARPX_DIM_RZ)
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
@@ -1798,12 +1830,10 @@ WarpX::ReadParameters ()
         for (auto& vv : m_v_comoving) { vv*= PhysConst::c; }
 
         const auto v_galilean_is_zero =
-            std::all_of(m_v_galilean.begin(), m_v_galilean.end(),
-            [](const auto& val){return val == 0.;});
+            std::ranges::all_of(m_v_galilean, [](const auto& val){return val == 0.;});
 
         const auto v_comoving_is_zero =
-            std::all_of(m_v_comoving.begin(), m_v_comoving.end(),
-            [](const auto& val){return val == 0.;});
+            std::ranges::all_of(m_v_comoving, [](const auto& val){return val == 0.;});
 
 
         // Galilean and comoving algorithms should not be used together
@@ -2651,10 +2681,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         AllocInitMultiFab(m_eb_reduce_particle_shape[lev], amrex::convert(ba, IntVect::TheCellVector()), dm, ncomps,
             ngRho, lev, "m_eb_reduce_particle_shape");
 
-        // EB info are needed only at the finest level
-        if (lev == maxLevel()) {
-
-            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+        if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
                 // Initialize the flags to 1 (i.e. "update this point") so that
                 // every allocated entry is well-defined, including the guard
@@ -2664,19 +2691,19 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 // tileboxes (e.g. `CalculateCurrentAmpere` or
                 // `ComputeExternalFieldOnGridUsingParser`). This matches the
                 // initialization of the corresponding PML flags in PML.cpp.
-                AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]", 1);
-                AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]", 1);
-                AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[x]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[y]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[z]", 1);
 
-                AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]", 1);
-                AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]", 1);
-                AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[x]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[y]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[z]", 1);
             }
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
@@ -2697,17 +2724,17 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
                 AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
                 AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
                 AllocInitMultiFab(m_flag_info_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
                 AllocInitMultiFab(m_flag_ext_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
                 AllocInitMultiFab(m_flag_ext_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
                 AllocInitMultiFab(m_flag_ext_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
 
                 /** EB: area_mod contains the modified areas of the mesh faces, i.e. if a face is enlarged it
                 * contains the area of the enlarged face
@@ -2749,7 +2776,6 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
                 m_fields.alloc_init(FieldType::ECTRhofield, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-            }
         }
     }
 
@@ -2995,6 +3021,25 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::Efield_cp, Direction{0}, lev, amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_cp, Direction{1}, lev, amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_cp, Direction{2}, lev, amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+
+        // EB info are needed on the coarse patch to update the coarse-patch fields
+        if (EB::enabled() &&
+            WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+
+            AllocInitMultiFab(m_eb_update_E_cp[lev][0], amrex::convert(cba, Ex_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[x]");
+            AllocInitMultiFab(m_eb_update_E_cp[lev][1], amrex::convert(cba, Ey_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[y]");
+            AllocInitMultiFab(m_eb_update_E_cp[lev][2], amrex::convert(cba, Ez_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[z]");
+
+            AllocInitMultiFab(m_eb_update_B_cp[lev][0], amrex::convert(cba, Bx_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[x]");
+            AllocInitMultiFab(m_eb_update_B_cp[lev][1], amrex::convert(cba, By_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[y]");
+            AllocInitMultiFab(m_eb_update_B_cp[lev][2], amrex::convert(cba, Bz_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[z]");
+        }
 
         if (fft_do_time_averaging)
         {
@@ -3689,8 +3734,8 @@ WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::
         case FieldType::Bfield_fp :
             ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
-        case FieldType::vector_potential_fp :
-            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
+        case FieldType::vector_potential_fp_nodal :
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp_nodal", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
             ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", lev), periodicity);

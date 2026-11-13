@@ -106,11 +106,10 @@ void RelativisticExplicitES::AddSpaceChargeField (
     // The options below are identical to those in MultiParticleContainer::DepositCharge
     bool const local = true;
     bool const reset = false;
-    bool const apply_boundary_and_scale_volume = true;
     bool const interpolate_across_levels = false;
     if ( !pc.do_not_deposit) {
         pc.DepositCharge(amrex::GetVecOfPtrs(rho),
-            local, reset, apply_boundary_and_scale_volume,
+            local, reset,
             interpolate_across_levels);
     }
 
@@ -121,6 +120,10 @@ void RelativisticExplicitES::AddSpaceChargeField (
         amrex::GetVecOfPtrs(rho_coarse),
         amrex::GetVecOfPtrs(rho_buf));
 
+    for (int lev = 0; lev < num_levels; ++lev) {
+        warpx.FinalizeRhoOnLevel(lev, rho[lev].get(), PatchType::fine);
+    }
+
     // Get the particle beta vector
     bool const local_average = false; // Average across all MPI ranks
     std::array<ParticleReal, 3> beta_pr = pc.meanParticleVelocity(local_average);
@@ -129,11 +132,17 @@ void RelativisticExplicitES::AddSpaceChargeField (
         beta[i] = beta_pr[i]/PhysConst::c; // Normalize
     }
 
+    // The convergence and verbosity settings are given per species for the
+    // relativistic solver; the remaining MLMG options are shared.
+    auto species_mlmg_options = m_mlmg_options;
+    species_mlmg_options.relative_tolerance = pc.self_fields_required_precision;
+    species_mlmg_options.absolute_tolerance = pc.self_fields_absolute_tolerance;
+    species_mlmg_options.max_iters = pc.self_fields_max_iters;
+    species_mlmg_options.verbosity = verbosity;
+
     // Compute the potential phi, by solving the Poisson equation
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
-                beta, pc.self_fields_required_precision,
-                pc.self_fields_absolute_tolerance, pc.self_fields_max_iters,
-                verbosity, is_igf_2d_slices);
+                beta, species_mlmg_options, is_igf_2d_slices);
 
     // Compute the corresponding electric and magnetic field, from the potential phi
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );
@@ -169,9 +178,7 @@ void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVector
 
     // Compute the potential phi, by solving the Poisson equation
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
-                beta, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity, is_igf_2d_slices);
+                beta, m_mlmg_options, is_igf_2d_slices);
 
     // Compute the corresponding electric field, from the potential phi.
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );

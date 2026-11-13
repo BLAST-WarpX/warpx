@@ -531,7 +531,7 @@ public:
             if (m_correct_energy_momentum) {
                 // Check if ux_n was added.
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
-                auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
+                auto const pos1 = std::ranges::find(real_names1, "ux_n");
                 if (pos1 != real_names1.end()) {
                     int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
@@ -1033,7 +1033,7 @@ public:
             if (m_correct_energy_momentum) {
                 // Check if ux_n was added.
                 std::vector<std::string> const & real_names1 = species_1.GetRealSoANames();
-                auto const pos1 = std::find(real_names1.begin(), real_names1.end(), "ux_n");
+                auto const pos1 = std::ranges::find(real_names1, "ux_n");
                 if (pos1 != real_names1.end()) {
                     int const n_builtin_real = PIdx::nattribs;
                     auto const u1x_ni = static_cast<int>(std::distance(real_names1.begin(), pos1));
@@ -1060,7 +1060,7 @@ public:
             if (m_correct_energy_momentum) {
                 // Check if ux_n was added.
                 std::vector<std::string> const & real_names2 = species_2.GetRealSoANames();
-                auto const pos2 = std::find(real_names2.begin(), real_names2.end(), "ux_n");
+                auto const pos2 = std::ranges::find(real_names2, "ux_n");
                 if (pos2 != real_names2.end()) {
                     int const n_builtin_real = PIdx::nattribs;
                     auto const u2x_ni = static_cast<int>(std::distance(real_names2.begin(), pos2));

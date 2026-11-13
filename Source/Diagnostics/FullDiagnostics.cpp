@@ -652,10 +652,8 @@ FullDiagnostics::AddRZModesToDiags (int lev)
 
     // Check if divE is requested
     // If so, all components will be written out
-    const bool divE_requested = std::any_of(
-        std::begin(m_varnames),
-        std::end(m_varnames),
-        [](const auto& varname) { return varname == "divE"; });
+    const bool divE_requested = std::ranges::any_of(
+        m_varnames, [](const auto& varname) { return varname == "divE"; });
 
     // If rho is requested, all components will be written out
     const bool rho_requested = utils::algorithms::is_in( m_varnames, "rho" );
