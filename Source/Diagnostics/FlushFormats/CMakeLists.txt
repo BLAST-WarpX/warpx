@@ -6,6 +6,7 @@ foreach(D IN LISTS WarpX_DIMS)
         FlushFormatCatalyst.cpp
         FlushFormatAscent.cpp
         FlushFormatCheckpoint.cpp
+        HostRandomState.cpp
         FlushFormatPlotfile.cpp
         FlushFormatSensei.cpp
     )
