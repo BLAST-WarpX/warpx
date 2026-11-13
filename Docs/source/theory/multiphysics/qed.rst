@@ -29,7 +29,7 @@ Rewritten in SI units, the pair production rate per unit volume is:
     \dfrac{d^2N}{dt dV} = \dfrac{e^2 E_s^2}{4 \pi^2 \hbar^2 c} \epsilon \eta \coth{\left({\dfrac{\pi \eta}{\epsilon}}\right)}\exp{\left({-\dfrac{\pi}{\epsilon}}\right)}
 
 
-where $e$ is the elementary charge, :math:`E_s`` is the Schwinger field, :math:`\epsilon = \mathcal{E}/E_s` and :math:`\eta = \mathcal{H}/E_s`.
+where :math:`e` is the elementary charge, :math:`E_s` is the Schwinger field, :math:`\epsilon = \mathcal{E}/E_s` and :math:`\eta = \mathcal{H}/E_s`.
 :math:`\mathcal{E}` and :math:`\mathcal{H}$` are given by:
 
 .. math::
