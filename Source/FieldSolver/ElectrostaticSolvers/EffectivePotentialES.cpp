@@ -23,14 +23,16 @@ void EffectivePotentialES::InitData() {
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
 
     // Initialize "sigma" MF which stores the dressing of the Poisson equation.
-    // It is a cell-centered multifab.
+    // It is a cell-centered multifab, defined on each mesh refinement level.
     auto& fields = warpx.GetMultiFabRegister();
-    auto* rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
-    fields.alloc_init(
-        warpx::fields::FieldType::effective_potential_sigma, /*level=*/ 0,
-        convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
-        rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
-    );
+    for (int lev = 0; lev < num_levels; ++lev) {
+        auto* rho = fields.get(warpx::fields::FieldType::rho_fp, lev);
+        fields.alloc_init(
+            warpx::fields::FieldType::effective_potential_sigma, lev,
+            convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
+            rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
+        );
+    }
     m_overwrite_sigma = true;
 }
 
@@ -64,7 +66,7 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     // Calculate the mass enhancement factor - see  Appendix A of
     // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
     // Also accumulate the total charge density.
-    ComputeSigma(rho_fp);
+    ComputeSigma(rho_fp, rho_cp);
     ExecutePythonCallback("afterdeposition");
 
     // perform phi calculation
@@ -92,7 +94,8 @@ void EffectivePotentialES::computePhi (
 }
 
 void EffectivePotentialES::ComputeSigma (
-    ablastr::fields::MultiLevelScalarField const& rho_fp )
+    ablastr::fields::MultiLevelScalarField const& rho_fp,
+    ablastr::fields::MultiLevelScalarField const& rho_cp )
 {
     // Reset the rho array
     for (const auto& rho_lev : rho_fp)
@@ -113,14 +116,12 @@ void EffectivePotentialES::ComputeSigma (
     amrex::Real density_floor = 0.0;
     utils::parser::queryWithParser(pp_warpx, "effective_potential_density_floor", density_floor);
 
-    int const lev = 0;
-
     // sigma is a cell-centered array
     amrex::GpuArray<int, 3> const cell_centered = {0, 0, 0};
     // The "coarsening is just 1 i.e. no coarsening"
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
 
-    // GetChargeDensityOnLevel returns a nodal multifab
+    // The charge density is a nodal multifab
     // Below we set all the unused dimensions to have cell-centered values for
     // rho since these values will be interpolated onto a cell-centered grid
     // - if this is not done the Interp function returns nonsense values.
@@ -135,78 +136,104 @@ void EffectivePotentialES::ComputeSigma (
     auto& warpx = WarpX::GetInstance();
     auto& mypc = warpx.GetPartContainer();
 
-    // The effective potential dielectric function is given by
-    // \varepsilon_{SI} = \varepsilon * (1 + \sum_{i in species} C_{SI}*(w_pi * dt)^2/4)
-    // Note the use of the plasma frequency in rad/s (not Hz) and the factor of 1/4,
-    // these choices make it so that C_SI = 1 is the marginal stability threshold.
-    auto mult_factor = (
-        C_SI * warpx.getdt(lev) * warpx.getdt(lev) / (4._rt * PhysConst::epsilon_0)
-    );
-
     // if this is the first step, use the full sigma
     if (m_overwrite_sigma) {
         time_filter_param = 1._rt;
         m_overwrite_sigma = false;
     }
 
-    // grab sigma from the multifab registry
-    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
+    // grab sigma from the multifab registry and scale it down from its
+    // current value for time filtering
+    const ablastr::fields::MultiLevelScalarField sigma = warpx.GetMultiFabRegister().get_mr_levels(
+        warpx::fields::FieldType::effective_potential_sigma, num_levels - 1);
+    for (int lev = 0; lev < num_levels; ++lev) {
+        sigma[lev]->mult(1.0_rt - time_filter_param, 0);
+    }
 
-    // scale sigma down from current value for time filtering
-    sigma->mult(1.0_rt - time_filter_param, 0);
+    // Temporary per-species charge density, with the same layout as rho_fp and rho_cp
+    amrex::Vector<std::unique_ptr<amrex::MultiFab>> rho_species_fp(num_levels);
+    amrex::Vector<std::unique_ptr<amrex::MultiFab>> rho_species_cp(num_levels);
+    // No charge buffers are used with the electrostatic solver
+    const amrex::Vector<std::unique_ptr<amrex::MultiFab>> rho_species_buf(num_levels);
+    for (int lev = 0; lev < num_levels; ++lev) {
+        rho_species_fp[lev] = std::make_unique<amrex::MultiFab>(
+            rho_fp[lev]->boxArray(), rho_fp[lev]->DistributionMap(),
+            rho_fp[lev]->nComp(), rho_fp[lev]->nGrowVect());
+        if (lev > 0) {
+            rho_species_cp[lev] = std::make_unique<amrex::MultiFab>(
+                rho_cp[lev]->boxArray(), rho_cp[lev]->DistributionMap(),
+                rho_cp[lev]->nComp(), rho_cp[lev]->nGrowVect());
+        }
+    }
 
     // Loop over each species to calculate the Poisson equation dressing
     for (auto const& pc : mypc) {
         if (pc->do_not_deposit) { continue; }
 
-        // grab the charge density for this species
+        // Deposit the charge density for this species on all levels.
         // Note: local deposition is done since the guard cells values are added
-        // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below.
-        // Defer physical boundary folding and volume scaling until after filtering.
-        auto rho = pc->GetChargeDensityOnLevel(lev, true, /*finalize*/false);
+        // to the valid cells after filtering in `SyncRho` below.
+        for (int lev = 0; lev < num_levels; ++lev) {
+            rho_species_fp[lev]->setVal(0.0_rt);
+        }
+        pc->DepositCharge(amrex::GetVecOfPtrs(rho_species_fp), /*local=*/true,
+                          /*reset=*/false, /*interpolate_across_levels=*/false);
 
-        // Handle the parallel transfer of guard cells and apply filtering
-        warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
-        // Apply boundary conditions to rho, and then apply volume scaling
-        warpx.FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
-
-        // Add rho for this species to the total charge density MultiFab,
-        // but only over the guard region that exists in both MultiFabs
-        // to avoid triggering the AMReX guard-size assertion when the
-        // deposition MultiFab still uses the pre-filter guard width.
-        auto add_ng = rho_fp[lev]->nGrowVect();
-        add_ng.min(rho->nGrowVect());
-        amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, add_ng);
+        // Apply filter, perform MPI exchange, add the charge from fine levels
+        // to coarse levels
+        warpx.SyncRho(amrex::GetVecOfPtrs(rho_species_fp),
+                      amrex::GetVecOfPtrs(rho_species_cp),
+                      amrex::GetVecOfPtrs(rho_species_buf));
 
         // get multiplication factor for this species
         auto const q = std::abs(pc->getCharge());
-        auto const mult_factor_pc = mult_factor * q / pc->getMass();
 
-        // update sigma
+        for (int lev = 0; lev < num_levels; ++lev) {
+            amrex::MultiFab* rho = rho_species_fp[lev].get();
+
+            // Apply boundary conditions to rho, and then apply volume scaling
+            warpx.FinalizeRhoOnLevel(lev, rho, PatchType::fine);
+
+            // Add rho for this species to the total charge density MultiFab
+            amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, rho_fp[lev]->nGrowVect());
+
+            // The effective potential dielectric function is given by
+            // \varepsilon_{SI} = \varepsilon * (1 + \sum_{i in species} C_{SI}*(w_pi * dt)^2/4)
+            // Note the use of the plasma frequency in rad/s (not Hz) and the factor of 1/4,
+            // these choices make it so that C_SI = 1 is the marginal stability threshold.
+            auto const mult_factor_pc = (
+                C_SI * warpx.getdt(lev) * warpx.getdt(lev) / (4._rt * PhysConst::epsilon_0)
+                * q / pc->getMass()
+            );
+
+            // update sigma
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( MFIter mfi(*sigma, TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& sigma_arr = sigma->array(mfi);
-            Array4<Real const> const& rho_arr = rho->const_array(mfi);
+            for ( MFIter mfi(*sigma[lev], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+                Array4<Real> const& sigma_arr = sigma[lev]->array(mfi);
+                Array4<Real const> const& rho_arr = rho->const_array(mfi);
 
-            // Loop over the cells and update the sigma field
-            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                // Interpolate rho to cell-centered value, applying a floor
-                // on the density
-                auto const rho_cc = std::max(
-                    density_floor*q,
-                    std::abs(ablastr::coarsen::sample::Interp(
-                        rho_arr, nodal, cell_centered, coarsen, i, j, k, 0
-                    ))
-                );
-                // add species term to sigma:
-                // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2
-                sigma_arr(i, j, k, 0) += time_filter_param * mult_factor_pc * rho_cc;
-            });
+                // Loop over the cells and update the sigma field
+                amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                    // Interpolate rho to cell-centered value, applying a floor
+                    // on the density
+                    auto const rho_cc = std::max(
+                        density_floor*q,
+                        std::abs(ablastr::coarsen::sample::Interp(
+                            rho_arr, nodal, cell_centered, coarsen, i, j, k, 0
+                        ))
+                    );
+                    // add species term to sigma:
+                    // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2
+                    sigma_arr(i, j, k, 0) += time_filter_param * mult_factor_pc * rho_cc;
+                });
+            }
         }
     }
-    sigma->plus(time_filter_param, 0);
+    for (int lev = 0; lev < num_levels; ++lev) {
+        sigma[lev]->plus(time_filter_param, 0);
+    }
 }
 
 void EffectivePotentialES::computePhi (
@@ -277,12 +304,13 @@ void EffectivePotentialES::computePhi (
     }
 
     // grab sigma from the multifab registry
-    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
+    const ablastr::fields::MultiLevelScalarField sigma = warpx.GetMultiFabRegister().get_mr_levels(
+        warpx::fields::FieldType::effective_potential_sigma, num_levels - 1);
 
     ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,
         sorted_phi,
-        *sigma,
+        sigma,
         mlmg_options,
         warpx.Geom(),
         warpx.DistributionMap(),
