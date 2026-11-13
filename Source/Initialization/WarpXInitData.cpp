@@ -30,6 +30,7 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -878,6 +879,16 @@ WarpX::InitData ()
     // (example: a box with 16 valid cells and 32 guard cells in z will not be considered valid)
     CheckGuardCells();
 
+#ifdef AMREX_USE_GPU
+    // Tiling launches many small kernels on GPU, which severely degrades performance.
+    // It is off by default on GPU, but can be turned on by accident.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !WarpXParticleContainer::do_tiling,
+        "particles.do_tiling is turned on, but WarpX was compiled for GPU. "
+        "Tiling on GPU leads to very poor performance. "
+        "Please set particles.do_tiling = 0 (or remove it from the input file). ");
+#endif
+
     PrintMainPICparameters();
     if (m_implicit_solver) {
         m_implicit_solver->PrintParameters();
@@ -1656,8 +1667,10 @@ void WarpX::InitializeEBGridData (int lev)
                 const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
                 const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
                 int const max_guard = guard_cells.ng_FieldSolver.max();
+                // The coarse patch has the resolution of level lev-1.
+                auto const* cp_eb_index_space = GetEBIndexSpace(lev-1);
                 auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    cgeom, cba, cdm,
+                    cp_eb_index_space, cgeom, cba, cdm,
                     {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
 
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(

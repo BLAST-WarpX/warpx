@@ -334,10 +334,13 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time,
-                         PushType push_type = PushType::Explicit);
+                         PushType push_type = PushType::Explicit,
+                         std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
@@ -419,7 +422,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                int particle_shape);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *

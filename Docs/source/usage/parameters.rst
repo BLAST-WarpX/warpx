@@ -283,7 +283,10 @@ Overall simulation parameters
             solver and to PETSc SNES.
             The first required linear solve always initializes the PC, including
             after restart. During adaptive implicit substepping, PC updates are forced
-            on every Newton iteration, overriding both intervals.
+            on every Newton iteration that requires a linear solve, overriding both intervals.
+            After adaptive substepping, the PC is rebuilt at the first subsequent Newton
+            iteration that requires a linear solve, regardless of both intervals, to
+            restore the coefficients for the full time-step size.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
             Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
@@ -354,6 +357,13 @@ Overall simulation parameters
           Wider stencils are supported by ``jacobian.pc_type = pc_petsc``, ``pc_algmg``, and ``pc_jacobi``.
           For these preconditioners, a width of 1 is sufficient for good GMRES performance in most cases.
           The ``pc_curl_curl_mlmg`` preconditioner forces the width to 0.
+
+        - ``jacobian.epsJFNK`` (``float``, default: 1.0e-6).
+          Relative perturbation factor for the matrix-free finite-difference Jacobian; must be finite and nonzero.
+          The perturbation magnitude scales with the base solution norm, using the right-hand-side norm when the base solution is zero.
+          This accommodates poorly scaled solution vectors whose norms are not of order unity.
+          For known linear systems (affine residuals), a value of ``1.0`` can reduce cancellation error and is useful for testing the solver and preconditioner.
+          For nonlinear problems, retain a small value such as the default: an order-one perturbation can produce an inaccurate Jacobian and impair convergence.
 
         - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
@@ -458,6 +468,16 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
+
+      - **Particle shapes:**
+        The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
+
+        - :pp:param:`algo.particle_shape` sets the shape used for the electrostatic part: the charge
+          density deposition, and the electric-field gather in the electrostatic (predictor) velocity push.
+        - ``implicit_evolve.magnetostatic_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
+          magnetostatic part: the current and mass matrices deposition, the field gather in the
+          inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
+          It must not be larger than :pp:param:`algo.particle_shape`.
 
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the
@@ -1108,9 +1128,10 @@ Domain Boundary Conditions
       The standard deviation for these distributions should be provided for each species using
       ``boundary.<species_name>.u_th``. The same standard deviation is used to sample all components.
 
-    * ``None``: No boundary conditions are applied to the particles.
-      When using RZ, RCYLINDER, and RSPHERE, this option must be used for the lower radial boundary, the first value of :pp:param:`boundary.particle_lo`.
-      This should not be used in any other cases.
+    * ``None``: This option is only for the ``r=0`` boundary in cylindrical and spherical geometries (RZ, RCYLINDER, and RSPHERE),
+      i.e., the first value of :pp:param:`boundary.particle_lo`.
+      It is not allowed for any other boundary.
+      No boundary conditions are applied to the particles there: particles crossing the axis simply re-enter the domain.
 
 .. pp:param:: boundary.reflect_all_velocities
     :type: ``bool``
@@ -1566,6 +1587,8 @@ Particle initialization
 
     Controls whether tiling ('cache blocking') transformation is used for particles.
     Tiling should be on when using OpenMP and off when using GPUs.
+    When WarpX is compiled for GPUs, setting this to ``true`` results in an error,
+    since tiling severely degrades performance on GPUs.
 
 .. pp:param:: <species_name>.species_type
     :type: ``string``
@@ -4545,6 +4568,17 @@ Additional parameters
     When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
 
+.. pp:param:: warpx.tiny_profiler_flush_interval
+    :type: ``string``
+    :default: s: ``-1``
+    :optional:
+
+    When WarpX is built with the AMReX tiny profiler, write the profiling report at the time steps specified using the `Time intervals`_ syntax, in addition to the report at the end of the simulation.
+    Each report contains timings (and memory usage, if memory profiling is enabled) accumulated since the start of the run.
+    Timers that are still active when the report is written, such as the enclosing ``WarpX::Evolve()`` timer, are only complete in the final report.
+    If the last step of the simulation is included in the intervals, the report is written twice at the end.
+    Writing the report involves collective communication over all timers, so very frequent intervals may slow the simulation down.
+
 .. pp:param:: warpx.sort_intervals
     :type: ``string``
     :default: s: ``-1`` on CPU; ``4`` on GPU
@@ -4844,6 +4878,8 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, and ``part_per_cell_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
+    With :pp:param:`<species_name>.do_temperature_deposition`, the per-direction temperatures ``Tx_<species_name>``, ``Ty_<species_name>`` and ``Tz_<species_name>`` (``Tr_``, ``Tt_`` and ``Tz_`` in RZ and RCYLINDER, ``Tr_``, ``Tt_`` and ``Tp_`` in RSPHERE) are also available, in K.
+    In openPMD output, all of these temperatures carry the temperature unit dimension. ``T_<species_name>`` is still written in eV, but with ``unitSI`` = :math:`q_e/k_B`, so readers that apply ``unitSI`` (e.g., openPMD-viewer) return it in K. Plotfile readers (e.g., yt) return ``T_<species_name>`` in eV.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.

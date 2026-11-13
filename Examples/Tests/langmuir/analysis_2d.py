@@ -103,26 +103,22 @@ for field in ["Ex", "Ez"]:
     print("%s: Max error: %.2e" % (field, max_error))
     error_rel = max(error_rel, max_error)
 
-# Plot the last field from the loop (Ez at iteration 40)
-fig, (ax1, ax2) = plt.subplots(1, 2, dpi=100)
-# First plot
-vmin = E_sim.min()
-vmax = E_sim.max()
-cax1 = make_axes_locatable(ax1).append_axes("right", size="5%", pad="5%")
-im1 = ax1.imshow(E_sim, origin="lower", extent=edge, vmin=vmin, vmax=vmax)
-cb1 = fig.colorbar(im1, cax=cax1)
-ax1.set_xlabel(r"$z$")
-ax1.set_ylabel(r"$x$")
-ax1.set_title(r"$E_z$ (sim)")
-# Second plot
-vmin = E_th.min()
-vmax = E_th.max()
-cax2 = make_axes_locatable(ax2).append_axes("right", size="5%", pad="5%")
-im2 = ax2.imshow(E_th, origin="lower", extent=edge, vmin=vmin, vmax=vmax)
-cb2 = fig.colorbar(im2, cax=cax2)
-ax2.set_xlabel(r"$z$")
-ax2.set_ylabel(r"$x$")
-ax2.set_title(r"$E_z$ (theory)")
+# Plot the last field from the loop (Ez at iteration 40) and By, if available
+# (By is zero in theory, useful to spot numerical artifacts)
+panels = [(E_sim, r"$E_z$ (sim)"), (E_th, r"$E_z$ (theory)")]
+if ("mesh", "By") in ds.derived_field_list:
+    By_sim = data[("mesh", "By")].to_ndarray()[:, :, 0]
+    panels.append((By_sim, r"$B_y$ (sim)"))
+fig, axes = plt.subplots(1, len(panels), figsize=(4 * len(panels), 4), dpi=100)
+for ax, (F, title) in zip(axes, panels):
+    cax = make_axes_locatable(ax).append_axes("right", size="5%", pad="5%")
+    im = ax.imshow(
+        F, origin="lower", extent=edge, vmin=F.min(), vmax=F.max(), cmap="RdBu_r"
+    )
+    fig.colorbar(im, cax=cax)
+    ax.set_xlabel(r"$z$")
+    ax.set_ylabel(r"$x$")
+    ax.set_title(title)
 # Save figure
 fig.tight_layout()
 fig.savefig("Langmuir_multi_2d_analysis.png", dpi=200)

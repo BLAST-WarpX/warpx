@@ -77,6 +77,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -178,6 +179,12 @@ MultiParticleContainer::ReadParameters ()
                        m_B_ext_particle_s.end(),
                        m_B_ext_particle_s.begin(),
                        ::tolower);
+#if defined(WARPX_DIM_RSPHERE)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_B_ext_particle_s == "none",
+            "RSPHERE does not support external magnetic fields: "
+            "particles.B_ext_particle_init_style must be none.");
+#endif
         pp_particles.query("E_ext_particle_init_style", m_E_ext_particle_s);
         std::transform(m_E_ext_particle_s.begin(),
                        m_E_ext_particle_s.end(),
@@ -546,19 +553,11 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev)->setVal(0.0);
             }
 
-            // If using a preconditioner (pc), suborbit particles deposit their contribution
-            // during the nonlinear-stage of JFNK. Do not reset if from linear stage of JNK.
-            const bool zero_mass_matrices_pc = implicit_options->use_mass_matrices_pc &&
-                                              !implicit_options->linear_stage_of_jfnk;
-            if (zero_mass_matrices_pc) {
-                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
-            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition,
+                   position_push_type, momentum_push_type, implicit_options);
     }
 }
 
@@ -629,7 +628,7 @@ void
 MultiParticleContainer::DepositCurrent (
     ablastr::fields::MultiLevelVectorField const & J,
     const amrex::Real dt, const amrex::Real relative_time,
-    const PushType push_type)
+    const PushType push_type, const std::optional<int> particle_shape)
 {
     // Reset the J arrays
     for (const auto& J_lev : J)
@@ -642,16 +641,9 @@ MultiParticleContainer::DepositCurrent (
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
-        pc->DepositCurrent(J, dt, relative_time, push_type);
+        pc->DepositCurrent(J, dt, relative_time, push_type, particle_shape);
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int lev = 0; lev < J.size(); ++lev)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToCurrentDensity(
-            J[lev][0], J[lev][1], J[lev][2], lev);
-    }
-#endif
 }
 
 void
