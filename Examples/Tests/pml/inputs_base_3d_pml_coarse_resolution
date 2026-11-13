@@ -1,0 +1,18 @@
+# A rectangular refined vacuum patch with PML on its interior faces.
+geometry.dims = 3
+geometry.prob_lo = -1 -1 -1
+geometry.prob_hi = 1 1 1
+amr.n_cell = 24 24 24
+amr.max_level = 1
+amr.ref_ratio_vect = 2 2 2
+amr.max_grid_size = 48
+amr.blocking_factor = 4
+amr.grid_eff = 1
+amr.n_error_buf = 0
+warpx.ref_patch_function(x,y,z) = "if((abs(x)<0.4)*(abs(y)<0.4)*(abs(z)<0.4),1,0)"
+warpx.pml_ncell = 4
+warpx.pml_delta = 4
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+algo.maxwell_solver = yee
+max_step = 0

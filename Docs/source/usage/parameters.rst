@@ -1159,6 +1159,7 @@ Additional PML parameters
     :default: 10
 
     The depth of the PML, in number of cells.
+    At a mesh-refinement boundary, the depth must span at least one coarse cell in each absorbing direction.
 
 .. pp:param:: do_similar_dm_pml
     :type: ``int``
@@ -1172,7 +1173,38 @@ Additional PML parameters
     :default: 10
 
     The characteristic depth, in number of cells, over which
-    the absorption coefficients of the PML increases.
+    the absorption coefficients of the PML increase.
+    At a mesh-refinement boundary, this depth must span at least one coarse cell in each absorbing direction.
+
+.. pp:param:: warpx.pml_ncell_vect
+    :type: list of integers
+    :optional:
+
+    Set the thickness of a finite-difference PML separately in each mesh direction.
+    Supply one positive cell count per direction. These values override
+    :pp:param:`warpx.pml_ncell`. For example, on an RZ mesh with half the radial spacing
+    and the same axial spacing as a reference mesh, ``8 4`` matches the physical
+    thickness of a four-cell reference absorber in both directions.
+
+.. pp:param:: warpx.pml_delta_vect
+    :type: list of integers
+    :optional:
+
+    Set the damping depth in positive cell counts for each mesh direction. These
+    values override :pp:param:`warpx.pml_delta` for a finite-difference PML.
+    Specify both directional parameters when matching the physical damping profile
+    and thickness of absorbers at different mesh spacings.
+
+.. pp:param:: warpx.pml_match_parent_at_physical_boundary
+    :type: ``bool``
+    :default: ``1``
+
+    For finite-difference mesh refinement, match the coarse-patch PML thickness and
+    damping depth to the parent in directions where every occupied column spans the
+    physical domain. Both coarse solves then use the same absorber at those boundaries.
+    A direction with an internal refinement face uses the fine-patch depth converted to
+    coarse cells. Set this parameter to ``0`` to restart an older checkpoint that stored
+    a coarsened PML at a spanning physical boundary, preserving its layout and damping.
 
 .. pp:param:: warpx.do_pml_in_domain
     :type: ``int``

@@ -1023,6 +1023,10 @@ WarpX::ReadParameters ()
 
         utils::parser::queryWithParser(pp_warpx, "pml_ncell", pml_ncell);
         utils::parser::queryWithParser(pp_warpx, "pml_delta", pml_delta);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD ||
+                (!pp_warpx.contains("pml_ncell_vect") && !pp_warpx.contains("pml_delta_vect")),
+            "Directional PML cell counts require a finite-difference Maxwell solver.");
         pp_warpx.query("pml_has_particles", pml_has_particles);
         pp_warpx.query("do_pml_j_damping", do_pml_j_damping);
         pp_warpx.query("do_pml_in_domain", do_pml_in_domain);
