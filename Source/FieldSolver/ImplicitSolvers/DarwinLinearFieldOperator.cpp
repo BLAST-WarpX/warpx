@@ -58,10 +58,27 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     //    input, so curl(Z) must be valid that much further out again;
     //  - curl(Z) reads Z at i-1..i, so Z is needed one cell beyond that;
     //  - independently, the direct nabla^4 stencil reads Z at i-2..i+2.
+    // This is the same trick the hybrid-PIC solver uses to avoid communicating
+    // after its curl (see GuardCellManager).
+    // With conducting (PEC) walls, chi curl(Z) is instead held over all the
+    // guard cells of the mass matrices: the product there (from the guard-cell
+    // mass-matrix deposits, which are not folded themselves) is folded back
+    // into the domain at the walls by ApplyScaledMassMatrices(), which then
+    // exchanges the guard cells of chi curl(Z) once more.
+    WarpX* const warpx_ptr = m_ops->GetWarpX();
+    const ablastr::fields::VectorField SX =
+        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
+    const ablastr::fields::VectorField SY =
+        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
+    const ablastr::fields::VectorField SZ =
+        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
     const amrex::IntVect mm_half_width = m_ops->MassMatricesStencilHalfWidth();
-    const amrex::IntVect chidA_ng    = amrex::IntVect(1);
-    const amrex::IntVect dA_ng       = chidA_ng + mm_half_width;
-    const amrex::IntVect Zscratch_ng = amrex::elemwiseMax(amrex::IntVect(2), dA_ng + 1);
+    const amrex::IntVect chidA_ng = m_ops->HasPEC()
+        ? amrex::elemwiseMax(amrex::IntVect(1), SX[0]->nGrowVect())
+        : amrex::IntVect(1);
+    const amrex::IntVect dA_ng    = chidA_ng + mm_half_width;
+    // (These are the scratch's own widths; Z's is always zero.)
+    const amrex::IntVect Z_ng     = amrex::elemwiseMax(amrex::IntVect(2), dA_ng + 1);
 
     m_lapZ_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
                     Zvec[lev][0]->nComp(), Zvec[lev][0]->nGrowVect());
@@ -71,14 +88,13 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
                     Zvec[lev][2]->nComp(), Zvec[lev][2]->nGrowVect());
 
     m_Zscratch_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
-                        Zvec[lev][0]->nComp(), Zscratch_ng);
+                        Zvec[lev][0]->nComp(), Z_ng);
     m_Zscratch_y.define(Zvec[lev][1]->boxArray(), Zvec[lev][1]->DistributionMap(),
-                        Zvec[lev][1]->nComp(), Zscratch_ng);
+                        Zvec[lev][1]->nComp(), Z_ng);
     m_Zscratch_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
-                        Zvec[lev][2]->nComp(), Zscratch_ng);
+                        Zvec[lev][2]->nComp(), Z_ng);
 
     // curl(Z) and chi curl(Z) live on the E/A/J staggering
-    WarpX* const warpx_ptr = m_ops->GetWarpX();
     const ablastr::fields::VectorField Efield =
         warpx_ptr->m_fields.get_alldirs(FieldType::Efield_fp, lev);
     m_dA_x.define(Efield[0]->boxArray(), Efield[0]->DistributionMap(), 1, dA_ng);
@@ -90,14 +106,9 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     m_chidA_z.define(Efield[2]->boxArray(), Efield[2]->DistributionMap(), 1, chidA_ng);
 
     // ApplyMassMatrices() only fills as many guard cells of its output as the
-    // mass matrices themselves hold valid data for, so those have to cover
-    // the one cell that the final curl reads.
-    const ablastr::fields::VectorField SX =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
-    const ablastr::fields::VectorField SY =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
-    const ablastr::fields::VectorField SZ =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+    // mass matrices themselves hold valid data for (they are summed out into
+    // their guard region by SumBoundaryJ), so those have to cover the one cell
+    // that the final curl reads.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         SX[0]->nGrowVect().allGE(chidA_ng) &&
         SY[1]->nGrowVect().allGE(chidA_ng) &&
@@ -138,7 +149,7 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // SemiImplicitDarwin::ApplyScaledMassMatrices).
     //
     // Every stage of that expression is a short, local stencil, so the whole
-    // operator is one stencil on Z. Rather than exchanging guard cells
+    // operator is one banded stencil on Z. Rather than exchanging guard cells
     // between the stages, each intermediate is evaluated over enough of its own
     // guard region to feed the next one (widths are set in define()), and the
     // only communication is the single exchange on Zscratch below.
@@ -174,11 +185,24 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
         Zscratch[ii]->FillBoundaryAndSync(warpx_ptr->Geom(lev).periodicity());
     }
 
+    // At conducting (PEC) walls, fill Zscratch's guard cells with the B-type
+    // image symmetry (covering the bilaplacian stencil below) and zero the
+    // wall-normal components of the iterate on the wall. Together with the
+    // corresponding zeroing of the operator output and of the source, this
+    // makes GMRES solve the reflected half-domain problem. This must come
+    // after the periodic fill above so that the mirror reads (and corner
+    // guard cells) see valid data.
+    m_ops->ApplyPECtoZ(Zscratch, lev, Zscratch[0]->nGrowVect());
+
     // Evaluation of the (single) 4th-order field equation:
     // bilaplacian(Z), discretized directly in a single pass over Z.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeVectorBiLaplacian(
         rhs_vec[lev], Zscratch, warpx_ptr->GetEBUpdateBFlag_fp()[lev], lev
     );
+
+    // Constrain the curl-free modes of Z, which the curl(chi curl(Z)) term
+    // below annihilates, with the grad-div penalty term (no-op unless enabled)
+    m_ops->AddGradDivZTerm(rhs_vec[lev], Zscratch, lev);
 
     // Calculate dA = curl(Z), out into dA's full guard region so that the mass
     // matrix gather below never runs off the end of it
@@ -190,11 +214,18 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // Calculate chi dA (the scaled mass matrices applied to dA) and write into
     // chidA. ApplyScaledMassMatrices() accumulates into its output and fills as
     // many of its guard cells as it has (one, here - just what the final curl
-    // reads), so clear it first including guard cells.
+    // reads - or all of the mass matrices' with PEC walls), so clear it first
+    // including guard cells.
     for (int ii = 0; ii < 3; ii++)
     {
         chidA[lev][ii]->setVal(0);
     }
+
+    // At conducting (PEC) walls, fill dA's guard cells with the E-type image
+    // symmetry before the mass matrices are applied below: the guard-cell
+    // mass-matrix deposits multiply these beyond-wall dA values.
+    m_ops->ApplyPECtodA(dA[lev], lev, m_dA_x.nGrowVect());
+
     m_ops->ApplyScaledMassMatrices(chidA, dA);
 
     // Reuse lapZ as a temporary storage location for curl(chi curl(Z))
@@ -215,4 +246,15 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // fact: everything above is evaluated from Zscratch, which was synced, and
     // from mass matrices that SumBoundaryJ leaves equal at duplicated nodes, so
     // the two cells are computed by identical operations on identical inputs.
+    // (With PEC walls, chi curl(Z) is re-exchanged after its wall fold, see
+    // ApplyScaledMassMatrices(), which keeps this true.)
+
+    // Project the operator output at conducting (PEC) walls: zero the
+    // constrained wall-normal rows so that they stay trivially satisfied for
+    // every Krylov vector (rhs_vec has no guard cells, so only the on-wall
+    // zeroing is performed). Also remove the (roundoff-level) component of
+    // the output along the constant null vectors of the operator, so that the
+    // Krylov space stays orthogonal to them, as the source is.
+    m_ops->ApplyPECtoZ(rhs_vec[lev], lev, amrex::IntVect(0));
+    m_ops->ProjectOutNullConstants(rhs_vec[lev], lev);
 }

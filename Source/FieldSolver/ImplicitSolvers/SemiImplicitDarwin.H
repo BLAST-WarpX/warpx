@@ -21,6 +21,8 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include <array>
+
 #include "ImplicitSolver.H"
 
 /** @file
@@ -119,6 +121,71 @@ public:
     void ClearParticleVelocities ();
     void FinishVelocityUpdate ();
 
+    /**
+     * \brief Apply conducting-wall (PEC) boundary conditions to a Z-staggered
+     *  (i.e., B-staggered) vector field: zero the wall-normal components on
+     *  the wall plane and fill `ng` guard layers with the B-type image
+     *  symmetry (tangential components even-mirrored, normal components
+     *  odd-mirrored). With ng = 0 only the on-wall zeroing (the projection of
+     *  the constrained degrees of freedom) is performed. No-op unless a PEC
+     *  boundary is present.
+     */
+    void ApplyPECtoZ ( const ablastr::fields::VectorField& a_field,
+                       int lev, const amrex::IntVect& ng ) const;
+
+    /**
+     * \brief Apply conducting-wall (PEC) boundary conditions to a dA-staggered
+     *  (i.e., E-staggered) vector field: zero the wall-tangential components
+     *  on the wall plane and fill `ng` guard layers with the E-type image
+     *  symmetry (tangential components odd-mirrored, normal components
+     *  even-mirrored). No-op unless a PEC boundary is present.
+     */
+    void ApplyPECtodA ( const ablastr::fields::VectorField& a_field,
+                        int lev, const amrex::IntVect& ng ) const;
+
+    /**
+     * \brief Add the grad-div (Coulomb-gauge penalty) term
+     *  -grad(alpha div(Z)) to the operator output `a_rhs`, on its valid cells.
+     *  The curl(chi curl(Z)) term annihilates curl-free Z modes, which are then
+     *  only constrained by the bilaplacian (eigenvalues ~k^4, many orders of
+     *  magnitude below the k^4 + chi k^2 of the solenoidal modes in domains
+     *  large compared to the electron skin depth), and this term lifts them to
+     *  k^4 + alpha k^2. With alpha spatially uniform, the term is discretely
+     *  curl-free, so it does not change dA = curl(Z). `a_Z` must have 2 guard
+     *  layers filled (with the periodic and PEC image values). No-op if
+     *  implicit_evolve.graddiv_factor is zero.
+     */
+    void AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
+                           const ablastr::fields::VectorField& a_Z,
+                           int lev );
+
+    /**
+     * \brief At conducting (PEC) walls, fold the guard-cell values of an
+     *  E-staggered vector field deposited from the particles (the current
+     *  density, or the product of the mass matrices with dA) back into the
+     *  domain, with the image symmetry of the E-field (tangential components
+     *  odd, normal components even), and set the image guard values. No-op
+     *  unless a PEC boundary is present.
+     */
+    void FoldGuardCellsAtPEC ( const ablastr::fields::VectorField& a_field, int lev ) const;
+
+    /**
+     * \brief Subtract the mean of each component of a Z-staggered vector
+     *  field whose uniform (constant) field is an exact null vector of the
+     *  wall-projected operator: zero curl, zero bilaplacian, and untouched by
+     *  the wall projection, which only zeroes wall-normal components. With
+     *  PEC walls, the source has a component along these null vectors (the
+     *  domain sum of curl(J) and laplacian(B) telescopes to wall values),
+     *  which GMRES can never reduce. Being constant, these components have
+     *  zero curl, so removing them does not change dA = curl(Z). No-op unless
+     *  a PEC boundary is present (with periodic boundaries the source has
+     *  zero mean).
+     */
+    void ProjectOutNullConstants ( const ablastr::fields::VectorField& a_field, int lev ) const;
+
+    /** \brief Whether any field boundary is a conducting (PEC) wall */
+    [[nodiscard]] bool HasPEC () const { return m_has_pec; }
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -130,6 +197,39 @@ private:
      * \brief Solver vectors for delta A
      */
     WarpXSolverVec m_Z, m_source;
+
+    /**
+     * \brief True if any field boundary is a conducting (PEC) wall; set in
+     *  Define(). Gates all wall boundary handling so periodic runs are untouched.
+     */
+    bool m_has_pec = false;
+
+    /**
+     * \brief Which components of Z admit a constant null vector of the
+     *  wall-projected operator: those that are not normal to any PEC wall
+     *  (see ProjectOutNullConstants). Set in Define(); all false unless a PEC
+     *  boundary is present.
+     */
+    std::array<bool, 3> m_null_constant_comp = {false, false, false};
+
+    /**
+     * \brief Multiplier of the grad-div penalty coefficient
+     *  (implicit_evolve.graddiv_factor; 0, the default, disables the term)
+     */
+    amrex::Real m_graddiv_factor = 0.0;
+
+    /**
+     * \brief Grad-div penalty coefficient alpha, refreshed every step from
+     *  the mass matrices: m_graddiv_factor times the domain mean of the
+     *  (2 mu0/dt)-scaled row sums of the diagonal mass-matrix blocks, i.e.,
+     *  the mean chi that curl(chi curl(Z)) applies to solenoidal modes
+     */
+    amrex::Real m_graddiv_alpha = 0.0;
+
+    /**
+     * \brief Cell-centered scratch holding div(Z) in AddGradDivZTerm()
+     */
+    amrex::MultiFab m_divZ;
 
     /**
      * \brief The linear operator whose action on a vector the linear solver
