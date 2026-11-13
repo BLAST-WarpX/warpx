@@ -1301,10 +1301,9 @@ void doEsirkepovDepositionSharedShapeN (
     !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
     using namespace amrex::literals;
 
-    // Esirkepov deposits all components of J on the same nodes, which span the old and
-    // new positions of the particle. With the CFL condition, a particle in a given cell
-    // touches nodes from depos_order cells below to depos_order+1 cells above that cell,
-    // so the buffers cover the tile grown by depos_order and made nodal.
+    // With the CFL condition, a particle in a given cell touches nodes from depos_order
+    // cells below to depos_order+1 cells above that cell, so the buffers cover the tile
+    // grown by depos_order.
     // The new position is the current position (used for binning) pushed by
     // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
     // grow the buffers by the number of cells that the particle can move in that time.
@@ -1318,8 +1317,8 @@ void doEsirkepovDepositionSharedShapeN (
 
     const amrex::GpuArray<amrex::Array4<amrex::Real>, 3> J{
         jx_fab.array(), jy_fab.array(), jz_fab.array()};
-    const amrex::IntVect nodal = amrex::IntVect::TheNodeVector();
-    const amrex::GpuArray<amrex::IntVect, 3> types{nodal, nodal, nodal};
+    const amrex::GpuArray<amrex::IntVect, 3> types{
+        jx_fab.box().type(), jy_fab.box().type(), jz_fab.box().type()};
 
     // Compile versions of the kernel with and without reduced shape
     auto launch = [&] (auto reduce_shape) {
