@@ -27,7 +27,7 @@ jobs:
       CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -36,8 +36,8 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
-    - uses: actions/setup-python@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       name: Install Python
       with:
         python-version: '3.x'
@@ -45,7 +45,7 @@ jobs:
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -118,7 +118,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -127,12 +127,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -174,7 +174,7 @@ jobs:
       #CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
-      uses: ax3l/free-disk-space@main
+      uses: ax3l/free-disk-space@44eeae95a80954c3eb6161397b5b201b22e178cc # main
       with:
         tool-cache: false
         android: true
@@ -183,12 +183,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Dependencies
       run: |
         .github/workflows/dependencies/nvhpc.sh 26.5
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

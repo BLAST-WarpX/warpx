@@ -189,7 +189,7 @@ void ParticleHistogram::ComputeDiags (int step)
     bool const do_parser_filter = m_do_parser_filter;
 
     // zero-out old data on the host
-    std::fill(m_data.begin(), m_data.end(), amrex::Real(0.0));
+    std::ranges::fill(m_data, 0.0_rt);
     amrex::Gpu::DeviceVector< amrex::Real > d_data( m_data.size(), 0.0 );
     amrex::Real* const AMREX_RESTRICT dptr_data = d_data.dataPtr();
 

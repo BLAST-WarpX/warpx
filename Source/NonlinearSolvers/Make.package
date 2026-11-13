@@ -1,3 +1,4 @@
+CEXE_sources += MatrixPCAlgMG.cpp
 CEXE_sources += WarpX_PETSc.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/NonlinearSolvers

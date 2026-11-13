@@ -10,6 +10,7 @@
 import argparse
 import os
 import sys
+from typing import Literal
 
 import dill
 import numpy as np
@@ -25,10 +26,9 @@ simulation = picmi.Simulation(warpx_serialize_initial_conditions=True, verbose=0
 
 
 class DummyES_Solver(picmi.ElectrostaticSolver):
-    def __init__(self, grid):
-        super(DummyES_Solver, self).__init__(
-            grid=grid, method="Multigrid", required_precision=1
-        )
+    # Different defaults than the WarpX solver
+    method: Literal["FFT", "Multigrid"] | None = "Multigrid"
+    required_precision: float | None = 1.0
 
     def solver_initialize_inputs(self):
         """Grab geometrical quantities from the grid."""
@@ -324,7 +324,7 @@ class EMModes(object):
                     warpx_self_fields_verbosity=self.test,
                 )
             else:
-                self.solver_obj = DummyES_Solver(self.grid)
+                self.solver_obj = DummyES_Solver(grid=self.grid)
             simulation.solver = self.solver_obj
 
         else:

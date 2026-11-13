@@ -41,7 +41,7 @@ boundary.field_hi = pec_insulator periodic
 boundary.particle_lo = reflecting periodic
 boundary.particle_hi = absorbing periodic
 
-insulator.area_x_hi(y,z) = (-1.0 <= z and z <= 1.0)
+insulator.area_x_hi(y,z) = (0.025e-2 <= z and z <= 0.075e-2)
 insulator.By_x_hi(y,z,t) = min(t/rise_time,1)*B0
 
 #################################
@@ -66,20 +66,25 @@ implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
 newton.linear_solver = petsc_ksp
 newton.max_iterations = 100
-newton.relative_tolerance = 1.0e-6
+newton.relative_tolerance = 1.0e-12
 newton.absolute_tolerance = 0.0
-newton.require_convergence = false
+newton.require_convergence = true
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
 newton.diagnostic_interval = 10
+newton.pc_update_newton_interval = 0
+newton.pc_update_time_step_interval = 100
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
-gmres.relative_tolerance = 1.0e-3
+gmres.relative_tolerance = 1.0e-6
 gmres.absolute_tolerance = 0.0
 
 jacobian.pc_type = "pc_petsc"
-pc_petsc.verbose = true
+jacobian.epsJFNK = 1.0  # Use an order-one perturbation factor for linear systems.
+precon_mat.verbose = true
 pc_petsc.type = "lu"
+
+algo.current_deposition = "direct"
 
 ###   Diagnostics
 diagnostics.diags_names = diag1

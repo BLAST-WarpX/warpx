@@ -32,6 +32,49 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_langmuir_multi_mr_dive_cleaning  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_langmuir_multi_mr_dive_cleaning  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000040"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_langmuir_multi_mr_dive_cleaning_shared_mem  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_langmuir_multi_mr_dive_cleaning_shared_mem  # inputs
+    "analysis_compare_shared_mem.py diags/diag1000040 ../test_2d_langmuir_multi_mr_dive_cleaning/diags/diag1000040"  # analysis
+    "analysis_default_regression.py --path diags/diag1000040"  # checksum
+    test_2d_langmuir_multi_mr_dive_cleaning  # dependency
+)
+
+add_warpx_test(
+    test_2d_langmuir_multi_mr_direct  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_langmuir_multi_mr_direct  # inputs
+    "analysis_2d.py diags/diag1000080"  # analysis
+    "analysis_default_regression.py --path diags/diag1000080"  # checksum
+    OFF  # dependency
+)
+
+# The shared-memory current deposition is only available on GPU
+if(WarpX_COMPUTE STREQUAL CUDA OR WarpX_COMPUTE STREQUAL HIP)
+    add_warpx_test(
+        test_2d_langmuir_multi_mr_direct_shared_mem  # name
+        2  # dims
+        2  # nprocs
+        inputs_test_2d_langmuir_multi_mr_direct_shared_mem  # inputs
+        "analysis_compare_shared_mem.py diags/diag1000080 ../test_2d_langmuir_multi_mr_direct/diags/diag1000080"  # analysis
+        "analysis_default_regression.py --path diags/diag1000080"  # checksum
+        test_2d_langmuir_multi_mr_direct  # dependency
+    )
+endif()
+
+add_warpx_test(
     test_2d_langmuir_multi_mr_maxlevel2  # name
     2  # dims
     2  # nprocs

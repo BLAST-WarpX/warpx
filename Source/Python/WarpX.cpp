@@ -128,9 +128,11 @@ void init_WarpX (py::module& m)
         )
 
         .def("initialize_data", &WarpX::InitData,
+            py::call_guard<py::gil_scoped_release>(),
             "Initializes the WarpX simulation"
         )
         .def("evolve", &WarpX::Evolve,
+            py::call_guard<py::gil_scoped_release>(),
             "Evolve the simulation the specified number of steps"
         )
 
@@ -201,7 +203,11 @@ void init_WarpX (py::module& m)
             R"pbdoc(Save the particle positions and velocities at the start of the step)pbdoc"
         )
         .def("deposit_mass_matrices",
-            [](WarpX& wx){ wx.DepositMassMatrices(); },
+            [](WarpX& wx, amrex::Real a_dt){
+                auto const* solver = wx.get_pointer_ImplicitSolver();
+                if (!solver) { throw py::value_error("deposit_mass_matrices requires an implicit solver"); }
+                wx.DepositMassMatrices(a_dt, solver->GetImplicitOptions());
+            },
             R"pbdoc(Zero and deposit the mass matrices from all species)pbdoc"
         )
         .def("sync_mass_matrices",
@@ -210,23 +216,38 @@ void init_WarpX (py::module& m)
         )
 
         // Expose functions used to sync the current and charge density multifabs
-        // accross tiles and apply appropriate boundary conditions
+        // across boxes and mesh refinement levels
         .def("sync_current",
             [](WarpX& wx, const std::string& current_fp_string){ wx.SyncCurrent(current_fp_string); },
             py::arg("current_fp_string"),
-            R"pbdoc(Sum the guard cells of a current-like vector field into the valid cells)pbdoc"
+            R"pbdoc(Synchronize a current-like vector field across boxes and mesh refinement levels.
+
+If current centering is used, first center ``current_fp_nodal`` onto this field.
+Then apply the filter (if used), sum the guard cells into the valid cells,
+and add the contributions of finer levels to coarser levels.
+
+This does not apply boundary conditions. In cylindrical and spherical geometries,
+it also does not apply the inverse radial volume scaling: if the field was filled
+with raw particle deposits, the result is the current density multiplied by the
+radial volume factor, not a physical current density.
+
+Parameters
+----------
+current_fp_string: string
+  Name of the vector field to synchronize)pbdoc"
         )
         .def("sync_rho",
-            [](WarpX& wx){ wx.SyncRho(); }
+            [](WarpX& wx){ wx.SyncRho(); },
+            R"pbdoc(Synchronize ``rho_fp`` across boxes and mesh refinement levels.
+
+Apply the filter (if used), sum the guard cells into the valid cells,
+and add the contributions of finer levels to coarser levels.
+
+This does not apply boundary conditions. In cylindrical and spherical geometries,
+it also does not apply the inverse radial volume scaling: if ``rho_fp`` was filled
+with raw particle deposits (e.g. with ``deposit_charge``), the result is the charge
+density multiplied by the radial volume factor, not a physical charge density.)pbdoc"
         )
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        .def("apply_inverse_volume_scaling_to_charge_density",
-            [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
-                wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-            },
-            py::arg("rho"), py::arg("lev")
-        )
-#endif
 
         // Expose functions to get the current simulation step and time
         .def("getistep",
