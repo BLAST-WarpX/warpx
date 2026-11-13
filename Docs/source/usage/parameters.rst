@@ -4397,8 +4397,10 @@ Additional parameters
     of assigning the particles to bins small enough to fit in the
     space available for the temporary buffers. Performance is mostly improved
     when there is lots of contention between particles writing to the same cell
-    (e.g. for high particles per cell). This feature is only available for CUDA
-    and HIP, and is only recommended for 3D or 2D. It supports the ``direct`` and
+    (e.g. for high particles per cell). We have observed this option to be faster
+    on AMD GPUs such as the MI250X and MI300A for greater than ~4 particles per cell,
+    but not neccesarily on NVIDIA hardware such as the A100. This feature is only available
+    for CUDA and HIP, and is only recommended for 3D or 2D. It supports the ``direct`` and
     ``esirkepov`` values of :pp:param:`algo.current_deposition` with the explicit
     particle push, and cannot be used with more than one azimuthal mode in RZ.
 
