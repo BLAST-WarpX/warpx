@@ -2875,7 +2875,12 @@ are applied to the grid directly. In particular, these fields can be seen in the
     For some mesh-refinement simulations,
     the external fields are only applied to the parent grid and not the refined patches. In such cases,
     :pp:param:`warpx.maxlevel_extEMfield_init` can be set to 0.
-    In that case, the other levels have external field values of 0.
+    In that case, the external contribution to the fine and coarse patches of
+    the refined levels is initialized to 0. With electromagnetic mesh refinement,
+    their auxiliary fields, which are gathered by particles, still include the
+    interpolated parent field through mesh-refinement substitution.
+    This parameter does not restrict external
+    fields applied directly to particles.
 
 Applied to Particles
 ^^^^^^^^^^^^^^^^^^^^
