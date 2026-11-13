@@ -53,6 +53,8 @@ diag2.intervals = 1
 diag2.diag_type = Full
 diag2.fields_to_plot = Er
 diag2.format = openpmd
+# a MultiFab from the field register, written on both levels
+diag2.additional_fields_to_plot = "Efield_fp[dir=r]"
 
 diag3.diag_type = BoundaryScraping
 diag3.format = openpmd

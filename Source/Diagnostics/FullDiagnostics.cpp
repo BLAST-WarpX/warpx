@@ -434,6 +434,22 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     std::vector<std::string> field_names = {"r", "t", "p"};
 #endif
 
+    // Names of a MultiFab looked up in the field register: all modes if it has as many
+    // components as the RZ fields, else a single name. Like all other names, they are
+    // only added once (on level 0); the number of components is checked on every level.
+    auto const add_register_field_names = [&] (std::string const & name, int mf_ncomp) {
+        if (mf_ncomp != ncomp && mf_ncomp != 1) {
+            WARPX_ABORT_WITH_MESSAGE("Error: " + name + " has an unexpected number of components"
+                                     " and can not be written out");
+        }
+        if (!update_varnames) { return; }
+        if (mf_ncomp == ncomp) {
+            AddRZModesToOutputNames(name, ncomp);
+        } else {
+            m_varnames.push_back(name);
+        }
+    };
+
     // Fill vector of functors for all components except individual cylindrical modes.
     const auto m_varname_fields_size = static_cast<int>(m_varnames_fields.size());
     for (int comp=0; comp<m_varname_fields_size; comp++){
@@ -481,13 +497,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 const amrex::MultiFab * mf = warpx.m_fields.get(fieldname, Direction{idir}, lev);
                 const int mf_ncomp = mf->nComp();
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
-                if (mf_ncomp == ncomp) {
-                    AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
-                } else if (mf_ncomp == 1) {
-                    m_varnames.push_back(m_varnames_fields[comp]);
-                } else {
-                    WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
-                }
+                add_register_field_names(m_varnames_fields[comp], mf_ncomp);
             }
         }
         // Check if comp was found above
@@ -605,13 +615,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
             const int mf_ncomp = mf->nComp();
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
-            if (mf_ncomp == ncomp) {
-                AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
-            } else if (mf_ncomp == 1) {
-                m_varnames.push_back(m_varnames_fields[comp]);
-            } else {
-                WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
-            }
+            add_register_field_names(m_varnames_fields[comp], mf_ncomp);
         } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error: " + m_varnames_fields[comp] + " is not a known field output type in RZ geometry");
