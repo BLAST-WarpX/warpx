@@ -93,8 +93,10 @@ private:
     /** Append m_all_field_functors[lev] with all modes of all components of E B and j.
      * The matching names are added to m_varnames once, by AddRZModeNamesToDiags.
      * \param[in] lev level on which source multifabs are defined.
+     * \param[in] deposit_current whether the first j functor added here deposits the current,
+     *            i.e., the current is not deposited by the solver or by a functor added before.
      */
-    void AddRZModesToDiags (int lev);
+    void AddRZModesToDiags (int lev, bool deposit_current);
     /** Initialize functors that store pointers to the fields requested by the user.
       * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
       */

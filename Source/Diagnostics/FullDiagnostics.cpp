@@ -673,7 +673,7 @@ FullDiagnostics::AddRZModeNamesToDiags ()
 }
 
 void
-FullDiagnostics::AddRZModesToDiags (int lev)
+FullDiagnostics::AddRZModesToDiags (int lev, bool deposit_current)
 {
 #ifdef WARPX_DIM_RZ
     using ablastr::fields::Direction;
@@ -697,10 +697,6 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     // If divE or rho are requested, all their modes will be written out
     const bool divE_requested = utils::algorithms::is_in(m_varnames_fields, "divE");
     const bool rho_requested = utils::algorithms::is_in(m_varnames_fields, "rho");
-
-    // Boolean flag for whether the current density should be deposited before
-    // diagnostic output
-    bool deposit_current = !m_solver_deposits_current;
 
     const std::array<std::string, 3> coord {"r", "theta", "z"};
 
@@ -755,7 +751,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     }
     AMREX_ALWAYS_ASSERT( ncomp_from_src == m_varnames.size() );
 #else
-    amrex::ignore_unused(lev);
+    amrex::ignore_unused(lev, deposit_current);
 #endif
 }
 
@@ -1073,7 +1069,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                     m_pfield_dofilter[pcomp], m_pfield_filter_strings[pcomp]);
         }
     }
-    AddRZModesToDiags( lev );
+    // deposit_current is false if a j functor above already deposits the current
+    AddRZModesToDiags( lev, deposit_current );
 }
 
 
