@@ -25,6 +25,7 @@
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuMemory.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_ParticleUtil.H>
 
 #include <cstddef>
 
@@ -40,41 +41,6 @@ int getMaxTboxAlongDim (int nCells, int tilesize){
     const int remainder = nCells % tilesize;
     maxTilesize = tilesize + int(std::ceil((amrex::Real) remainder / nTiles));
     return maxTilesize;
-}
-
-/*
- * \brief Box of the tile with a given index, for the tiles of a box numbered as by
- *        amrex::getTileIndex (with tiling). This is the inverse of amrex::getTileIndex.
- * \param tile_index : Index of the tile
- * \param box : The box that is divided into tiles
- * \param tile_size : The tile size
- */
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Box getTileBoxFromIndex (int tile_index, const amrex::Box& box,
-                                const amrex::IntVect& tile_size) noexcept
-{
-    amrex::IntVect tile_lo, tile_hi;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        // Must be consistent with the tiling_1d function in amrex::getTileIndex
-        const int lo = box.smallEnd(idim);
-        const int ncells = box.length(idim);
-        const int ntile = amrex::max(ncells/tile_size[idim], 1);
-        const int itile = tile_index % ntile;
-        tile_index /= ntile;
-        const int ts_right = ncells/ntile;
-        const int ts_left = ts_right+1;
-        const int nleft = ncells - ntile*ts_right;
-        if (itile < nleft) {
-            // tiles on the left have size of ts_left
-            tile_lo[idim] = lo + itile*ts_left;
-            tile_hi[idim] = tile_lo[idim] + ts_left - 1;
-        } else {
-            // tiles on the right have size of ts_right
-            tile_lo[idim] = lo + itile*ts_right + nleft;
-            tile_hi[idim] = tile_lo[idim] + ts_right - 1;
-        }
-    }
-    return amrex::Box(tile_lo, tile_hi);
 }
 
 /*
@@ -162,7 +128,7 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
 
         // These boxes define the index space for the shared memory buffers.
         // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
-        amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
+        amrex::Box buffer_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
         buffer_box.grow(ngrow);
         amrex::GpuArray<amrex::Box, N> tbox;
         for (int n = 0; n < N; ++n) {
