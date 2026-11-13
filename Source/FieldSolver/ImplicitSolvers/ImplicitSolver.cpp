@@ -784,6 +784,10 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             // Default m_skip_particle_picard_init to true if using suborbits
             if (m_particle_suborbits) { m_skip_particle_picard_init = true; }
             pp.query("skip_particle_picard_init", m_skip_particle_picard_init);
+            pp.query("update_mass_matrices_newton_interval", m_update_mass_matrices_newton_interval);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_update_mass_matrices_newton_interval >= 0,
+                "ImplicitSolver: update_mass_matrices_newton_interval must be a non-negative integer");
         }
         if (m_use_mass_matrices_pc) {
             m_mass_matrices_pc_width = 1;
@@ -1110,12 +1114,18 @@ void ImplicitSolver::InitializeImplicitOptions ()
     m_implicit_options.ncomp_zz = m_ncomp_zz;
 }
 
-void ImplicitSolver::PreLinearSolve (const bool update_pc)
+void ImplicitSolver::PreLinearSolve (const bool update_pc,
+                                     const int nl_iter)
 {
     BL_PROFILE("ImplicitSolver::PreLinearSolve()");
 
-    // The deposit is skipped when the mass matrices are used only for a PC that is not updated
-    if (m_use_mass_matrices_jacobian || (m_use_mass_matrices_pc && update_pc)) {
+    const bool update_jacobian = (nl_iter == 0) || (m_update_mass_matrices_newton_interval > 0
+                                  && nl_iter % m_update_mass_matrices_newton_interval == 0);
+
+    const bool deposit_mm = (m_use_mass_matrices_jacobian && update_jacobian) ||
+                            (m_use_mass_matrices_pc && update_pc);
+
+    if (deposit_mm) {
         m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
         FinishMassMatricesDeposition();
     }
@@ -1462,6 +1472,7 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
             if (m_use_mass_matrices_jacobian) {
                 amrex::Print() << "        skip particle picard init:  " << (m_skip_particle_picard_init ? "true":"false") << "\n";
+                amrex::Print() << "        update mass matrices newton interval:  " << m_update_mass_matrices_newton_interval << "\n";
             }
             amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             if (m_use_mass_matrices_pc) {

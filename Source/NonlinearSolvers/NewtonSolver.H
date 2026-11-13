@@ -293,7 +293,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         // Prepare for the linear solve
         m_linear_function->setBaseSolution(a_U);
         m_linear_function->setBaseRHS(m_R);
-        m_ops->PreLinearSolve(update_pc);
+        m_ops->PreLinearSolve(update_pc, iter);
         if (update_pc) {
             m_linear_function->updatePreCondMat();
             // Keep WarpX sparse assembly and cached PETSc factors on the same schedule.
