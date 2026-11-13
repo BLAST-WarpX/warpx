@@ -725,7 +725,6 @@ void doEsirkepovDepositionShapeNKernel (const long ip,
                                   const amrex::Array4<amrex::Real>& Jx_arr,
                                   [[maybe_unused]] const amrex::Array4<amrex::Real>& Jy_arr,
                                   [[maybe_unused]] const amrex::Array4<amrex::Real>& Jz_arr,
-                                  long np_to_deposit,
                                   const amrex::Real dt,
                                   const amrex::Real relative_time,
                                   const amrex::XDim3 & dinv,
@@ -1129,8 +1128,6 @@ void doEsirkepovDepositionShapeNKernel (const long ip,
             }
 #endif
 #endif
-        }
-    );
 }
 
 /**
