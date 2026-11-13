@@ -136,22 +136,23 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
         }
 
         amrex::Gpu::SharedMemory<amrex::Real> gsm;
-        amrex::Real* const shared = gsm.dataPtr();
+        amrex::Real* const shared_memory_pointer = gsm.dataPtr();
 
         // Note: not `if constexpr`, since nvcc does not allow an extended __device__ lambda
         // to first-capture variables in a constexpr-if context. `fused` is a template
         // parameter, so the branch is still resolved at compile time.
         if (fused) {
             // Deposit into one buffer per array, then add them to the global arrays
-            amrex::GpuArray<amrex::Array4<amrex::Real>, N> buffers;
+            amrex::GpuArray<amrex::Array4<amrex::Real>, N> shared_memory_arrays;
             int nshared = 0;
             for (int n = 0; n < N; ++n) {
-                buffers[n] = amrex::Array4<amrex::Real>(shared + nshared,
+                shared_memory_arrays[n] = amrex::Array4<amrex::Real>(
+                    shared_memory_pointer + nshared,
                     amrex::begin(tbox[n]), amrex::end(tbox[n]), 1);
                 nshared += static_cast<int>(tbox[n].numPts());
             }
             for (int i = threadIdx.x; i < nshared; i += blockDim.x) {
-                shared[i] = 0.0_rt;
+                shared_memory_pointer[i] = 0.0_rt;
             }
             __syncthreads();
             // Deposit current into shared memory
@@ -160,25 +161,25 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                  ip_orig += blockDim.x)
             {
                 const unsigned int ip = permutation[ip_orig];
-                deposit_particle.template deposit<(1 << N) - 1>(ip, buffers);
+                deposit_particle.template deposit<(1 << N) - 1>(ip, shared_memory_arrays);
             }
             __syncthreads();
             // Add current from shared memory into the current stored in global memory
             // Operates on all components of J at the same time
             // Each thread runs over a different set of cells
             for (int n = 0; n < N; ++n) {
-                addLocalToGlobal(tbox[n], arrays[n], buffers[n]);
+                addLocalToGlobal(tbox[n], arrays[n], shared_memory_arrays[n]);
             }
         } else {
             // Deposit into one array at a time: deposit into the buffer, then add the
             // buffer to the global array
             amrex::constexpr_for<0, N>([&] (auto n) {
-                amrex::Array4<amrex::Real> const buffer(shared,
+                amrex::Array4<amrex::Real> const shared_memory_array(shared_memory_pointer,
                     amrex::begin(tbox[n]), amrex::end(tbox[n]), 1);
-                amrex::GpuArray<amrex::Array4<amrex::Real>, N> buffers;
-                for (int m = 0; m < N; ++m) { buffers[m] = buffer; }
+                amrex::GpuArray<amrex::Array4<amrex::Real>, N> shared_memory_arrays;
+                for (int m = 0; m < N; ++m) { shared_memory_arrays[m] = shared_memory_array; }
                 for (int i = threadIdx.x; i < npts; i += blockDim.x) {
-                    shared[i] = 0.0_rt;
+                    shared_memory_pointer[i] = 0.0_rt;
                 }
                 __syncthreads();
                 // Deposit current into shared memory
@@ -187,12 +188,13 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                      ip_orig += blockDim.x)
                 {
                     const unsigned int ip = permutation[ip_orig];
-                    deposit_particle.template deposit<(1 << decltype(n)::value)>(ip, buffers);
+                    deposit_particle.template deposit<(1 << decltype(n)::value)>(
+                        ip, shared_memory_arrays);
                 }
                 __syncthreads();
                 // Add current from shared memory into the current stored in global memory
                 // Each thread runs over a different set of cells
-                addLocalToGlobal(tbox[n], arrays[n], buffer);
+                addLocalToGlobal(tbox[n], arrays[n], shared_memory_array);
                 __syncthreads();
             });
         }
