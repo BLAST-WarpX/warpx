@@ -30,7 +30,7 @@ Rewritten in SI units, the pair production rate per unit volume is:
 
 
 where :math:`e` is the elementary charge, :math:`E_s` is the Schwinger field, :math:`\epsilon = \mathcal{E}/E_s` and :math:`\eta = \mathcal{H}/E_s`.
-:math:`\mathcal{E}` and :math:`\mathcal{H}$` are given by:
+:math:`\mathcal{E}` and :math:`\mathcal{H}` are given by:
 
 .. math::
 
