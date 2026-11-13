@@ -1,7 +1,7 @@
 .. _theory-bc:
 
-Boundary conditions
-===================
+Boundary conditions at the edge of the simulation box
+=====================================================
 
 .. _theory-bc-PML:
 
