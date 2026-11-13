@@ -22,12 +22,13 @@
 #endif
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
+#include "Particles/ParticleCreation/SmartCopy.H"
+#include "Particles/ParticleCreation/SmartUtils.H"
+#include "Particles/ParticleBoundaries_K.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
 #endif
-#include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartCreate.H"
-#include "Particles/ParticleCreation/SmartUtils.H"
 #include "Particles/PhotonParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
@@ -35,6 +36,7 @@
 #include "SpeciesPhysicalProperties.H"
 #include "Utils/Algorithms/IsIn.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
@@ -78,6 +80,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -91,6 +94,174 @@ namespace
     struct MyFieldList
     {
         Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
+    };
+
+    struct SecondaryEmissionFilter
+    {
+        amrex::Real m_probability;
+
+        template <typename SrcData>
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        int operator() (const SrcData& /*src*/, int /*i*/, amrex::RandomEngine const& engine) const noexcept
+        {
+            return amrex::Random(engine) < m_probability;
+        }
+    };
+
+    struct SecondaryEmissionTransform
+    {
+        int m_boundary;
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_plo;
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_phi;
+        amrex::GpuArray<amrex::ParticleReal, AMREX_SPACEDIM> m_rlo;
+        amrex::GpuArray<amrex::ParticleReal, AMREX_SPACEDIM> m_rhi;
+        int m_normal_index;
+        amrex::ParticleReal m_uth;
+        GetParticlePosition<PIdx> m_GetPosition;
+        amrex::Real m_dt;
+        amrex::ParticleReal m_mass;
+        amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> m_do_cropping;
+
+        template <typename DstData, typename SrcData>
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        void operator() (DstData& dst, SrcData& src, int i_src, int i_dst,
+                         amrex::RandomEngine const& engine) const noexcept
+        {
+            amrex::ParticleReal & ux = dst.m_rdata[PIdx::ux][i_dst];
+            amrex::ParticleReal & uy = dst.m_rdata[PIdx::uy][i_dst];
+            amrex::ParticleReal & uz = dst.m_rdata[PIdx::uz][i_dst];
+
+            if (m_boundary < 2*AMREX_SPACEDIM) {
+                [[maybe_unused]] int const idim = m_boundary / 2;
+                int const iside = m_boundary % 2;
+
+                // Get the absorbed particle position
+                amrex::ParticleReal x_n, y_n, z_n;
+                m_GetPosition(i_src, x_n, y_n, z_n);
+                amrex::ParticleReal x_nm1 = x_n;
+                amrex::ParticleReal y_nm1 = y_n;
+                amrex::ParticleReal z_nm1 = z_n;
+
+                // Propogate the position backwards in time to find the previous position
+                UpdatePosition(x_nm1, y_nm1, z_nm1, ux, uy, uz, -m_dt, m_mass);
+
+                // Crop to the round off lo or hi (so that the new particle is
+                // considered inside the domain)
+#if defined(WARPX_DIM_3D)
+                ParticleUtils::crop_at_boundary(x_nm1, y_nm1, z_nm1, x_n, y_n, z_n,
+                                                m_rlo[0], m_rhi[0], m_do_cropping[0]);
+                ParticleUtils::crop_at_boundary(y_nm1, z_nm1, x_nm1, y_n, z_n, x_n,
+                                                m_rlo[1], m_rhi[1], m_do_cropping[1]);
+                ParticleUtils::crop_at_boundary(z_nm1, x_nm1, y_nm1, z_n, x_n, y_n,
+                                                m_rlo[2], m_rhi[2], m_do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                ParticleUtils::crop_at_boundary(x_nm1, z_nm1, x_n, z_n,
+                                                m_rlo[0], m_rhi[0], m_do_cropping[0]);
+                ParticleUtils::crop_at_boundary(z_nm1, x_nm1, z_n, x_n,
+                                                m_rlo[1], m_rhi[1], m_do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+                ParticleUtils::crop_at_boundary(z_n, m_rlo[0], m_rhi[0], m_do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                ParticleUtils::crop_at_boundary(x_n, m_rlo[0], m_rhi[0], m_do_cropping[0]);
+#endif
+
+#if defined(WARPX_DIM_3D)
+                dst.m_rdata[PIdx::x][i_dst] = x_n;
+                dst.m_rdata[PIdx::y][i_dst] = y_n;
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_XZ)
+                dst.m_rdata[PIdx::x][i_dst] = x_n;
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_1D_Z)
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_RZ)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+                dst.m_rdata[PIdx::z][i_dst] = z_n;
+#elif defined(WARPX_DIM_RCYLINDER)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+#elif defined(WARPX_DIM_RSPHERE)
+                dst.m_rdata[PIdx::r][i_dst] = std::sqrt(x_n*x_n + y_n*y_n + z_n*z_n);
+                dst.m_rdata[PIdx::theta][i_dst] = std::atan2(y_n, x_n);
+                dst.m_rdata[PIdx::phi][i_dst] = std::atan2(z_n, std::sqrt(x_n*x_n + y_n*y_n));
+#endif
+
+                // momentum_index is the momentum normal to the boundary
+#if defined(WARPX_DIM_3D)
+                int const momentum_index = PIdx::ux + idim;
+#elif defined(WARPX_DIM_XZ)
+                int const momentum_index = (idim == 0) ? PIdx::ux : PIdx::uz;
+#elif defined(WARPX_DIM_RZ)
+                int const momentum_index = (idim == 0) ? PIdx::ux : PIdx::uz;
+#elif defined(WARPX_DIM_1D_Z)
+                int const momentum_index = PIdx::uz;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                int const momentum_index = PIdx::ux;
+#endif
+
+                // Only the sign of the normal velocity is used
+                dst.m_rdata[momentum_index][i_dst] = iside == 0 ? -1._prt : 1._prt;
+
+#if defined(WARPX_DIM_3D)
+                if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
+                else if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uy, uz, ux, m_uth, engine); }
+                else if (idim == 2) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                if (idim == 0) { ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine); }
+                else if (idim == 1) { ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine); }
+#elif defined(WARPX_DIM_1D_Z)
+                ApplyParticleBoundaries::thermalize_boundary_particle(uz, ux, uy, m_uth, engine);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                ApplyParticleBoundaries::thermalize_boundary_particle(ux, uy, uz, m_uth, engine);
+#endif
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const theta = dst.m_rdata[PIdx::theta][i_dst];
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const phi = dst.m_rdata[PIdx::phi][i_dst];
+#else
+                amrex::ParticleReal const phi = 0._prt;
+#endif
+                ParticleUtils::transform_momentum_to_cartesian(ux, uy, uz, theta, phi);
+#endif
+
+            } else {
+                // Note that for EB, the particle position has already been mapped to the
+                // boundary surface
+
+                amrex::ParticleReal const nx = src.m_runtime_rdata[m_normal_index][i_src];
+                amrex::ParticleReal const ny = src.m_runtime_rdata[m_normal_index+1][i_src];
+                amrex::ParticleReal const nz = src.m_runtime_rdata[m_normal_index+2][i_src];
+                amrex::ParticleReal un = -1._prt;
+                amrex::ParticleReal ut1 = 0._prt;
+                amrex::ParticleReal ut2 = 0._prt;
+                ApplyParticleBoundaries::thermalize_boundary_particle(un, ut1, ut2, m_uth, engine);
+
+                amrex::ParticleReal tx = 1._prt;
+                amrex::ParticleReal ty = 0._prt;
+                amrex::ParticleReal tz = 0._prt;
+                if (amrex::Math::abs(nx) > 0.9_prt) {
+                    tx = 0._prt;
+                    ty = 1._prt;
+                }
+                amrex::ParticleReal const dot = tx*nx + ty*ny + tz*nz;
+                tx -= dot*nx;
+                ty -= dot*ny;
+                tz -= dot*nz;
+                amrex::ParticleReal const inv_t_norm = 1._prt / std::sqrt(tx*tx + ty*ty + tz*tz);
+                tx *= inv_t_norm;
+                ty *= inv_t_norm;
+                tz *= inv_t_norm;
+                amrex::ParticleReal const sx = ny*tz - nz*ty;
+                amrex::ParticleReal const sy = nz*tx - nx*tz;
+                amrex::ParticleReal const sz = nx*ty - ny*tx;
+
+                ux = un*nx + ut1*tx + ut2*sx;
+                uy = un*ny + ut1*ty + ut2*sy;
+                uz = un*nz + ut1*tz + ut2*sz;
+            }
+        }
     };
 }
 
@@ -124,6 +295,8 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
 
     // Setup particle collisions
     collisionhandler = std::make_unique<CollisionHandler>(this);
+
+    InitSecondaryEmissionBoundaryBuffer();
 
 }
 
@@ -301,6 +474,9 @@ MultiParticleContainer::ReadParameters ()
             }
 
             species_types.resize(nspecies, PCTypes::Physical);
+            m_secondary_emission_product_species.resize(nspecies, -1);
+            m_secondary_emission_yield.resize(nspecies, 0.0_rt);
+            m_secondary_emission_energy_eV.resize(nspecies, 0.0_rt);
 
             // Get rigid-injected species
             std::vector<std::string> rigid_injected_species;
@@ -342,6 +518,28 @@ MultiParticleContainer::ReadParameters ()
 
                 if (name_is_in_photon_species || species_type_is_photon  ){
                     species_types[spec_index] = PCTypes::Photon;
+                }
+
+                std::string secondary_emission_product_name;
+                if (pp_species.query(
+                        "secondary_emission_product_species", secondary_emission_product_name)) {
+                    m_secondary_emission_product_species[spec_index] = getSpeciesID(
+                        secondary_emission_product_name);
+                    pp_species.get(
+                        "secondary_emission_yield",
+                        m_secondary_emission_yield[spec_index]);
+                    utils::parser::getWithParser(
+                        pp_species,
+                        "secondary_emission_energy_eV",
+                        m_secondary_emission_energy_eV[spec_index]);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_secondary_emission_yield[spec_index] >= 0.0_rt &&
+                        m_secondary_emission_yield[spec_index] <= 1.0_rt,
+                        name + ".secondary_emission_yield must be between 0 and 1");
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        m_secondary_emission_energy_eV[spec_index] >= 0.0_rt,
+                        name + ".secondary_emission_energy_eV must be non-negative");
+                    m_do_secondary_emission = true;
                 }
             }
         }
@@ -1019,6 +1217,153 @@ MultiParticleContainer::ContinuousFluxInjection (amrex::Real t, amrex::Real dt) 
 {
     for (const auto& pc : allcontainers){
         pc->ContinuousFluxInjection(t, dt);
+    }
+}
+
+void
+MultiParticleContainer::InitSecondaryEmissionBoundaryBuffer ()
+{
+    if (!m_do_secondary_emission) { return; }
+
+    m_secondary_emission_buffer = std::make_unique<ParticleBoundaryBuffer>();
+
+    for (int ispecies = 0; ispecies < nSpecies(); ++ispecies) {
+        int const product_species = m_secondary_emission_product_species[ispecies];
+        if (product_species >= 0) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                GetParticleContainer(product_species).getMass() > 0.0_prt,
+                "Secondary emission product species '" + species_names[product_species]
+                + "' must have nonzero mass");
+            m_secondary_emission_buffer->enableForSpecies(ispecies);
+        }
+    }
+}
+
+void
+MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::Real const dt,
+                                             int const finest_level, bool const do_eb)
+{
+    if (!m_do_secondary_emission) { return; }
+
+    auto & warpx = WarpX::GetInstance();
+
+    // Gather absorbed particles in the particle boundary buffer
+    if (not do_eb) {
+        m_secondary_emission_buffer->gatherParticlesFromDomainBoundaries(*this, cur_time);
+    } else {
+        m_secondary_emission_buffer->gatherParticlesFromEmbeddedBoundaries(
+            *this, warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+    }
+
+    // Set to loop over the domain boundaries, or the EB boundary
+#ifdef AMREX_USE_EB
+    int const boundary_start = do_eb ? 2*AMREX_SPACEDIM : 0;
+    int const boundary_stop = do_eb ? 2*AMREX_SPACEDIM + 1 : 2*AMREX_SPACEDIM;
+#else
+    if (do_eb) { return; }
+    int const boundary_start = 0;
+    int const boundary_stop = 2*AMREX_SPACEDIM;
+#endif
+
+    // With EB boundaries, a call is needed to Redistribute.
+    // Save the species that should be redistributed.
+    // (Redistribute already done afterwards for domain boundaries)
+    std::set<int> product_species_to_redistribute;
+
+    for (int boundary = boundary_start; boundary < boundary_stop; ++boundary) {
+
+        if (!m_secondary_emission_buffer->isDefinedForAnySpecies(boundary)) { continue; }
+
+        for (int source_species = 0; source_species < nSpecies(); ++source_species) {
+
+            int const product_species = m_secondary_emission_product_species[source_species];
+            if (product_species < 0) { continue; }
+
+            auto* source_pc = m_secondary_emission_buffer->getParticleBufferPointer(
+                species_names[source_species], boundary);
+            if (source_pc == nullptr || !source_pc->isDefined()) { continue; }
+
+            auto& product_pc = GetParticleContainer(product_species);
+            const SmartCopyFactory copy_factory(*source_pc, product_pc);
+            const auto copy = copy_factory.getSmartCopy();
+
+            // normal_index is only needed with EB
+            int const normal_index =
+                source_pc->GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
+
+            // The filter flags which particles will yield secondaries
+            auto const filter = SecondaryEmissionFilter{m_secondary_emission_yield[source_species]};
+
+            auto const& geom = WarpX::GetInstance().Geom(0);
+
+            auto const uth = static_cast<amrex::ParticleReal>(std::sqrt(
+                PhysConst::q_e*m_secondary_emission_energy_eV[source_species]/product_pc.getMass()) /
+                PhysConst::c);
+
+            amrex::MFItInfo info;
+            if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+                info.EnableTiling(WarpXParticleContainer::tile_size);
+            }
+#ifdef AMREX_USE_OMP
+            info.SetDynamic(true);
+#endif
+            for (int lev = 0; lev <= source_pc->finestLevel(); ++lev) {
+
+                for (WarpXParIter pti(*source_pc, lev, info); pti.isValid(); ++pti) {
+                    product_pc.DefineAndReturnParticleTile(lev, pti.index(), pti.LocalTileIndex());
+                }
+
+                // Setup flag specify whether to do cropping (only on PEC boundaries)
+                auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
+                auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
+
+                amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> do_cropping;
+                for (int idim=0; idim < AMREX_SPACEDIM; ++idim) {
+                    do_cropping[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PEC
+                                         || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator);
+                    do_cropping[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PEC
+                                         || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator);
+                }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+                for (WarpXParIter pti(*source_pc, lev, info); pti.isValid(); ++pti) {
+
+                    auto& src_tile = source_pc->ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
+                    if (src_tile.numParticles() == 0) { continue; }
+
+                    const auto GetPosition = GetParticlePosition<PIdx>(pti);
+
+                    // The transform fixes the emitted particles position to the boundary
+                    // and generates the new velocity
+                    auto const transform = SecondaryEmissionTransform{
+                        boundary, geom.ProbLoArray(), geom.ProbHiArray(),
+                        geom.RoundOffLo(), geom.RoundOffHi(), normal_index,
+                        uth, GetPosition, dt, product_pc.getMass(), do_cropping};
+
+                    auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
+                    const auto np_dst = dst_tile.numParticles();
+
+                    // Now add the emitted particles
+                    const auto num_added = filterCopyTransformParticles<1>(
+                        product_pc, dst_tile, src_tile, np_dst, filter, copy, transform);
+                    setNewParticleIDs(dst_tile, np_dst, num_added);
+
+                }
+            }
+
+            if (do_eb) {
+                product_species_to_redistribute.insert(product_species);
+            }
+        }
+
+        m_secondary_emission_buffer->clearParticles(boundary);
+
+    }
+
+    for (int const product_species : product_species_to_redistribute) {
+        GetParticleContainer(product_species).Redistribute();
     }
 }
 

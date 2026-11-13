@@ -1,0 +1,51 @@
+max_step = 3
+
+amr.n_cell = 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 128
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -2.0
+geometry.prob_hi = 2.0  2.0
+
+boundary.field_lo = none pec
+boundary.field_hi = pec pec
+boundary.particle_lo = none absorbing
+boundary.particle_hi = absorbing absorbing
+
+warpx.const_dt = 0.000000075
+warpx.random_seed = 3
+warpx.eb_implicit_function = "-(x**2+y**2+z**2-radius**2)"
+
+my_constants.radius = 0.2
+
+algo.maxwell_solver = none
+algo.field_gathering = momentum-conserving
+algo.particle_shape = 1
+
+particles.species_names = ions electrons
+
+ions.species_type = proton
+ions.injection_style = MultipleParticles
+ions.multiple_particles_pos_x =   0.025   0.0     -0.1    -0.14   1.94     0.1     0.3
+ions.multiple_particles_pos_y =   0.0     0.0      0.0     0.0    0.0      0.0     0.0
+ions.multiple_particles_pos_z =  -0.26   -0.29     0.25   -0.23   0.0     -1.9     1.9
+ions.multiple_particles_ux    =   0.0006  0.00033  0.0005  0.0007 0.0023  -0.00066 0.0004
+ions.multiple_particles_uy    =   0.0     0.0      0.0     0.0    0.0      0.0     0.0
+ions.multiple_particles_uz    =   0.0027  0.0024  -0.0021  0.0019 0.00067 -0.003   0.0025
+ions.multiple_particles_weight =  1.0     1.0      1.0     1.0    1.0      1.0     1.0
+#ions.save_particles_at_eb = 1
+ions.secondary_emission_product_species = electrons
+ions.secondary_emission_yield = 1.0
+ions.secondary_emission_energy_eV = 0.0259
+
+electrons.species_type = electron
+electrons.injection_style = none
+
+diagnostics.diags_names = diag1
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = none
+diag1.format = openpmd

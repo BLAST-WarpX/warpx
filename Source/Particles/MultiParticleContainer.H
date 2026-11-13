@@ -19,6 +19,7 @@
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
 #endif
+#include "Particles/ParticleBoundaryBuffer.H"
 #include "PhysicalParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
@@ -373,6 +374,10 @@ public:
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
 
+    void doSecondaryEmission (amrex::Real cur_time, amrex::Real dt, int finest_level, bool do_eb);
+
+    void InitSecondaryEmissionBoundaryBuffer ();
+
     std::string m_B_ext_particle_s = "none";
     std::string m_E_ext_particle_s = "none";
     // Parser for B_external on the particle
@@ -457,6 +462,12 @@ protected:
     std::vector<bool> m_gather_from_main_grid;
 
     std::vector<PCTypes> species_types;
+
+    bool m_do_secondary_emission = false;
+    std::vector<int> m_secondary_emission_product_species;
+    std::vector<amrex::Real> m_secondary_emission_yield;
+    std::vector<amrex::Real> m_secondary_emission_energy_eV;
+    std::unique_ptr<ParticleBoundaryBuffer> m_secondary_emission_buffer;
 
     template<typename ...Args>
     [[nodiscard]]

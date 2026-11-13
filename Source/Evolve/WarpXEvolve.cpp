@@ -282,7 +282,7 @@ WarpX::Evolve (int numsteps)
 
         mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
-        HandleParticlesAtBoundaries(step, cur_time, num_moved);
+        HandleParticlesAtBoundaries(step, cur_time, dt[0], num_moved);
 
         // Apply particle thermalizer (no-op until implemented)
         if (m_particle_thermalizer.defined()) {
@@ -756,12 +756,13 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
     }
 }
 
-void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved)
+void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, amrex::Real a_dt, int num_moved)
 {
     ExecutePythonCallback("particlescraper");
 
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
+    mypc->doSecondaryEmission(cur_time, a_dt, finest_level, false);
 
     // Without mesh refinement, use a local redistribute when particles can only
     // have moved by a small number of cells; otherwise fall back to a global one.
@@ -771,11 +772,11 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1.)
         const amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> dx = Geom(0).CellSizeArray();
 
-        // Particles cannot travel faster than the speed of light, so c * dt / dx
+        // Particles cannot travel faster than the speed of light, so c * a_dt / dx
         // is a physical upper bound on the number of cells crossed per direction.
         amrex::RealVect max_distance_relative_to_grid;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            max_distance_relative_to_grid[d] = PhysConst::c * dt[0] / dx[d];
+            max_distance_relative_to_grid[d] = PhysConst::c * a_dt / dx[d];
         }
 
         // Moving window: particles can additionally move by the number of cells
@@ -798,7 +799,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         const amrex::RealVect v_galilean = amrex::RealVect::TheZeroVector();
 #endif
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * dt[0] / dx[d];
+            max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * a_dt / dx[d];
         }
 
         // Convert to an integer number of cells (rounding up), per direction.
@@ -832,6 +833,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
+        mypc->doSecondaryEmission(cur_time, a_dt, finest_level, true);
         if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
             // If particles are simply absorbed, no need for a full Redistribute.
             // Instead: simply delete the absorbed particles

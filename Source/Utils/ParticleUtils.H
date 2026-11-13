@@ -227,6 +227,48 @@ namespace ParticleUtils {
         }
     }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void transform_momentum_to_curvilinear (
+        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+        [[maybe_unused]] amrex::ParticleReal& uz,
+        amrex::ParticleReal const theta,
+        [[maybe_unused]] amrex::ParticleReal const phi)
+    {
+        amrex::ParticleReal const ux_save = ux;
+        amrex::ParticleReal const uy_save = uy;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        ux = ux_save*std::cos(theta) + uy_save*std::sin(theta);
+        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const uz_save = uz;
+        ux = +ux_save*std::cos(theta)*std::cos(phi) + uy_save*std::sin(theta)*std::cos(phi) + uz_save*std::sin(phi);
+        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
+        uz = -ux_save*std::cos(theta)*std::sin(phi) - uy_save*std::sin(theta)*std::sin(phi) + uz_save*std::cos(phi);
+#endif
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void transform_momentum_to_cartesian (
+        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+        [[maybe_unused]] amrex::ParticleReal& uz,
+        amrex::ParticleReal const theta,
+        [[maybe_unused]] amrex::ParticleReal const phi)
+    {
+        amrex::ParticleReal const ux_save = ux;
+        amrex::ParticleReal const uy_save = uy;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        ux = ux_save*std::cos(theta) - uy_save*std::sin(theta);
+        uy = ux_save*std::sin(theta) + uy_save*std::cos(theta);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const uz_save = uz;
+        ux = +ux_save*std::cos(theta)*std::cos(phi) - uy_save*std::sin(theta) - uz_save*std::cos(theta)*std::sin(phi);
+        uy = +ux_save*std::sin(theta)*std::cos(phi) + uy_save*std::cos(theta) - uz_save*std::sin(theta)*std::sin(phi);
+        uz = +ux_save*std::sin(phi) + uz_save*std::cos(phi);
+#endif
+    }
+#endif
+
     /**
      * \brief Generate a random angle with isotropic or anisotropic distribution.
      *
@@ -343,9 +385,10 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
+    template <typename T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void crop_at_boundary(double & x1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+    void crop_at_boundary(T & x1,
+                          T xmin, T xmax, amrex::GpuArray<bool,2> const& do_cropping) {
         if (do_cropping[0] && x1 < xmin) {
             x1 = xmin;
         }
@@ -361,17 +404,18 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
+    template <typename T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void crop_at_boundary(double x0, double z0,
-                          double & x1, double & z1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+    void crop_at_boundary(T x0, T z0,
+                          T & x1, T & z1,
+                          T xmin, T xmax, amrex::GpuArray<bool,2> const& do_cropping) {
         if (do_cropping[0] && x1 < xmin) {
-            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            T const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             z1 = z0 + fx*(z1 - z0);
         }
         else if (do_cropping[1] && x1 > xmax) {
-            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            T const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             z1 = z0 + fx*(z1 - z0);
         }
@@ -384,18 +428,19 @@ namespace ParticleUtils {
      * \param[in] xmax The upper boundary of the domain in grid units
      * \param[in] do_cropping Whether to crop at each of the boundaries
      */
+    template <typename T>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void crop_at_boundary(double x0, double y0, double z0,
-                          double & x1, double & y1, double & z1,
-                          double xmin, double xmax, amrex::GpuArray<bool,2> const& do_cropping) {
+    void crop_at_boundary(T x0, T y0, T z0,
+                          T & x1, T & y1, T & z1,
+                          T xmin, T xmax, amrex::GpuArray<bool,2> const& do_cropping) {
         if (do_cropping[0] && x1 < xmin) {
-            double const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
+            T const fx = ((x0 - x1) != 0. ? (x0 - xmin)/(x0 - x1) : 0.);
             x1 = xmin;
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);
         }
         else if (do_cropping[1] && x1 > xmax) {
-            double const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
+            T const fx = ((x0 - x1) != 0. ? (xmax - x0)/(x1 - x0) : 0.);
             x1 = xmax;
             y1 = y0 + fx*(y1 - y0);
             z1 = z0 + fx*(z1 - z0);

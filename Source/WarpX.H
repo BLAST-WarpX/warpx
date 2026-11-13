@@ -677,9 +677,10 @@ public:
      *
      * @param step current step
      * @param cur_time current time
+     * @param a_dt time step size
      * @param num_moved number of cells the moving window moved
      */
-    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
+    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, amrex::Real a_dt, int num_moved);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
