@@ -22,6 +22,7 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
+#include <cmath>
 #include <functional>
 #include <string>
 
@@ -96,7 +97,9 @@ struct InjectorDensityFromFile
 #if (AMREX_SPACEDIM < 3)
         amrex::ignore_unused(x,y,z);
 #endif
-#if (AMREX_SPACEDIM == 1)
+#if defined(WARPX_DIM_RSPHERE)
+        return m_external_field_view(amrex::RealVect{std::sqrt(x*x+y*y+z*z)});
+#elif (AMREX_SPACEDIM == 1)
         return m_external_field_view(amrex::RealVect{z});
 #elif defined(WARPX_DIM_RZ)
         return m_external_field_view(amrex::RealVect{std::sqrt(x*x+y*y),z});
