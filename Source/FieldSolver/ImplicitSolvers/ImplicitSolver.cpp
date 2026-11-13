@@ -337,7 +337,8 @@ void ImplicitSolver::ApplyMassMatrices (
     const ablastr::fields::MultiLevelVectorField* a_in_ref,
     const ablastr::fields::MultiLevelVectorField* a_baseline,
     const amrex::Real a_scale,
-    const bool a_zero_out_first )
+    const bool a_zero_out_first,
+    amrex::IntVect const& a_ngrow )
 {
     BL_PROFILE("ImplicitSolver::ApplyMassMatrices()");
     using namespace amrex::literals;
@@ -362,6 +363,22 @@ void ImplicitSolver::ApplyMassMatrices (
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
         ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
+
+        // The loops below write a_out and read the mass matrices directly at
+        // (i,j,k) over the valid region grown by a_ngrow, so both must hold
+        // that many guard cells.
+        for (int a = 0; a < 3; ++a) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                a_out[lev][a]->nGrowVect().allGE(a_ngrow),
+                "ImplicitSolver::ApplyMassMatrices: a_out has fewer guard cells "
+                "than the requested a_ngrow.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                SX[a]->nGrowVect().allGE(a_ngrow) &&
+                SY[a]->nGrowVect().allGE(a_ngrow) &&
+                SZ[a]->nGrowVect().allGE(a_ngrow),
+                "ImplicitSolver::ApplyMassMatrices: the mass matrices have fewer "
+                "guard cells than the requested a_ngrow.");
+        }
 
         if (a_zero_out_first) {
             a_out[lev][0]->setVal(0.0);
@@ -430,15 +447,13 @@ void ImplicitSolver::ApplyMassMatrices (
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
-            // The outer loop below reads Sxx/Sxy/Sxz (etc.) directly at (i,j,k),
-            // so it must stay within the mass matrices' own ghost region - grow
-            // by the min of the input's and the mass matrices' ghost widths.
+            // Region of a_out to fill: the valid region plus a_ngrow guard cells
             amrex::Box outbx = amrex::convert(mfi.validbox(),a_out[lev][0]->ixType());
             amrex::Box outby = amrex::convert(mfi.validbox(),a_out[lev][1]->ixType());
             amrex::Box outbz = amrex::convert(mfi.validbox(),a_out[lev][2]->ixType());
-            outbx.grow(amrex::elemwiseMin(a_out[lev][0]->nGrowVect(), SX[0]->nGrowVect()));
-            outby.grow(amrex::elemwiseMin(a_out[lev][1]->nGrowVect(), SY[1]->nGrowVect()));
-            outbz.grow(amrex::elemwiseMin(a_out[lev][2]->nGrowVect(), SZ[2]->nGrowVect()));
+            outbx.grow(a_ngrow);
+            outby.grow(a_ngrow);
+            outbz.grow(a_ngrow);
 
             // The inner stencil reads are bounded by the input field's own
             // (potentially wider) ghost region, which holds correct
@@ -667,7 +682,8 @@ void ImplicitSolver::ApplyMassMatrices (
 
 void ImplicitSolver::AssertMassMatricesStencilNotClipped (
     const ablastr::fields::MultiLevelVectorField& a_out,
-    const ablastr::fields::MultiLevelVectorField& a_in ) const
+    const ablastr::fields::MultiLevelVectorField& a_in,
+    amrex::IntVect const& a_ngrow ) const
 {
     // Number of components of the mass matrix S_ab, which maps a_in[b] to a_out[a]
     const amrex::IntVect ncomp[3][3] = {{m_ncomp_xx, m_ncomp_xy, m_ncomp_xz},
@@ -681,7 +697,9 @@ void ImplicitSolver::AssertMassMatricesStencilNotClipped (
     for (int lev = 0; lev < static_cast<int>(a_out.size()); ++lev) {
         for (int a = 0; a < 3; ++a) {
             const amrex::IntVect out_nodal = a_out[lev][a]->ixType().toIntVect();
-            const amrex::Box outb = amrex::convert(validbox, a_out[lev][a]->ixType());
+            // Same region of a_out as ApplyMassMatrices fills
+            amrex::Box outb = amrex::convert(validbox, a_out[lev][a]->ixType());
+            outb.grow(a_ngrow);
             for (int b = 0; b < 3; ++b) {
                 const amrex::IntVect in_nodal = a_in[lev][b]->ixType().toIntVect();
                 amrex::Box in_fullb = amrex::convert(validbox, a_in[lev][b]->ixType());
@@ -719,13 +737,19 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
     const ablastr::fields::MultiLevelVectorField J0_ml =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp_non_suborbit, finest_level);
 
+    // Fill all guard cells of J, as particle deposition does: the mass
+    // matrices hold the particles' contributions there, and SyncCurrentAndRho()
+    // folds them into the neighboring valid cells afterwards.
+    const amrex::IntVect ngJ = J_ml[0][0]->nGrowVect();
+
     ApplyMassMatrices(
         /* a_out           = */ J_ml,
         /* a_in            = */ E_ml,
         /* a_in_ref        = */ &E0_ml,
         /* a_baseline      = */ &J0_ml,
         /* a_scale         = */ 1.0_rt,
-        /* a_zero_out_first = */ a_J_from_MM_only);
+        /* a_zero_out_first = */ a_J_from_MM_only,
+        /* a_ngrow         = */ ngJ);
 }
 
 

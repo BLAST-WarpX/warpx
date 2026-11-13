@@ -53,9 +53,8 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     // output:
     //  - the final curl reads chi curl(Z) at i..i+1, so that intermediate is
     //    needed one cell beyond the valid region;
-    //  - the mass matrix gather reaches half_width cells, and
-    //    ApplyMassMatrices() silently clamps it to the guard region of its
-    //    input, so curl(Z) must be valid that much further out again;
+    //  - the mass matrix gather reaches half_width cells, so curl(Z) must be
+    //    valid that much further out again;
     //  - curl(Z) reads Z at i-1..i, so Z is needed one cell beyond that;
     //  - independently, the direct nabla^4 stencil reads Z at i-2..i+2.
     const amrex::IntVect mm_half_width = m_ops->MassMatricesStencilHalfWidth();
@@ -88,22 +87,6 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     m_chidA_x.define(Efield[0]->boxArray(), Efield[0]->DistributionMap(), 1, chidA_ng);
     m_chidA_y.define(Efield[1]->boxArray(), Efield[1]->DistributionMap(), 1, chidA_ng);
     m_chidA_z.define(Efield[2]->boxArray(), Efield[2]->DistributionMap(), 1, chidA_ng);
-
-    // ApplyMassMatrices() only fills as many guard cells of its output as the
-    // mass matrices themselves hold valid data for, so those have to cover
-    // the one cell that the final curl reads.
-    const ablastr::fields::VectorField SX =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
-    const ablastr::fields::VectorField SY =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
-    const ablastr::fields::VectorField SZ =
-        warpx_ptr->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        SX[0]->nGrowVect().allGE(chidA_ng) &&
-        SY[1]->nGrowVect().allGE(chidA_ng) &&
-        SZ[2]->nGrowVect().allGE(chidA_ng),
-        "The semi-implicit Darwin solver requires at least one guard cell on the "
-        "mass matrices (i.e. on the current density).");
 
     m_is_defined = true;
 }
@@ -188,14 +171,14 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     );
 
     // Calculate chi dA (the scaled mass matrices applied to dA) and write into
-    // chidA. ApplyScaledMassMatrices() accumulates into its output and fills as
-    // many of its guard cells as it has (one, here - just what the final curl
-    // reads), so clear it first including guard cells.
+    // chidA, out into its full guard region (one cell - just what the final
+    // curl reads). ApplyScaledMassMatrices() accumulates into its output, so
+    // clear it first including guard cells.
     for (int ii = 0; ii < 3; ii++)
     {
         chidA[lev][ii]->setVal(0);
     }
-    m_ops->ApplyScaledMassMatrices(chidA, dA);
+    m_ops->ApplyScaledMassMatrices(chidA, dA, m_chidA_x.nGrowVect());
 
     // Reuse lapZ as a temporary storage location for curl(chi curl(Z))
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
