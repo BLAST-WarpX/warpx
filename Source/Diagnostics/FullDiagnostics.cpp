@@ -53,6 +53,20 @@
 using namespace amrex::literals;
 using warpx::fields::FieldType;
 
+namespace
+{
+#ifdef WARPX_DIM_RZ
+    /** Number of components of a multi-mode RZ field: the real part of mode 0, then the real
+     *  and imaginary parts of each higher mode. Same layout as WarpX::ncomps, which is only set
+     *  when the fields are allocated, after the diagnostics read their parameters.
+     */
+    int RZModesNComp ()
+    {
+        return 2 * WarpX::n_rz_azimuthal_modes - 1;
+    }
+#endif
+}
+
 FullDiagnostics::FullDiagnostics (int i, const std::string& name, DiagTypes diag_type):
     Diagnostics{i, name, diag_type},
     m_solver_deposits_current{
@@ -638,20 +652,16 @@ FullDiagnostics::AddRZModeNamesToDiags ()
 #ifdef WARPX_DIM_RZ
     if (!m_dump_rz_modes) { return; }
 
-    const int ncomp_multimodefab = 2 * WarpX::n_rz_azimuthal_modes - 1;
+    const int ncomp_multimodefab = RZModesNComp();
 
     const bool divE_requested = utils::algorithms::is_in(m_varnames_fields, "divE");
     const bool rho_requested = utils::algorithms::is_in(m_varnames_fields, "rho");
     const std::array<std::string, 3> coord {"r", "theta", "z"};
 
-    for (int dim = 0; dim < 3; ++dim) {
-        AddRZModesToOutputNames(std::string("E") + coord[dim], ncomp_multimodefab);
-    }
-    for (int dim = 0; dim < 3; ++dim) {
-        AddRZModesToOutputNames(std::string("B") + coord[dim], ncomp_multimodefab);
-    }
-    for (int dim = 0; dim < 3; ++dim) {
-        AddRZModesToOutputNames(std::string("J") + coord[dim], ncomp_multimodefab);
+    for (auto const & field : {"E", "B", "J"}) {
+        for (auto const & dir : coord) {
+            AddRZModesToOutputNames(field + dir, ncomp_multimodefab);
+        }
     }
     if (divE_requested) {
         AddRZModesToOutputNames(std::string("divE"), ncomp_multimodefab);
@@ -671,8 +681,10 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     if (!m_dump_rz_modes) { return; }
 
     auto & warpx = WarpX::GetInstance();
-    const int ncomp_multimodefab = warpx.m_fields.get(FieldType::Efield_aux, Direction::r, 0)->nComp();
-    // Make sure all multifabs have the same number of components
+    // Same number of components and same requested fields as the names added in
+    // AddRZModeNamesToDiags
+    const int ncomp_multimodefab = RZModesNComp();
+    // Make sure all multifabs have that number of components
     for (int dim=0; dim<3; dim++){
         AMREX_ALWAYS_ASSERT(
             warpx.m_fields.get(FieldType::Efield_aux, Direction{dim}, lev)->nComp() == ncomp_multimodefab );
@@ -682,15 +694,9 @@ FullDiagnostics::AddRZModesToDiags (int lev)
             warpx.m_fields.get(FieldType::current_fp, Direction{dim}, lev)->nComp() == ncomp_multimodefab );
     }
 
-    // Check if divE is requested
-    // If so, all components will be written out
-    const bool divE_requested = std::any_of(
-        std::begin(m_varnames),
-        std::end(m_varnames),
-        [](const auto& varname) { return varname == "divE"; });
-
-    // If rho is requested, all components will be written out
-    const bool rho_requested = utils::algorithms::is_in( m_varnames, "rho" );
+    // If divE or rho are requested, all their modes will be written out
+    const bool divE_requested = utils::algorithms::is_in(m_varnames_fields, "divE");
+    const bool rho_requested = utils::algorithms::is_in(m_varnames_fields, "rho");
 
     // Boolean flag for whether the current density should be deposited before
     // diagnostic output
@@ -707,7 +713,7 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     if (rho_requested) {
         n_new_fields += 1;
     }
-    m_all_field_functors[lev].reserve( m_all_field_functors[0].size() + n_new_fields );
+    m_all_field_functors[lev].reserve( m_all_field_functors[lev].size() + n_new_fields );
     // E
     for (int dim=0; dim<3; dim++){
         // 3 components, r theta z
@@ -744,8 +750,8 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     // and check that it corresponds to the number of components in m_varnames
     // and m_mf_output
     int ncomp_from_src = 0;
-    for (int i=0; i<m_all_field_functors[0].size(); i++){
-        ncomp_from_src += m_all_field_functors[lev][i]->nComp();
+    for (auto const & functor : m_all_field_functors[lev]){
+        ncomp_from_src += functor->nComp();
     }
     AMREX_ALWAYS_ASSERT( ncomp_from_src == m_varnames.size() );
 #else

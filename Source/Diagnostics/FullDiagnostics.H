@@ -71,7 +71,10 @@ private:
      */
     void AddRZModesToOutputNames (const std::string& field, int ncomp);
 
-    /** Append diagnostic names for all requested cylindrical modes. */
+    /** Append diagnostic names for all requested cylindrical modes.
+     * Called once, after the requested fields are read. The names must be in the same order
+     * as the functors added in AddRZModesToDiags.
+     */
     void AddRZModeNamesToDiags ();
 
     /** Define the cell-centered multifab m_mf_output depending on user-defined
