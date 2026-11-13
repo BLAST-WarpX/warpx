@@ -409,17 +409,16 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // This function is called multiple times, for different values of `lev`
     // but the `varnames` need only be updated once.
 
-    const bool update_varnames = (lev==0);
-    if (update_varnames) {
-        m_varnames.clear();
-        const auto n_rz = ncomp * static_cast<int>(m_varnames.size());
-        m_varnames.reserve(n_rz);
-    }
-
-    // Add functors for average particle data for each species
     const auto nvar = static_cast<int>(m_varnames_fields.size());
     const auto nspec = static_cast<int>(m_pfield_species.size());
     const auto ntot = static_cast<int>(nvar + m_pfield_varnames.size() * nspec);
+
+    const bool update_varnames = (lev==0);
+    if (update_varnames) {
+        m_varnames.clear();
+        // upper bound: at most ncomp names per field
+        m_varnames.reserve(static_cast<std::size_t>(ncomp) * static_cast<std::size_t>(ntot));
+    }
 
     // Reset field functors
     m_all_field_functors[lev].clear();
@@ -636,8 +635,8 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // and check that it corresponds to the number of components in m_varnames
     // and m_mf_output
     int ncomp_from_src = 0;
-    for (int jj=0; jj<m_all_field_functors[0].size(); jj++){
-        ncomp_from_src += m_all_field_functors[lev][jj]->nComp();
+    for (auto const & functor : m_all_field_functors[lev]){
+        ncomp_from_src += functor->nComp();
     }
 
     AMREX_ALWAYS_ASSERT( ncomp_from_src == m_varnames.size() );
