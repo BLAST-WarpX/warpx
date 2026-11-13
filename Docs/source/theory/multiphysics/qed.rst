@@ -37,7 +37,7 @@ where $e$ is the elementary charge, :math:`E_s`` is the Schwinger field, :math:`
     \mathcal{E} = \sqrt{\sqrt{\mathcal{F}^2 + \mathcal{G}^2} + \mathcal{F}} \\
     \mathcal{H} = \sqrt{\sqrt{\mathcal{F}^2 + \mathcal{G}^2} - \mathcal{F}} \\
 
-:math:`\mathcal{F}` and :math:`\mathcal{G}$` are the invariants of the electromagnetic field and are equal to:
+:math:`\mathcal{F}` and :math:`\mathcal{G}` are the invariants of the electromagnetic field and are equal to:
 
 .. math::
 
