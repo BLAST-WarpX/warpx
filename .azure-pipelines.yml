@@ -98,7 +98,7 @@ jobs:
       set -euo pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
       df -h
-      echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
+      .github/workflows/dependencies/ubuntu_apt.sh
       sudo apt update
       sudo apt install -y ccache curl gcc gfortran git g++ ninja-build \
         openmpi-bin libopenmpi-dev \
@@ -129,14 +129,14 @@ jobs:
       #  #python3 -m pip install --upgrade openpmd-api
       #fi
       if [[ "${WARPX_CMAKE_FLAGS}" == *"-DWarpX_PETSC=ON"* ]]; then
-         git init petsc
-         git -C petsc remote add origin https://gitlab.com/petsc/petsc.git
-         if ! git -C petsc fetch --depth 1 origin release; then
+         git init "$CEI_TMP/petsc"
+         cd "$CEI_TMP/petsc"
+         git remote add origin https://gitlab.com/petsc/petsc.git
+         if ! git fetch --depth 1 origin release; then
             echo "PETSc GitLab fetch failed; trying the official GitHub mirror."
-            git -C petsc fetch --depth 1 https://github.com/petsc/petsc.git release
+            git fetch --depth 1 https://github.com/petsc/petsc.git release
          fi
-         git -C petsc checkout -b release FETCH_HEAD
-         cd petsc
+         git checkout -b release FETCH_HEAD
          ./configure                        \
              --prefix=/usr                  \
              --with-fortran-bindings=no     \
@@ -182,7 +182,8 @@ jobs:
       # TODO select only specific datasets?
       git clone --depth 1 https://github.com/openPMD/openPMD-example-datasets.git
       cd -
-      rm -rf ${CEI_TMP}
+      sudo apt-get clean
+      rm -rf "${CEI_TMP}"
       df -h
     displayName: 'Install dependencies'
 
@@ -234,9 +235,11 @@ jobs:
       # set options
       set -euo pipefail
       # find and print backtrace
-      find build/bin/ -type f -name "Backtrace*" \
-        -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
-        -exec cat {} \;
+      if [[ -d build/bin ]]; then
+        find build/bin/ -type f -name "Backtrace*" \
+          -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \
+          -exec cat {} \;
+      fi
     displayName: 'Logs'
     condition: always()
 

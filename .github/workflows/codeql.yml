@@ -38,6 +38,7 @@ jobs:
       - name: Install Packages (C++)
         if: ${{ matrix.language == 'cpp' }}
         run: |
+          .github/workflows/dependencies/ubuntu_apt.sh
           sudo apt-get update
           sudo apt-get install --yes cmake openmpi-bin libopenmpi-dev libhdf5-openmpi-dev libadios-openmpi-dev ccache
 
