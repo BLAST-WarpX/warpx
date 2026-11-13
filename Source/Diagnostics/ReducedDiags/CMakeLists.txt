@@ -26,6 +26,7 @@ foreach(D IN LISTS WarpX_DIMS)
         ParticleNumber.cpp
         ReducedDiags.cpp
         RhoMaximum.cpp
+        ScalarProbe.cpp
         Timestep.cpp
     )
 endforeach()
