@@ -9,10 +9,12 @@ foreach(D IN LISTS WarpX_DIMS)
         ComputeGradient.cpp
         EvolveB.cpp
         EvolveBPML.cpp
+        CylindricalPML.cpp
         EvolveE.cpp
         EvolveEPML.cpp
         EvolveF.cpp
         EvolveFPML.cpp
+        EvolveGPML.cpp
         EvolveG.cpp
         EvolveECTRho.cpp
         FiniteDifferenceSolver.cpp

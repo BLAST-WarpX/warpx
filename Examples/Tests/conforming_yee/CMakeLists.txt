@@ -1,0 +1,232 @@
+if(3 IN_LIST WarpX_DIMS AND WarpX_PYTHON AND WarpX_PRECISION STREQUAL "DOUBLE")
+    if(WarpX_EB)
+        set(enclosed_reference test_3d_conforming_yee_uniform_enclosed_port)
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_enclosed_port
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --uniform"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_enclosed_port
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --reference ../${enclosed_reference}/enclosed_reference.npz"
+            OFF
+            OFF
+            ${enclosed_reference}
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_grid_aligned_port
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --uniform --expand-aperture --reference ../${enclosed_reference}/enclosed_reference.npz"
+            OFF
+            OFF
+            ${enclosed_reference}
+        )
+        set(antenna_reference test_3d_conforming_yee_uniform_enclosed_antenna)
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_enclosed_antenna
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --uniform --impressed-current"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_enclosed_antenna
+            3
+            1
+            "inputs_base_3d_conforming_enclosed_port.py --impressed-current --reference ../${antenna_reference}/enclosed_reference.npz"
+            OFF
+            OFF
+            ${antenna_reference}
+        )
+        set(collar_material "collar must have vacuum material")
+        set(collar_eb "collar must have active edges and faces")
+        set(collar_port "ports must lie clear of the Yee interface collar")
+        foreach(obstacle IN ITEMS material eb port)
+            add_warpx_test(
+                test_3d_conforming_yee_invalid_collar_${obstacle}
+                3
+                1
+                "inputs_base_3d_conforming_enclosed_port.py --touch ${obstacle}"
+                OFF
+                OFF
+                OFF
+            )
+            set_tests_properties(test_3d_conforming_yee_invalid_collar_${obstacle}.run
+                PROPERTIES PASS_REGULAR_EXPRESSION "${collar_${obstacle}}")
+        endforeach()
+        set(wall_reference test_3d_conforming_yee_uniform_parent_wall)
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_parent_wall
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --uniform"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_parent_wall
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --reference ../${wall_reference}/wall_reference.npz"
+            OFF
+            OFF
+            ${wall_reference}
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_esirkepov_wall_guard
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --esirkepov"
+            OFF
+            OFF
+            OFF
+        )
+        set_tests_properties(test_3d_conforming_yee_esirkepov_wall_guard.run PROPERTIES
+            PASS_REGULAR_EXPRESSION "A fixed-shape particle source stencil reached a material")
+    endif()
+    foreach(side IN ITEMS lo hi)
+        set(reference test_3d_conforming_yee_uniform_exit_${side})
+        add_warpx_test(
+            test_3d_conforming_yee_uniform_exit_${side}
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --uniform --open-face ${side}"
+            OFF
+            OFF
+            OFF
+        )
+        add_warpx_test(
+            test_3d_conforming_yee_exit_${side}
+            3
+            1
+            "inputs_base_3d_conforming_parent_wall.py --open-face ${side} --reference ../${reference}/wall_reference.npz"
+            OFF
+            OFF
+            ${reference}
+        )
+    endforeach()
+    foreach(layout IN ITEMS box stepped)
+        add_warpx_test(
+            test_3d_conforming_yee_${layout}_pulse
+            3
+            1
+            "inputs_base_3d_conforming_yee.py --layout ${layout}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+    add_warpx_test(
+        test_3d_conforming_yee_fixed_vacuum
+        3
+        1
+        "inputs_base_3d_conforming_yee.py --layout box --fixed-vacuum"
+        OFF
+        OFF
+        OFF
+    )
+    set(invalid_gather "gathering requires the matching fixed-shape current")
+    set(invalid_current "current requires the 3D conforming Yee interface")
+    set(invalid_cleaning "disabled divergence cleaning")
+    foreach(option IN ITEMS gather current cleaning)
+        add_warpx_test(
+            test_3d_conforming_yee_invalid_${option}
+            3
+            1
+            "inputs_base_3d_conforming_yee.py --layout stepped --invalid ${option}"
+            OFF
+            OFF
+            OFF
+        )
+        set_tests_properties(test_3d_conforming_yee_invalid_${option}.run
+            PROPERTIES PASS_REGULAR_EXPRESSION "${invalid_${option}}")
+    endforeach()
+    set(crossing_outward "")
+    set(crossing_inward "--inward")
+    set(crossing_frozen "--frozen")
+    set(crossing_native_source "--native-source")
+    set(crossing_boundary "--boundary")
+    foreach(direction IN ITEMS outward inward frozen boundary native_source)
+        add_warpx_test(
+            test_3d_conforming_yee_crossing_${direction}
+            3
+            1
+            "inputs_base_3d_conforming_yee_crossing.py ${crossing_${direction}}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+    set_tests_properties(test_3d_conforming_yee_crossing_boundary.run
+        PROPERTIES PASS_REGULAR_EXPRESSION "A fixed-shape particle source stencil reached")
+    add_warpx_test(
+        test_3d_conforming_yee_stepped_absorber
+        3
+        1
+        "inputs_base_3d_conforming_yee.py --layout stepped --absorber"
+        OFF
+        OFF
+        OFF
+    )
+    add_warpx_test(
+        test_3d_conforming_yee_stepped_restart
+        3
+        1
+        "inputs_base_3d_conforming_yee.py --layout stepped --absorber --restart ../test_3d_conforming_yee_stepped_absorber"
+        OFF
+        OFF
+        test_3d_conforming_yee_stepped_absorber
+    )
+endif()
+
+# Prescribed currents overlap both x faces of the fine patch.
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_uniform_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_transverse_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 1"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_isotropic_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 2"
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_3d_conforming_yee_straddling_antenna_esirkepov_picmi
+    3
+    1
+    "inputs_base_3d_conforming_yee_straddling_antenna.py --ratio 2 2 2 --esirkepov"
+    OFF
+    OFF
+    OFF
+)

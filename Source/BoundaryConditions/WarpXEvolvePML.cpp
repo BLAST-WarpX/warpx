@@ -74,9 +74,14 @@ WarpX::DampPML (const int lev, PatchType patch_type)
                                    dt[lev], m_fields);
     }
 #endif
+#ifndef WARPX_DIM_RZ
     if (pml[lev]) {
         DampPML_Cartesian (lev, patch_type);
     }
+#else
+    // Cylindrical convolution memories integrate damping within each field push.
+    amrex::ignore_unused(lev, patch_type);
+#endif
 }
 
 void

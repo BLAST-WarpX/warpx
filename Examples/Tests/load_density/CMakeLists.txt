@@ -80,3 +80,23 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag/"   # checksum
     test_rz_load_density_prepare  # dependency
 )
+
+add_warpx_test(
+    test_rz_tiled_radial_volume  # name
+    RZ  # dims
+    1  # nprocs
+    inputs_test_rz_tiled_radial_volume  # inputs
+    "analysis_tiled_radial_volume.py diags/diag1000001"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_refined_axis_deposition_picmi
+    RZ
+    1
+    inputs_test_rz_refined_axis_deposition_picmi.py
+    OFF
+    OFF
+    OFF
+)

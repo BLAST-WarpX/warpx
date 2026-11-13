@@ -1,6 +1,10 @@
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "FlushFormatCheckpoint.H"
 
 #include "BoundaryConditions/PML.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
@@ -75,7 +79,18 @@ FlushFormatCheckpoint::WriteToFile (
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);
 
     WriteWarpXHeader(checkpointname, geom, /*is_checkpoint=*/true);
+    CompositeYeeSurface::WriteCheckpointIdentity(warpx, checkpointname);
 
+#ifdef WARPX_DIM_RZ
+    if (warpx.usesConformingRadialInterface() && ParallelDescriptor::IOProcessor()) {
+        warpx::radial_particles::write_identity(warpx, checkpointname);
+        auto const filename = checkpointname + "/ConformingRadialInterface";
+        std::ofstream marker(filename);
+        marker << "Axisymmetric conforming radial Yee grid, version 1\n";
+        marker.close();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(marker.good(), "Could not save the radial interface type.");
+    }
+#endif
     WriteJobInfo(checkpointname);
 
     for (int lev = 0; lev < nlev; ++lev)

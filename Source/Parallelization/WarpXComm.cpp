@@ -6,19 +6,24 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
+#include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "Filter/BilinearFilter.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
-#include "Particles/MultiParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/average.H>
@@ -28,6 +33,7 @@
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
+#include <AMReX_BCRec.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
 #include <AMReX_BoxArray.H>
@@ -39,6 +45,7 @@
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IndexType.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_Interpolater.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MakeType.H>
 #include <AMReX_MultiFab.H>
@@ -55,6 +62,72 @@ using warpx::fields::FieldType;
 
 namespace
 {
+    // Negative-radius deposits are folded after filtering and the guard-cell
+    // sum. The parent must receive those deposits as well as its valid cells.
+    amrex::IntVect axis_deposit_guards (amrex::MultiFab const& parent,
+                                       amrex::Geometry const& geom)
+    {
+        amrex::IntVect ng(0);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        if (geom.ProbLo(0) == 0._rt) { ng[0] = parent.nGrow(0); }
+#else
+        amrex::ignore_unused(parent, geom);
+#endif
+        return ng;
+    }
+
+    void collect_refined_deposits (amrex::MultiFab& parent, amrex::MultiFab const& source,
+                                   amrex::Geometry const& geom)
+    {
+        auto const ng = axis_deposit_guards(parent, geom);
+        auto const& period = geom.periodicity();
+        int const ncomp = parent.nComp();
+        amrex::MultiFab received(parent.boxArray(), parent.DistributionMap(), ncomp, ng);
+        received.setVal(0.0_rt);
+        received.ParallelAdd(source, 0, 0, ncomp, source.nGrowVect(), ng, period);
+
+        auto const owners = amrex::OwnerMask(received, period);
+        auto const mask = owners->const_arrays();
+        auto const src = received.const_arrays();
+        auto const dst = parent.arrays();
+        int const axis = geom.Domain().smallEnd(0);
+        amrex::ParallelFor(received, ng, ncomp,
+        [=] AMREX_GPU_DEVICE (int b, int i, int j, int k, int n)
+        {
+            // An exterior radial guard has the same transverse owner as the
+            // adjacent axis point. Interior ghosts do not contribute a second
+            // copy when the parent subsequently sums its guard cells.
+            int const im = amrex::max(i, axis);
+            if (mask[b].contains(im,j,k) && mask[b](im,j,k)) {
+                dst[b](i,j,k,n) += src[b](i,j,k,n);
+            }
+        });
+    }
+
+    // In subcycling the parent has already summed its own deposits. Add the
+    // received value to each valid copy and to each axis guard that is folded.
+    void add_subcycled_deposits (amrex::MultiFab& parent, amrex::MultiFab const& received,
+                                 int const dcomp, int const ncomp)
+    {
+        amrex::MultiFab::Add(parent, received, 0, dcomp, ncomp, 0);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        int const ng = received.nGrow(0);
+        if (ng == 0) { return; }
+        for (amrex::MFIter mfi(parent, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            auto bx = mfi.tilebox();
+            if (bx.smallEnd(0) != 0) { continue; }
+            bx.setRange(0, -ng, ng);
+            auto const src = received.const_array(mfi);
+            auto const dst = parent.array(mfi);
+            amrex::ParallelFor(bx, ncomp,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            {
+                dst(i,j,k,dcomp+n) += src(i,j,k,n);
+            });
+        }
+#endif
+    }
+
     /**
      * \brief This function is called if \c warpx.do_current_centering = 1 and
      * it centers the currents from a nodal grid to a staggered grid (Yee) using
@@ -463,21 +536,105 @@ namespace
                 Array4<Real const> const& fy_c = dF[1]->const_array(mfi);
                 Array4<Real const> const& fz_c = dF[2]->const_array(mfi);
 
-                amrex::ParallelFor(Box(fx_aux), Box(fy_aux), Box(fz_aux),
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    // Add the coarse correction after refining the native fine data onto the aux grid.
-                    warpx_interp(j, k, l, fx_aux, fx_fp, fx_c, Fx_stag, refinement_ratio);
-                },
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    warpx_interp(j, k, l, fy_aux, fy_fp, fy_c, Fy_stag, refinement_ratio);
-                },
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    warpx_interp(j, k, l, fz_aux, fz_fp, fz_c, Fz_stag, refinement_ratio);
-                });
+                int const components = field_aux[lev][0]->nComp();
+                amrex::ParallelFor(
+                    Box(fx_aux), Box(fy_aux), Box(fz_aux),
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        // Add the coarse correction after refining the native fine data onto the
+                        // aux grid.
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fx_aux, fx_fp, fx_c, Fx_stag, refinement_ratio,
+                                         component);
+                        }
+                    },
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fy_aux, fy_fp, fy_c, Fy_stag, refinement_ratio,
+                                         component);
+                        }
+                    },
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fz_aux, fz_fp, fz_c, Fz_stag, refinement_ratio,
+                                         component);
+                        }
+                    });
             }
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+            if (field_cp_type == FieldType::Bfield_cp &&
+                (EB::enabled() || WarpX::GetInstance().HasCurrentControlledPorts()) &&
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+                WarpX::grid_type == GridType::Staggered) {
+                // Interpolating face components independently introduces
+                // magnetic divergence when the coarse correction varies near an
+                // EB or PML. Interpolate the valid faces together, preserving
+                // the coarse flux.
+                auto const& warpx = WarpX::GetInstance();
+                int const components = field_aux[lev][0]->nComp();
+                Vector<Array<BCRec, AMREX_SPACEDIM>> const boundary_conditions(
+                    components);
+                // FaceDivFree supports only ratios 2 and 4 in each direction.
+                // FaceLinear copies a coarse face to its subfaces and interpolates
+                // in the normal direction. Each fine cell then inherits the coarse
+                // divergence, also along directions with unit refinement.
+                amrex::Interpolater* face_interp = &amrex::face_divfree_interp;
+                if (std::any_of(refinement_ratio.begin(), refinement_ratio.end(),
+                                [](int r) { return r != 2 && r != 4; })) {
+                    face_interp = &amrex::face_linear_interp;
+                }
+                Array<IArrayBox*, AMREX_SPACEDIM> const solve_mask{};
+                for (MFIter mfi(*field_aux[lev][0]); mfi.isValid(); ++mfi) {
+                    Array<FArrayBox*, AMREX_SPACEDIM> coarse_faces{};
+                    Array<FArrayBox*, AMREX_SPACEDIM> fine_faces{};
+                    for (int direction = 0; direction < AMREX_SPACEDIM;
+                         ++direction) {
+                        int const component =
+                            AMREX_SPACEDIM == 2 && direction == 1 ? 2
+                                                                  : direction;
+                        coarse_faces[direction] = &(*dF[component])[mfi];
+                        fine_faces[direction] =
+                            &(*field_aux[lev][component])[mfi];
+                    }
+                    Box const cells = amrex::enclosedCells(mfi.validbox());
+                    face_interp->interp_arr(
+                        coarse_faces, 0, fine_faces, 0, components, cells,
+                        refinement_ratio, solve_mask, warpx.Geom(lev - 1),
+                        warpx.Geom(lev), boundary_conditions, 0, 0,
+                        amrex::RunOn::Gpu);
+                    for (int direction = 0; direction < AMREX_SPACEDIM;
+                         ++direction) {
+                        int const component =
+                            AMREX_SPACEDIM == 2 && direction == 1 ? 2
+                                                                  : direction;
+                        auto const values =
+                            field_aux[lev][component]->array(mfi);
+                        auto const fine =
+                            field_fp[lev][component]->const_array(mfi);
+                        Box const faces = amrex::convert(
+                            cells, field_aux[lev][component]->ixType());
+                        amrex::ParallelFor(
+                            faces, components,
+                            [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                                values(i, j, k, n) += fine(i, j, k, n);
+                            });
+                    }
+                }
+                // The face interpolation replaces valid values after the
+                // component-wise interpolation filled the auxiliary ghosts.
+                // Refresh shared faces and ghosts before a contour or gather
+                // reads values from a neighboring box.
+                for (int direction = 0; direction < AMREX_SPACEDIM;
+                     ++direction) {
+                    int const component =
+                        AMREX_SPACEDIM == 2 && direction == 1 ? 2 : direction;
+                    ablastr::utils::communication::FillBoundary(
+                        *field_aux[lev][component], ng_src,
+                        WarpX::do_single_precision_comms,
+                        warpx.Geom(lev).periodicity(), true);
+                }
+            }
+#endif
         }
         else // electrostatic
         {
@@ -609,12 +766,12 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
     // Refined levels use the low-order coarse/fine interpolation path for both B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {
+        amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         BoxArray const& nba = Bfield_aux[lev][0]->boxArray();
-        BoxArray const& cnba = amrex::coarsen(nba,2);
+        BoxArray const& cnba = amrex::coarsen(nba, refinement_ratio);
         DistributionMapping const& dm = Bfield_aux[lev][0]->DistributionMap();
         amrex::Periodicity const& cperiod = Geom(lev-1).periodicity();
 
-        amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         amrex::IntVect const& ng_src = guard_cells.ng_FieldGather;
 
         // Before reading aux[lev-1] guard cells in the coarse/fine interpolation below,
@@ -653,6 +810,26 @@ WarpX::UpdateAuxiliaryDataSameType ()
     // and MultiFab::Copy detects that and does nothing.
     CopyLevelZeroAuxiliaryData(m_fields, Efield_aux, Efield_fp, FieldType::Efield_avg_fp, ng_src);
     CopyLevelZeroAuxiliaryData(m_fields, Bfield_aux, Bfield_fp, FieldType::Bfield_avg_fp, ng_src);
+
+#ifdef WARPX_DIM_RZ
+    if (m_conforming_radial_interface) {
+        // The physical fine patch already carries the exterior field through
+        // the shared Yee edge. Its current-free interface is outside the particle stencil.
+        for (int d = 0; d < 3; ++d) {
+            MultiFab::Copy(*Efield_aux[1][d], *Efield_fp[1][d], 0, 0, 1,
+                           Efield_aux[1][d]->nGrowVect());
+            MultiFab::Copy(*Bfield_aux[1][d], *Bfield_fp[1][d], 0, 0, 1,
+                           Bfield_aux[1][d]->nGrowVect());
+        }
+        FillRadialInterfaceGatherGuards();
+        warpx::radial_particles::update_gather(*this);
+        return;
+    }
+#endif
+    if (m_composite_yee_surface) {
+        m_composite_yee_surface->UpdateGatherFields();
+        return;
+    }
 
     // Refined levels add the coarse-patch correction through the same helper for B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
@@ -1247,24 +1424,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
                 // On a coarse level, the data in mf_comm comes from the
                 // coarse patch of the fine level. They are unfiltered and uncommunicated.
                 // We need to add it to the fine patch of the current level.
-                MultiFab fine_lev_cp(J_fp[lev][Direction{idim}]->boxArray(),
-                                     J_fp[lev][Direction{idim}]->DistributionMap(),
-                                     ncomp, 0);
-                fine_lev_cp.setVal(0.0);
-                fine_lev_cp.ParallelAdd(*mf_comm, 0, 0, ncomp, mf_comm->nGrowVect(),
-                                        IntVect(0), period);
-                // We now need to create a mask to fix the double counting.
-                auto owner_mask = amrex::OwnerMask(fine_lev_cp, period);
-                auto const& mma = owner_mask->const_arrays();
-                auto const& sma = fine_lev_cp.const_arrays();
-                auto const& dma = J_fp[lev][Direction{idim}]->arrays();
-                amrex::ParallelFor(fine_lev_cp, IntVect(0), ncomp,
-                [=] AMREX_GPU_DEVICE (int bno, int i, int j, int k, int n)
-                {
-                    if (mma[bno](i,j,k) && sma[bno](i,j,k,n) != 0.0_rt) {
-                        dma[bno](i,j,k,n) += sma[bno](i,j,k,n);
-                    }
-                });
+                collect_refined_deposits(*J_fp[lev][Direction{idim}], *mf_comm, Geom(lev));
                 // Now it's safe to apply filter and sumboundary on J_cp
                 ablastr::fields::MultiLevelVectorField const& J_cp = m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch);
                 if (use_filter)
@@ -1378,29 +1538,10 @@ WarpX::SyncRho (
     {
         if (lev < finest_level)
         {
-            auto const& period = Geom(lev).periodicity();
-
             // On a coarse level, the data in mf_comm comes from the
             // coarse patch of the fine level. They are unfiltered and uncommunicated.
             // We need to add it to the fine patch of the current level.
-            MultiFab fine_lev_cp(charge_fp[lev]->boxArray(),
-                                 charge_fp[lev]->DistributionMap(),
-                                 ncomp, 0);
-            fine_lev_cp.setVal(0.0);
-            fine_lev_cp.ParallelAdd(*mf_comm, 0, 0, ncomp, mf_comm->nGrowVect(),
-                                    IntVect(0), period);
-            // We now need to create a mask to fix the double counting.
-            auto owner_mask = amrex::OwnerMask(fine_lev_cp, period);
-            auto const& mma = owner_mask->const_arrays();
-            auto const& sma = fine_lev_cp.const_arrays();
-            auto const& dma = charge_fp[lev]->arrays();
-            amrex::ParallelFor(fine_lev_cp, IntVect(0), ncomp,
-            [=] AMREX_GPU_DEVICE (int bno, int i, int j, int k, int n)
-            {
-                if (mma[bno](i,j,k) && sma[bno](i,j,k,n) != 0.0_rt) {
-                    dma[bno](i,j,k,n) += sma[bno](i,j,k,n);
-                }
-            });
+            collect_refined_deposits(*charge_fp[lev], *mf_comm, Geom(lev));
             // Now it's safe to apply filter and sumboundary on charge_cp
             ApplyFilterandSumBoundaryRho(lev+1, lev, *charge_cp[lev+1], 0, ncomp);
         }
@@ -1776,8 +1917,9 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
 
         for (int idim=0; idim<3; ++idim)
         {
+            auto const dst_ng = axis_deposit_guards(*J_fp[lev][idim], Geom(lev));
             MultiFab mf(J_fp[lev][idim]->boxArray(),
-                        J_fp[lev][idim]->DistributionMap(), J_fp[lev][idim]->nComp(), 0);
+                        J_fp[lev][idim]->DistributionMap(), J_fp[lev][idim]->nComp(), dst_ng);
             mf.setVal(0.0);
 
             const IntVect ng = J_cp[lev+1][idim]->nGrowVect();
@@ -1794,7 +1936,7 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
                 ablastr::utils::communication::ParallelAdd(
                     mf, *J_buffer[lev+1][idim], 0, 0,
                     J_buffer[lev+1][idim]->nComp(),
-                    ng, amrex::IntVect(0),
+                    ng, dst_ng,
                     do_single_precision_comms, period);
             }
             else if (use_filter) // but no buffer
@@ -1804,7 +1946,7 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
                 ablastr::utils::communication::ParallelAdd(
                     mf, *J_cp[lev+1][idim], 0, 0,
                     J_cp[lev+1][idim]->nComp(),
-                    ng, amrex::IntVect(0),
+                    ng, dst_ng,
                     do_single_precision_comms, period);
             }
             else if (J_buffer[lev+1][idim]) // but no filter
@@ -1816,7 +1958,7 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
                 ablastr::utils::communication::ParallelAdd(
                     mf, *J_buffer[lev+1][idim], 0, 0,
                     J_buffer[lev+1][idim]->nComp(),
-                    ng, amrex::IntVect(0),
+                    ng, dst_ng,
                     do_single_precision_comms, period);
             }
             else // no filter, no buffer
@@ -1824,11 +1966,11 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
                 ablastr::utils::communication::ParallelAdd(
                     mf, *J_cp[lev+1][idim], 0, 0,
                     J_cp[lev+1][idim]->nComp(),
-                    ng, amrex::IntVect(0),
+                    ng, dst_ng,
                     do_single_precision_comms, period);
             }
             SumBoundaryJ(J_cp, lev+1, idim, period);
-            MultiFab::Add(*J_fp[lev][idim], mf, 0, 0, J_fp[lev+1][idim]->nComp(), 0);
+            add_subcycled_deposits(*J_fp[lev][idim], mf, 0, mf.nComp());
         }
     }
 }
@@ -1913,9 +2055,10 @@ void WarpX::AddRhoFromFineLevelandSumBoundary (
     if (lev < finest_level){
 
         const amrex::Periodicity& period = Geom(lev).periodicity();
+        auto const dst_ng = axis_deposit_guards(*charge_fp[lev], Geom(lev));
         MultiFab mf(charge_fp[lev]->boxArray(),
                     charge_fp[lev]->DistributionMap(),
-                    ncomp, 0);
+                    ncomp, dst_ng);
         mf.setVal(0.0);
         IntVect ng = charge_cp[lev+1]->nGrowVect();
         IntVect ng_depos_rho = get_ng_depos_rho();
@@ -1936,7 +2079,7 @@ void WarpX::AddRhoFromFineLevelandSumBoundary (
 
             MultiFab::Add(rhofb, rhofc, 0, 0, ncomp, ng);
 
-            ablastr::utils::communication::ParallelAdd(mf, rhofb, 0, 0, ncomp, ng, IntVect::TheZeroVector(),
+            ablastr::utils::communication::ParallelAdd(mf, rhofb, 0, 0, ncomp, ng, dst_ng,
                                                        WarpX::do_single_precision_comms, period);
             WarpXSumGuardCells( *charge_cp[lev+1], rhofc, period, ng_depos_rho, icomp, ncomp );
         }
@@ -1948,7 +2091,7 @@ void WarpX::AddRhoFromFineLevelandSumBoundary (
             MultiFab rf(charge_cp[lev+1]->boxArray(), charge_cp[lev+1]->DistributionMap(), ncomp, ng);
             bilinear_filter.ApplyStencil(rf, *charge_cp[lev+1], lev+1, icomp, 0, ncomp);
 
-            ablastr::utils::communication::ParallelAdd(mf, rf, 0, 0, ncomp, ng, IntVect::TheZeroVector(),
+            ablastr::utils::communication::ParallelAdd(mf, rf, 0, 0, ncomp, ng, dst_ng,
                                                        WarpX::do_single_precision_comms, period);
             WarpXSumGuardCells( *charge_cp[lev+1], rf, period, ng_depos_rho, icomp, ncomp );
         }
@@ -1962,7 +2105,7 @@ void WarpX::AddRhoFromFineLevelandSumBoundary (
             ablastr::utils::communication::ParallelAdd(mf, *charge_buffer[lev + 1], icomp, 0,
                                                        ncomp,
                                                        charge_buffer[lev + 1]->nGrowVect(),
-                                                       IntVect::TheZeroVector(), WarpX::do_single_precision_comms,
+                                                       dst_ng, WarpX::do_single_precision_comms,
                                                        period);
             WarpXSumGuardCells(*(charge_cp[lev+1]), period, ng_depos_rho, icomp, ncomp);
         }
@@ -1971,10 +2114,10 @@ void WarpX::AddRhoFromFineLevelandSumBoundary (
             ng_depos_rho.min(ng);
             ablastr::utils::communication::ParallelAdd(mf, *charge_cp[lev + 1], icomp, 0, ncomp,
                                                        charge_cp[lev + 1]->nGrowVect(),
-                                                       IntVect::TheZeroVector(), WarpX::do_single_precision_comms,
+                                                       dst_ng, WarpX::do_single_precision_comms,
                                                        period);
             WarpXSumGuardCells(*(charge_cp[lev+1]), period, ng_depos_rho, icomp, ncomp);
         }
-        MultiFab::Add(*charge_fp[lev], mf, 0, icomp, ncomp, 0);
+        add_subcycled_deposits(*charge_fp[lev], mf, icomp, ncomp);
     }
 }

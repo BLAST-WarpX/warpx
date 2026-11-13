@@ -8,7 +8,11 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
@@ -606,6 +610,21 @@ WarpX::OneStep_nosub (
         FinalizeJ(); // Apply boundary conditions and inverse volume scaling to J
     }
 
+#ifdef WARPX_DIM_RZ
+    if (m_conforming_radial_interface) {
+        CheckRadialInterfaceCollar();
+        if (warpx::radial_particles::enabled(m_fields)) {
+            auto current = warpx::radial_particles::deposit(*this, a_dt);
+            if (use_filter) { ApplyFilterJ(current, 1); }
+            SumBoundaryJ(current, 1, Geom(1).periodicity());
+            auto const& j = current[1];
+            FinalizeJOnLevel(1, j[0], j[1], j[2], PatchType::fine);
+            warpx::radial_particles::add_current(*this, j);
+        }
+    }
+#endif
+    if (m_composite_yee_surface) { m_composite_yee_surface->AssembleParticleCurrent(a_dt); }
+
     // At this point, J is up-to-date inside the domain except with Vay deposition,
     // and E and B are up-to-date including enough guard cells for the first
     // step of the field solve.
@@ -648,12 +667,23 @@ WarpX::OneStep_nosub (
         }
     } else {
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/0);
-        EvolveG(0.5_rt * dt[0]);
         FillBoundaryF(guard_cells.ng_FieldSolverF);
         FillBoundaryG(guard_cells.ng_FieldSolverG);
 
+#ifdef WARPX_DIM_RZ
+        if (m_conforming_radial_interface) { ShareRadialInterface(true); }
+#endif
         EvolveB(0.5_rt * dt[0], SubcyclingHalf::FirstHalf, a_cur_time); // We now have B^{n+1/2}
         FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+#ifdef WARPX_DIM_RZ
+        if (m_conforming_radial_interface) {
+            ShareRadialInterface(false);
+        }
+#endif
+
+        // G shares the electric-field time staggering and is advanced with B at n+1/2.
+        EvolveG(dt[0]);
 
         if (m_em_solver_medium == MediumForEM::Vacuum) {
             // vacuum medium
@@ -666,8 +696,11 @@ WarpX::OneStep_nosub (
         }
         FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
+#ifdef WARPX_DIM_RZ
+        if (m_conforming_radial_interface) { ShareRadialInterface(true); }
+#endif
         EvolveF(0.5_rt * dt[0], /*rho_comp=*/1);
-        EvolveG(0.5_rt * dt[0]);
+        FillBoundaryG(guard_cells.ng_FieldSolverG);
         EvolveB(0.5_rt * dt[0], SubcyclingHalf::SecondHalf, a_cur_time + 0.5_rt * dt[0]); // We now have B^{n+1}
 
         if (do_pml) {
@@ -685,6 +718,7 @@ WarpX::OneStep_nosub (
         }
     } // !PSATD
 
+    ApplyCompositeCurrentControlledPorts(a_cur_time + a_dt);
     ExecutePythonCallback("afterEsolve");
 }
 

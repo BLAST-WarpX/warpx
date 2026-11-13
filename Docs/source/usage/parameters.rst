@@ -956,6 +956,107 @@ Setting up the field mesh
     This patch is rectangular, and thus its extent is given here by the coordinates
     of the lower corner (:pp:param:`warpx.fine_tag_lo`) and upper corner (:pp:param:`warpx.fine_tag_hi`).
 
+.. pp:param:: warpx.composite_yee_surface
+    :type: bool
+    :default: 0
+
+    Experimental 3D conforming Yee interface on a closed, static fine patch.
+    Both levels advance their native Maxwell fields at the same timestep. Shared
+    tangential electric edges and normal magnetic fluxes couple the two meshes.
+    Rectangular and stepped patches are supported, including transverse-only
+    refinement. This option requires double precision, a single MPI rank,
+    explicit staggered Yee evolution, energy-conserving gathering and exactly
+    two levels. Divergence cleaning and subcycling must be disabled.
+
+    The fine patch must lie inside the physical domain. The coarse/fine
+    boundary needs a two-parent-cell vacuum collar with active Maxwell edges
+    and faces. Conductors, embedded boundaries and prescribed magnetic ports
+    can lie inside the fine volume or on the exterior parent grid, clear of
+    this collar. Adjacent fine boxes use native fields across their common
+    faces. The physical outer PML remains active on the parent. Restart with
+    the same interface and particle coupling.
+
+.. pp:param:: warpx.composite_yee_fixed_shape_current
+    :type: bool
+    :default: 0
+
+    On the 3D conforming interface, deposit a particle current with the same
+    physical shape across both leaf grids. Supports linear or cubic Esirkepov
+    or Villasenor deposition for kinetic particles with fixed species charge.
+    With Villasenor deposition the projected particle current feeds the native
+    macroscopic and embedded-boundary update on the parent grid. Particles
+    can reach parent conductors or leave through absorbing particle boundaries
+    backed by exterior PML. At these open faces the physical particle shape
+    extends into guard cells on its last push. Other outer boundaries require
+    the particle stencil to remain inside the domain. Esirkepov deposition
+    requires clearance from both material and physical boundaries.
+    With kinetic species, temporary current arrays span the domain at the
+    fine spacing. WarpX adds the projected kinetic current to independent
+    native sources, including current supplied by an ``afterdeposition``
+    callback. Prescribed antenna markers whose current stencil may overlap
+    the interface use the same finest-spacing deposit. Markers farther from
+    the interface retain their native deposition, including its treatment of
+    material and outer boundaries. A vacuum run with no particles or antenna
+    skips the temporary allocation.
+
+.. pp:param:: warpx.composite_yee_fixed_shape_gather
+    :type: bool
+    :default: 0
+
+    Gather particle forces with the same physical support as the fixed-shape
+    current. This requires :pp:param:`warpx.composite_yee_fixed_shape_current`.
+    Fine-spacing force arrays span the full domain in this mode.
+
+.. pp:param:: warpx.conforming_radial_interface
+    :type: ``bool``
+    :default: ``0``
+
+    Join the axisymmetric plasma bore to its radial exterior using the two neighboring
+    magnetic samples and one shared tangential electric field at the common radius.
+    The inner and outer Maxwell grids have the same axial spacing. The radial magnetic
+    differences use the distance between the adjacent sample centers and the cylindrical
+    dual area for the axial Ampere update. Exterior axial PML fields use the same join.
+
+    This experimental option requires explicit staggered Yee evolution, one azimuthal
+    mode, one rank, one regular box per level and a radial refinement ratio of two with
+    axial ratio one. The fine patch must include the axis and span the axial domain.
+    Physical absorbing boundaries use exterior PMLs. The gather and deposition buffers
+    default to zero in this mode and must remain zero. Each species gathers and deposits
+    on its own mesh, with particle fields on the native Yee staggering. Currents and particles may
+    occupy either mesh away from the join. An active particle stencil or a deposited
+    current in its vacuum collar ends the run with a diagnostic. Use the same grid
+    method when restarting a checkpoint.
+
+
+.. pp:param:: warpx.conforming_radial_fixed_shape
+    :type: ``bool``
+    :default: ``0``
+
+    With :pp:param:`warpx.conforming_radial_interface`, a kinetic particle can
+    cross the radial join while keeping its physical shape. WarpX deposits
+    Esirkepov current on a finest-spacing particle grid, sums its guard cells
+    and applies the cylindrical volume factors. On the exterior Maxwell grid,
+    the radial current is the average of the two fine radial fluxes. The axial
+    current uses the annular dual area, including the larger dual cell at the
+    join. The particle force uses the same radial interpolation. The field
+    solve still takes place on the inner and outer Yee meshes.
+
+    The option supports particle shapes one through three, the energy-conserving
+    gather and axial current filtering. An Esirkepov waveform antenna uses the
+    same cylindrical current transfer, including when it spans the radial join.
+    Independently supplied native currents must have zero support in the
+    interface collar.
+    A fixed-shape checkpoint records the particle shape and filter. A checkpoint
+    from the guarded radial interface can enable this option when every trajectory
+    stencil is still contained in the fine bore.
+
+    Charge balance in the geometric Yee dual cells through the axis uses
+    :pp:param:`boundary.verboncoeur_axis_correction` set to ``0`` on both
+    the refined mesh and its uniform reference. This assigns the axial current
+    and charge at :math:`r=0` the dual area :math:`\pi\Delta r^2/4`.
+    The default density correction uses :math:`\pi\Delta r^2/3` at that node.
+
+
 .. pp:param:: warpx.ref_patch_function(x,y,z)
     :type: ``string``
     :optional:
@@ -1159,6 +1260,7 @@ Additional PML parameters
     :default: 10
 
     The depth of the PML, in number of cells.
+    At a mesh-refinement boundary, the depth must span at least one coarse cell in each absorbing direction.
 
 .. pp:param:: do_similar_dm_pml
     :type: ``int``
@@ -1172,7 +1274,38 @@ Additional PML parameters
     :default: 10
 
     The characteristic depth, in number of cells, over which
-    the absorption coefficients of the PML increases.
+    the absorption coefficients of the PML increase.
+    At a mesh-refinement boundary, this depth must span at least one coarse cell in each absorbing direction.
+
+.. pp:param:: warpx.pml_ncell_vect
+    :type: list of integers
+    :optional:
+
+    Set the thickness of a finite-difference PML separately in each mesh direction.
+    Supply one positive cell count per direction. These values override
+    :pp:param:`warpx.pml_ncell`. For example, on an RZ mesh with half the radial spacing
+    and the same axial spacing as a reference mesh, ``8 4`` matches the physical
+    thickness of a four-cell reference absorber in both directions.
+
+.. pp:param:: warpx.pml_delta_vect
+    :type: list of integers
+    :optional:
+
+    Set the damping depth in positive cell counts for each mesh direction. These
+    values override :pp:param:`warpx.pml_delta` for a finite-difference PML.
+    Specify both directional parameters when matching the physical damping profile
+    and thickness of absorbers at different mesh spacings.
+
+.. pp:param:: warpx.pml_match_parent_at_physical_boundary
+    :type: ``bool``
+    :default: ``1``
+
+    For finite-difference mesh refinement, match the coarse-patch PML thickness and
+    damping depth to the parent in directions where every occupied column spans the
+    physical domain. Both coarse solves then use the same absorber at those boundaries.
+    A direction with an internal refinement face uses the fine-patch depth converted to
+    coarse cells. Set this parameter to ``0`` to restart an older checkpoint that stored
+    a coarsened PML at a spanning physical boundary, preserving its layout and damping.
 
 .. pp:param:: warpx.do_pml_in_domain
     :type: ``int``
@@ -1205,17 +1338,26 @@ Additional PML parameters
     :type: ``bool``
 
     Whether to use divergence cleaning for E in the PML region.
-    The value must match :pp:param:`warpx.do_pml_divb_cleaning` (either both false or both true).
+    For the Cartesian PSATD solver, the value must match :pp:param:`warpx.do_pml_divb_cleaning`
+    (either both false or both true); both are turned on by default.
     This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
-    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
+
+    For Cartesian FDTD solvers, this option defaults to the value of
+    :pp:param:`warpx.do_dive_cleaning` and can be set independently to enable or
+    disable electric divergence cleaning in the PML.
 
 .. pp:param:: warpx.do_pml_divb_cleaning
     :type: ``bool``
 
     Whether to use divergence cleaning for B in the PML region.
-    The value must match :pp:param:`warpx.do_pml_dive_cleaning` (either both false or both true).
-    This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
-    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
+    With Cartesian PSATD, this is enabled by default and must match
+    :pp:param:`warpx.do_pml_dive_cleaning`.
+    With Cartesian staggered Yee or CKC, it defaults to false and requires
+    explicit evolution without subcycling. It is independent of regular-grid
+    :pp:param:`warpx.do_divb_cleaning` and electric PML cleaning.
+    FDTD magnetic cleaning advances a split G field and includes its gradient
+    in the magnetic update. It is not implemented for cylindrical PML.
+
 
 .. _running-cpp-parameters-eb:
 
@@ -2875,7 +3017,12 @@ are applied to the grid directly. In particular, these fields can be seen in the
     For some mesh-refinement simulations,
     the external fields are only applied to the parent grid and not the refined patches. In such cases,
     :pp:param:`warpx.maxlevel_extEMfield_init` can be set to 0.
-    In that case, the other levels have external field values of 0.
+    In that case, the external contribution to the fine and coarse patches of
+    the refined levels is initialized to 0. With electromagnetic mesh refinement,
+    their auxiliary fields, which are gathered by particles, still include the
+    interpolated parent field through mesh-refinement substitution.
+    This parameter does not restrict external
+    fields applied directly to particles.
 
 Applied to Particles
 ^^^^^^^^^^^^^^^^^^^^
@@ -4084,6 +4231,26 @@ Maxwell solver: PSATD method
 Maxwell solver: macroscopic media
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+The Cartesian macroscopic solver supports static refined grids with explicit Yee or CKC evolution,
+or theta-implicit Yee evolution,
+synchronized timesteps, and no moving window or dynamic load balancing. Conductivity,
+permittivity, and permeability are initialized independently on every fine and coarse
+patch, including their guard cells, from constants or physical-coordinate expressions.
+Material diagnostics use the fine patch at each level. Checkpoints preserve each patch's
+PML and divergence-cleaning fields so resumed fields agree with uninterrupted evolution.
+The existing vacuum treatment of
+PML cells remains in use; place material interfaces and current sources away from patch
+PMLs. Yee SMR supports staircase embedded boundaries on every fine and coarse patch.
+RZ supports explicit Yee macroscopic evolution, including static refinement.
+Material expressions use ``x=r`` and even scalar parity across the axis.
+
+Theta-implicit SMR uses native AMReX GMRES,
+``implicit_evolve.nonlinear_solver = newton`` and
+``jacobian.pc_type = none``, with mass matrices, filtering, and divergence cleaning
+disabled. Its nonlinear state includes fine-patch, coarse-patch, and exterior-PML
+electric fields. Conductivity is evaluated at the trial field time
+:math:`n+\theta`; ``algo.macroscopic_sigma_method`` selects only the explicit update.
+
 .. pp:param:: algo.macroscopic_sigma_method
     :type: ``string``
     :optional:
@@ -4094,6 +4261,24 @@ Maxwell solver: macroscopic media
     - ``laxwendroff`` is the semi-implicit, second order in time scheme for E-update.
 
     Comparing the two methods, Lax-Wendroff is more prone to developing oscillations and requires a smaller timestep for stability. On the other hand, Backward Euler is more robust but it is first-order accurate in time compared to the second-order Lax-Wendroff method.
+
+.. pp:param:: macroscopic.dive_cleaning_vacuum_patches_only
+    :type: ``bool``
+    :default: 0
+
+    Restrict electric divergence cleaning to entirely vacuum material patches
+    when :pp:param:`algo.em_solver_medium = macroscopic` and
+    :pp:param:`warpx.do_dive_cleaning = 1`.
+    A patch here means a complete fine- or coarse-patch field set at one
+    refinement level, including the material interpolation halo.
+    Its static coefficients must be exactly zero conductivity, vacuum
+    permittivity and vacuum permeability.
+
+    Vacuum patches use the vacuum Maxwell update, including the electric
+    cleaning gradient. Material-bearing patches and their PML skip electric
+    cleaning, because particle charge density does not include conductor or
+    impressed-source charge. Magnetic cleaning is controlled separately.
+    All non-particle charge sources must lie outside the cleaned vacuum patches.
 
 .. pp:param:: macroscopic.sigma/epsilon/mu_function(x,y,z)
     :link_aliases:
@@ -4117,6 +4302,227 @@ Maxwell solver: macroscopic media
     To initialize a constant conductivity, permittivity, and permeability of the
     computational medium, respectively. The default values are the corresponding values
     in vacuum.
+
+.. _running-cpp-parameters-prescribed-current:
+
+Maxwell solver: externally driven currents
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+WarpX provides two distinct, coexisting models for a current waveform supplied by an
+external source:
+
+* The **impressed-current antenna** deposits a local current density in one or more boxes.
+  It is useful when the desired source itself is an antenna or when the complete current
+  path is already divergence-free.  It does not connect two boxes into a circuit.
+* The **paired current-controlled port** requires two terminal surfaces and constrains one
+  global through-current between them.  Use this model to drive a rod, wire, plasma column,
+  or macroscopic conductor between spatially separated terminals.
+
+Both models read a plain-text, two-column waveform (time [s], current [A]) and linearly
+interpolate it.  Sample times must be finite and strictly increasing.  Values at the two
+endpoints are included, and the current is zero outside the tabulated time interval.  In
+2D XZ, port waveform values have units A/m and denote current per unit invariant-y length.
+
+Impressed-current antenna
+"""""""""""""""""""""""""
+
+The box source is implemented by ``PrescribedCurrentParticleContainer`` and deposits
+:math:`\boldsymbol{J}_{\mathrm{ext}} = \mathrm{sign}\,I(t)\hat{\boldsymbol{e}}/A`
+through the standard particle current-deposition path.  Each source cell contains a
+coincident pair with opposite charge weights and opposite velocities.  The currents add,
+while separation of the two charges deposits the external polarization charge required by
+
+.. math::
+
+   \frac{\partial \rho_{\mathrm{ext}}}{\partial t}
+   = -\boldsymbol{\nabla}\!\cdot\boldsymbol{J}_{\mathrm{ext}}.
+
+Consequently a finite open box polarizes at its ends; it is not a through-current port.
+Changing ``drive.sign`` only reverses that box's current vector.  In particular, a second
+box with negative sign does not automatically define a return terminal or cause current to
+flow through the material between the boxes.
+
+The antenna requires ``algo.particle_shape >= 1`` and a charge-conserving deposition,
+``algo.current_deposition = esirkepov`` or ``villasenor``.  It works with explicit and
+theta-implicit Yee Maxwell solves and with vacuum or macroscopic media.  It is rejected by
+Hybrid-PIC: the artificial particles are an external electromagnetic source and must not be
+included in the Hybrid-PIC ion current.
+
+The antenna supports static mesh refinement (SMR) in 2D XZ and 3D with explicit or theta-implicit
+field evolution and no moving window. Antenna regions may span refinement boundaries.
+Each leaf cell intersecting the drive seeds a pair at its center. The weights use the
+physical overlap of the drive with that cell, including fractional cells and the
+annular volume in RZ. This preserves the integrated source of a subcell drive
+in active cells. Embedded particle boundaries remove antenna pairs seeded inside
+a solid. For a drive box that overlaps an embedded electrode, measure the
+deposited current on the active Yee edges to determine how much current reaches
+the aperture.
+The particle shape distributes the cell-averaged source across neighboring grid points. The displacement
+limit uses the finest cell spacing. On restart, all levels are reconstructed from the
+waveform integral at the checkpoint time. RZ supports explicit Yee SMR; its
+cylindrical absorbing layers require exterior vacuum without divergence cleaning.
+1D Z remains unsupported.
+For implicit evolution, waveform integration uses the physical step endpoints,
+independently of the theta evaluation time or nonlinear iteration.
+
+* ``warpx.current_injection`` (`bool`, optional, default: ``0``)
+    Enable the box impressed-current antenna.
+
+* ``warpx.current_injection.type`` (`string`, optional, default: ``antenna``)
+    Source model.  The only accepted value in this namespace is ``antenna``.  Paired
+    terminals use the separate ``warpx.current_controlled_port`` namespace below.
+
+* ``warpx.current_injection.file`` (`string`, optional)
+    Path to a global plain-text waveform file with two columns: ``t [s]`` and ``I [A]``,
+    used by every antenna region that does not specify its own file.  May be omitted only
+    if every region sets ``pair_N.file``.
+
+* ``warpx.current_injection.n_pairs`` (`integer`, optional, default: ``1``)
+    Number of independent antenna boxes.  At least one must be defined.  Here ``pair_N``
+    is an input-schema label for region ``N``; it does not pair circuit terminals.
+
+For each index ``N`` (starting from 0):
+
+* ``warpx.current_injection.pair_N.file`` (`string`, optional)
+    Per-region waveform file, overriding the global ``warpx.current_injection.file``.
+
+* ``warpx.current_injection.pair_N.drive.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`)
+    Bounding box of the antenna region in physical coordinates [m].
+
+* ``warpx.current_injection.pair_N.drive.A`` (`float`)
+    Cross-sectional area of the antenna region [m^2] used to convert current :math:`I(t)`
+    to current density :math:`J = I(t)/A`. In RZ, this parameter is optional and unused
+    for a radial (``dir = 0``) drive: WarpX instead applies the coaxial profile
+    :math:`J_r = I(t)/(2\pi r L_z)`, where :math:`L_z` is the physical axial length of the drive inside the domain,
+    shared by all refinement levels.
+
+* ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
+    Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
+    In RZ these values denote r, theta, and z. Set independently per region. Drive boxes
+    may overlap; every drive retains its own waveform, direction, area, and sign.
+
+* ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
+    Sign of the local antenna current: :math:`J = \mathrm{sign}\, I(t)/A`.  This reverses
+    the current vector only; it has no terminal or return-path semantics.
+
+**PICMI interface (WarpX extension).** The same feature is available from Python/PICMI
+via ``pywarpx.picmi.PrescribedCurrentDrive`` and
+``pywarpx.picmi.PrescribedCurrentInjection``, added to a simulation with
+``Simulation.add_prescribed_current_injection``. See the example
+``Examples/Tests/prescribed_current_injection/inputs_test_3d_prescribed_current_injection_picmi.py``
+and the :ref:`PICMI Python documentation <usage-picmi-parameters>`.
+Set ``particle_shape`` (and a current deposition algorithm) on the simulation, since
+injection uses the particle deposition path.
+Add at most one ``PrescribedCurrentInjection`` object to a simulation and put all antenna
+regions in its ``drives`` list.
+
+Paired current-controlled ports
+"""""""""""""""""""""""""""""""
+
+Each paired port defines two coordinate-aligned terminal surfaces with matching transverse
+bounds and a current waveform.  Positive current flows from terminal 0 to terminal 1.
+Neither terminal has to coincide with a simulation-domain boundary: both can be
+internal, and a terminal called ``ground`` may be placed in surrounding vacuum outside
+the modeled device.  A terminal surface can cut through plasma, a macroscopic material,
+or an embedded-boundary object.
+The perimeter used for the Ampere circulation must remain in field-carrying cells, so an EB
+conductor should be enclosed by, rather than cover, that perimeter.
+
+On every mesh cross-section between a port's two terminals, WarpX projects the magnetic
+circulation to
+
+.. math::
+
+   \oint_{\partial S} \boldsymbol{H}\!\cdot d\boldsymbol{\ell} = I(t),
+   \qquad \boldsymbol{H}=\boldsymbol{B}/\mu.
+
+In vacuum this reduces to :math:`\oint \boldsymbol{B}\cdot d\boldsymbol{\ell}=\mu_0 I(t)`.
+In macroscopic media, the measurement uses the patch's permeability with the same cell
+indexing as the macroscopic Ampere update.
+
+In a fully kinetic Maxwell solve this controls the **total Ampere current** through
+:math:`S`. The total includes particle current, separately impressed antenna current,
+macroscopic conduction current, and displacement current. In a vacuum gap without
+free current, the prescribed current changes the electric flux through the aperture
+and can produce a large voltage. To represent an external lead carrying a known
+current through the gap, supply its waveform and physical cross section separately
+with ``warpx.current_injection``. Measure the free current and the electric field
+integral across the gap when interpreting the terminal voltage.
+In Hybrid-PIC, which omits displacement current, the same constraint controls the combined
+ion and electron-fluid current.  The 3D correction is constructed as a discrete curl, so it
+does not introduce magnetic divergence.  The source is an ideal current constraint; an
+external circuit/power model is not yet coupled to it.  Hybrid-PIC ports cannot currently
+be combined with analytic external current or split external fields because those would
+make the plasma-current target ambiguous.
+
+Current-controlled ports support the Yee and Hybrid-PIC field solvers on a single level,
+Cartesian SMR with explicit or theta-implicit Yee evolution, and RZ SMR with explicit
+Yee evolution and synchronized timesteps. They support
+3D, in-plane x or z current in 2D XZ, and radial or axial current in
+axisymmetric RZ with one azimuthal mode.  Terminal surfaces must currently be
+matching rectangles, disks or annuli for axial RZ current, or cylindrical surfaces for
+radial RZ current.  Coordinates are represented on the nearest compatible field plane.
+Multiple ports are supported when their correction regions are separated by more than one
+grid cell, as in separate coil gaps. Cartesian SMR supports staircase embedded boundaries and
+ports crossing transverse or axial refinement boundaries.
+Ports with two coarse cells of clearance use the contours of each containing patch.
+When the auxiliary and Maxwell fields have the same staggering, the finest containing grid
+also constrains the reconstructed magnetic field used by particles. Incoming parent-grid
+fields therefore contribute to the measured terminal current.
+Crossing ports use a fixed physical contour, interpolating :math:`H=B/\mu` from the
+finest available grid at each quadrature point. A coupled discrete-curl correction
+enforces the requested circulation at the terminals and at the finest axial cell planes
+between them. The contour must remain outside covered EB cells, and crossing ports
+must stay at least one coarse cell inside the global domain boundaries.
+RZ SMR ports require two coarse cells of clearance from refinement boundaries;
+RZ crossing ports and RZ implicit SMR remain unsupported. General curved terminal masks, moving windows,
+dynamic load balancing, and hybrid-staggered grids remain unsupported.
+
+* ``warpx.current_controlled_port`` (`bool`, optional, default: ``0``)
+    Enable paired current-controlled ports.
+
+* ``warpx.current_controlled_port.n_ports`` (`integer`, optional)
+    Number of ports.  When this is present, define port ``N`` under
+    ``warpx.current_controlled_port.port_N`` for indices starting at zero.  When it is
+    omitted, the single-port parameters below retain their original unindexed names.
+
+* ``warpx.current_controlled_port.file`` (`string`)
+    Path to the two-column waveform file.  This one waveform controls both terminals and
+    all intervening cross-sections.
+
+* ``warpx.current_controlled_port.current_scale`` (`float`, optional, default: ``1``)
+    Positive multiplier applied to the waveform.  This lets several ports reuse one file
+    with different current fractions.
+
+* ``warpx.current_controlled_port.direction`` (`integer`: ``0``, ``1``, or ``2``)
+    Axis from terminal 0 to terminal 1.  In 3D, ``0``, ``1``, and ``2`` mean x, y, and z.
+    In 2D XZ, only ``0`` (x) and ``2`` (z) are representable.  In RZ, ``0`` selects radial
+    current through cylindrical terminal surfaces and ``2`` selects axial current through
+    disk or annular terminal surfaces.  Azimuthal current is not a two-terminal surface in
+    an axisymmetric model.
+
+* ``warpx.current_controlled_port.terminal_N.lower_bound`` (`3 floats`)
+* ``warpx.current_controlled_port.terminal_N.upper_bound`` (`3 floats`)
+    Lower and upper physical-coordinate bounds [m] of terminal ``N``, for ``N = 0, 1``.
+    The lower and upper coordinate in ``direction`` must be equal, making a zero-thickness
+    surface; the two terminal positions must differ.  Their transverse bounds must match.
+    The y entries are ignored in 2D XZ and RZ.  For axial RZ current, a radial lower bound
+    of zero defines a disk and a positive lower bound defines an annulus.  For radial RZ
+    current, each terminal radius must be positive and the z bounds define its axial span.
+
+For indexed input, replace the prefix in the four per-port parameters above with
+``warpx.current_controlled_port.port_N``.  Each indexed port may use its own waveform,
+direction, scale, and terminal pair.
+
+**PICMI interface (WarpX extension).** Construct ``pywarpx.picmi.CurrentControlledPort``
+and add each instance with ``Simulation.add_current_controlled_port``.  See
+``Examples/Tests/current_controlled_port/inputs_test_current_controlled_port_picmi.py``.
+After initialization, ``libwarpx.warpx.get_current_controlled_port_statuses()`` returns
+one ``[target, terminal_0, terminal_1]`` current row per port.  The singular status method
+is retained for one-port scripts and returns the first row.
+The antenna and paired port may be enabled together when their combined effect is intended;
+an antenna current that crosses a port contour is part of the total current controlled by
+that port.  Place them in disjoint regions when their effects should be independent.
 
 .. _running-cpp-parameters-hybrid-model:
 
@@ -4876,6 +5282,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, and ``part_per_cell_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    For macroscopic electromagnetic solves, ``sigma``, ``epsilon``, and ``mu`` write the material-property fields used by the solver.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     With :pp:param:`<species_name>.do_temperature_deposition`, the per-direction temperatures ``Tx_<species_name>``, ``Ty_<species_name>`` and ``Tz_<species_name>`` (``Tr_``, ``Tt_`` and ``Tz_`` in RZ and RCYLINDER, ``Tr_``, ``Tt_`` and ``Tp_`` in RSPHERE) are also available, in K.

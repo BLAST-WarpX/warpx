@@ -7,10 +7,12 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "WarpX.H"
+#include "FieldSolver/CompositeYeeSurface.H"
 
 #include "BoundaryConditions/PML.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #if defined(WARPX_USE_FFT)
 #   include "FieldSolver/SpectralSolver/SpectralFieldData.H"
 #   ifdef WARPX_DIM_RZ
@@ -946,29 +948,42 @@ WarpX::PushPSATD (amrex::Real start_time)
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, subcycling_half, start_time);
+        EvolveB(lev, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 
     // Allow execution of Python callback after B-field push
+    if (apply_current_controlled_port) {
+        ApplyCompositeCurrentControlledPorts(start_time + a_dt);
+    }
+    if (m_composite_yee_surface) { m_composite_yee_surface->RestrictMagnetic(); }
     ExecutePythonCallback("afterBpush");
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     ABLASTR_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
+    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time,
+            apply_current_controlled_port);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time);
+        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt,
+                SubcyclingHalf subcycling_half, amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
@@ -987,27 +1002,32 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         } else {
             m_fdtd_solver_cp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         }
     }
 
     amrex::Real const new_time = start_time + a_dt;
     ApplyBfieldBoundary(lev, patch_type, subcycling_half, new_time);
+    if (apply_current_controlled_port) {
+        ApplyCurrentControlledPort(lev, patch_type, new_time);
+    }
 }
 
 
 void
 WarpX::EvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
+    if (m_composite_yee_surface) { m_composite_yee_surface->RememberElectric(); }
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         EvolveE(lev, a_dt, start_time);
     }
 
     // Allow execution of Python callback after E-field push
+    if (m_composite_yee_surface) { m_composite_yee_surface->AdvanceElectric(a_dt); }
     ExecutePythonCallback("afterEpush");
 }
 
@@ -1027,39 +1047,29 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 {
     // Evolve E field in regular cells
     if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_eb_update_E_fp[lev],
-                                        a_dt );
+        m_fdtd_solver_fp[lev]->EvolveE(
+            m_fields, lev, patch_type,
+            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+            GetEBUpdateEFlag(patch_type)[lev], a_dt);
     } else {
-        m_fdtd_solver_cp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_eb_update_E_cp[lev],
-                                        a_dt );
+        m_fdtd_solver_cp[lev]->EvolveE(
+            m_fields, lev, patch_type,
+            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+            GetEBUpdateEFlag(patch_type)[lev], a_dt);
     }
 
     // Evolve E field in PML cells
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_fp(),
-                pml[lev]->GetMultiSigmaBox_fp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_fp(), a_dt, pml_has_particles);
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_cp(),
-                pml[lev]->GetMultiSigmaBox_cp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_cp(), a_dt, pml_has_particles);
         }
     }
 
@@ -1091,7 +1101,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 void
 WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1102,7 +1112,7 @@ WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     EvolveF(lev, PatchType::fine, a_dt, rho_comp);
     if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, rho_comp); }
@@ -1111,23 +1121,39 @@ WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveF()");
 
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
+        auto const& material =
+            *m_macroscopic_properties[lev][patch_type == PatchType::fine ? 0 : 1];
+        if (!material.IsVacuumPatch()) {
+            // Conductivity and impressed sources can create physical charge
+            // that is not present in the particle rho used by this cleaner.
+            if (material.CleanVacuumPatchesOnly()) { return; }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_dive_cleaning,
+                "Electric divergence cleaning with macroscopic media requires vacuum properties "
+                "on cleaned patches. Set macroscopic.dive_cleaning_vacuum_patches_only=1 "
+                "to leave material-bearing patches and their PML uncleaned.");
+        }
+    }
+
     // Evolve F field in regular cells
-    if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
-    } else {
-        m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+    if (do_dive_cleaning) {
+        if (patch_type == PatchType::fine) {
+            m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                            m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
+        } else {
+            m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                            m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+        }
     }
 
     // Evolve F field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml_dive_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
                 m_fields.get(FieldType::pml_F_fp, lev),
@@ -1145,7 +1171,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 void
 WarpX::EvolveG (amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1156,7 +1182,7 @@ WarpX::EvolveG (amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     EvolveG(lev, PatchType::fine, a_dt);
 
@@ -1169,21 +1195,21 @@ WarpX::EvolveG (int lev, amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveG()");
 
     bool const skip_lev0_coarse_patch = true;
 
     // Evolve G field in regular cells
-    if (patch_type == PatchType::fine)
+    if (do_divb_cleaning && patch_type == PatchType::fine)
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
         m_fdtd_solver_fp[lev]->EvolveG(
             m_fields.get(FieldType::G_fp, lev),
             Bfield_fp[lev], a_dt);
     }
-    else // coarse patch
+    else if (do_divb_cleaning) // coarse patch
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
         m_fdtd_solver_cp[lev]->EvolveG(
@@ -1191,15 +1217,26 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
             Bfield_cp_new[lev], a_dt);
     }
 
-    // TODO Evolution in PML cells will go here
+    if (do_pml_divb_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
+        bool const fine = patch_type == PatchType::fine;
+        auto* const solver = fine ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+        solver->EvolveGPML(m_fields.get(fine ? FieldType::pml_G_fp : FieldType::pml_G_cp, lev),
+                          m_fields.get_alldirs(fine ? FieldType::pml_B_fp : FieldType::pml_B_cp, lev),
+                          a_dt);
+    }
 }
 
 void
 WarpX::MacroscopicEvolveE (amrex::Real a_dt, amrex::Real start_time)
 {
+    if (m_composite_yee_surface) { m_composite_yee_surface->RememberElectric(); }
     for (int lev = 0; lev <= finest_level; ++lev ) {
         MacroscopicEvolveE(lev, a_dt, start_time);
     }
+
+    // Match the vacuum and Hybrid-PIC electric-field advance callbacks.
+    if (m_composite_yee_surface) { m_composite_yee_surface->AdvanceElectric(a_dt); }
+    ExecutePythonCallback("afterEpush");
 }
 
 void
@@ -1207,47 +1244,47 @@ WarpX::MacroscopicEvolveE (int lev, amrex::Real a_dt, amrex::Real start_time) {
 
     ABLASTR_PROFILE("WarpX::MacroscopicEvolveE()");
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        lev == 0,
-        "Macroscopic EvolveE is not implemented for lev>0, yet."
-    );
-
     MacroscopicEvolveE(lev, PatchType::fine, a_dt, start_time);
+    if (lev > 0) {
+        MacroscopicEvolveE(lev, PatchType::coarse, a_dt, start_time);
+    }
 }
 
 void
 WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real start_time) {
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        patch_type == PatchType::fine,
-        "Macroscopic EvolveE is not implemented for lev>0, yet."
-    );
-
-    m_fdtd_solver_fp[lev]->MacroscopicEvolveE(
+    bool const fine_patch = patch_type == PatchType::fine;
+    auto const& material = *m_macroscopic_properties[lev][fine_patch ? 0 : 1];
+    if (m_fields.has(fine_patch ? FieldType::F_fp : FieldType::F_cp, lev)) {
+        if (material.IsVacuumPatch()) {
+            // The vacuum update includes grad(F); the material update does not.
+            EvolveE(lev, patch_type, a_dt, start_time);
+            return;
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(material.CleanVacuumPatchesOnly(),
+            "Electric divergence cleaning with macroscopic media requires vacuum properties "
+            "on cleaned patches.");
+    }
+    auto* const solver = fine_patch ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+    solver->MacroscopicEvolveE(
         m_macroscopic_solver_algo,
-        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-        m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-        m_fields.get_alldirs(FieldType::current_fp, lev),
-        m_eb_update_E_fp[lev],
-        a_dt, m_macroscopic_properties);
+        m_fields.get_alldirs(fine_patch ? FieldType::Efield_fp : FieldType::Efield_cp, lev),
+        m_fields.get_alldirs(fine_patch ? FieldType::Bfield_fp : FieldType::Bfield_cp, lev),
+        m_fields.get_alldirs(fine_patch ? FieldType::current_fp : FieldType::current_cp, lev),
+        GetEBUpdateEFlag(patch_type)[lev], a_dt, m_macroscopic_properties[lev][fine_patch ? 0 : 1],
+        lev);
 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_fp(),
-                pml[lev]->GetMultiSigmaBox_fp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_fp(), a_dt, pml_has_particles);
         } else {
             m_fdtd_solver_cp[lev]->EvolveEPML(
-                m_fields,
-                patch_type,
-                lev,
-                pml[lev]->GetEBUpdateEFlag_cp(),
-                pml[lev]->GetMultiSigmaBox_cp(),
-                a_dt, pml_has_particles );
+                m_fields, patch_type, lev,
+                pml[lev]->GetEBUpdateEFlag(patch_type),
+                pml[lev]->GetMultiSigmaBox_cp(), a_dt, pml_has_particles);
         }
     }
 
@@ -1402,6 +1439,21 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
 }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+namespace
+{
+    // Grow only the outer faces of the FAB. Negative-r deposits are folded
+    // into the physical cells below, so leave those source guards untouched.
+    amrex::Box radial_scaling_box (amrex::MFIter const& mfi, amrex::MultiFab const& field,
+                                   bool const touches_axis)
+    {
+        auto box = mfi.tilebox(field.ixType().toIntVect(), field.nGrowVect());
+        if (touches_axis) {
+            box.setSmall(0, amrex::max(box.smallEnd(0), mfi.validbox().smallEnd(0)));
+        }
+        return box;
+    }
+}
+
 // This scales the current by the inverse volume and wraps around the deposition at negative radius.
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
@@ -1419,6 +1471,10 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
+#if defined(WARPX_DIM_RZ)
+    int const nmodes = n_rz_azimuthal_modes;
+#endif
+
     for (amrex::MFIter mfi(*Jx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
@@ -1426,44 +1482,20 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
         amrex::Array4<amrex::Real> const& Jt_arr = Jy->array(mfi);
         amrex::Array4<amrex::Real> const& Jz_arr = Jz->array(mfi);
 
-        amrex::Box const & tilebox = mfi.tilebox();
-        amrex::Box tbr = convert( tilebox, Jx->ixType().toIntVect() );
-        amrex::Box tbt = convert( tilebox, Jy->ixType().toIntVect() );
-        amrex::Box tbz = convert( tilebox, Jz->ixType().toIntVect() );
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Real rmin  = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tbr = radial_scaling_box(mfi, *Jx, rmin == 0._rt);
+        auto const tbt = radial_scaling_box(mfi, *Jy, rmin == 0._rt);
+        auto const tbz = radial_scaling_box(mfi, *Jz, rmin == 0._rt);
+        const amrex::Real rminr = rmin + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = rmin + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = rmin + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const int irmin = valid.smallEnd(0);
 
         // For ishift, 1 means cell centered, 0 means node centered
         int const ishift_r = (rminr > rmin ? 1 : 0);
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
-
-        // Grow the tileboxes to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0._rt) {
-           tbr.growLo(0, ngJ[0]);
-           tbt.growLo(0, ngJ[0]);
-           tbz.growLo(0, ngJ[0]);
-        }
-        tbr.growHi(0, ngJ[0]);
-        tbt.growHi(0, ngJ[0]);
-        tbz.growHi(0, ngJ[0]);
-#if defined(WARPX_DIM_RZ)
-        tbr.grow(1, ngJ[1]);
-        tbt.grow(1, ngJ[1]);
-        tbz.grow(1, ngJ[1]);
-
-        const int nmodes = n_rz_azimuthal_modes;
-#endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
         // included in the current deposition.
@@ -1631,6 +1663,10 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
+    int const ncomp_rr = Sxx->nComp();
+    int const ncomp_tt = Syy->nComp();
+    int const ncomp_zz = Szz->nComp();
+
     for ( amrex::MFIter mfi(*Sxx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
 
@@ -1638,46 +1674,20 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
         amrex::Array4<amrex::Real> const& Stt_arr = Syy->array(mfi);
         amrex::Array4<amrex::Real> const& Szz_arr = Szz->array(mfi);
 
-        amrex::Box const & tilebox = mfi.tilebox();
-        amrex::Box tbr = convert( tilebox, Sxx->ixType().toIntVect() );
-        amrex::Box tbt = convert( tilebox, Syy->ixType().toIntVect() );
-        amrex::Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
-
-        int const ncomp_rr = Sxx->nComp();
-        int const ncomp_tt = Syy->nComp();
-        int const ncomp_zz = Szz->nComp();
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Real rmin  = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tbr = radial_scaling_box(mfi, *Sxx, rmin == 0._rt);
+        auto const tbt = radial_scaling_box(mfi, *Syy, rmin == 0._rt);
+        auto const tbz = radial_scaling_box(mfi, *Szz, rmin == 0._rt);
+        const amrex::Real rminr = rmin + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = rmin + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = rmin + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const int irmin = valid.smallEnd(0);
 
         // For ishift, 1 means cell centered, 0 means node centered
         int const ishift_r = (rminr > rmin ? 1 : 0);
         int const ishift_t = (rmint > rmin ? 1 : 0);
         int const ishift_z = (rminz > rmin ? 1 : 0);
-
-        // Grow the tileboxes to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0._rt) {
-           tbr.growLo(0, ngS[0]);
-           tbt.growLo(0, ngS[0]);
-           tbz.growLo(0, ngS[0]);
-        }
-        tbr.growHi(0, ngS[0]);
-        tbt.growHi(0, ngS[0]);
-        tbz.growHi(0, ngS[0]);
-#if defined(WARPX_DIM_RZ)
-        tbr.grow(1, ngS[1]);
-        tbt.grow(1, ngS[1]);
-        tbz.grow(1, ngS[1]);
-#endif
 
         // Rescale current in r-z mode since the inverse volume factor was not
         // included in the current deposition.
@@ -1786,35 +1796,17 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev,
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
 #endif
 
-    amrex::Box tilebox;
-
     for (amrex::MFIter mfi(*Rho, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
 
         amrex::Array4<amrex::Real> const& Rho_arr = Rho->array(mfi);
 
-        tilebox = mfi.tilebox();
-        amrex::Box tb = convert( tilebox, Rho->ixType().toIntVect() );
-
-        // Lower corner of tile box physical domain
-        // Note that this is done before the tilebox.grow so that
-        // these do not include the guard cells.
-        const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const amrex::Dim3 lo = lbound(tilebox);
-        const amrex::Real rmin = xyzmin.x;
-        const amrex::Real rminr = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const int irmin = lo.x;
+        amrex::Box const& valid = mfi.validbox();
+        amrex::Real const rmin = WarpX::LowerCorner(valid, lev, 0._rt).x;
+        auto const tb = radial_scaling_box(mfi, *Rho, rmin == 0._rt);
+        const int irmin = valid.smallEnd(0);
+        const amrex::Real rminr = rmin + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const int ishift = (rminr > rmin ? 1 : 0);
-
-        // Grow the tilebox to include the guard cells, except for the
-        // guard cells at negative radius.
-        if (rmin > 0.) {
-           tb.growLo(0, ngRho[0]);
-        }
-        tb.growHi(0, ngRho[0]);
-#if defined(WARPX_DIM_RZ)
-        tb.grow(1, ngRho[1]);
-#endif
 
         // Rescale charge in r-z mode since the inverse volume factor was not
         // included in the charge deposition.

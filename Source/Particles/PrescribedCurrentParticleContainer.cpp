@@ -1,0 +1,612 @@
+/* Copyright 2026 WarpX contributors
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#include "PrescribedCurrentParticleContainer.H"
+
+#include "Fields.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
+#include "Particles/WarpXParticleContainer.H"
+#include "Utils/CurrentWaveform.H"
+#include "Utils/Parser/ParserUtils.H"
+#include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
+#include "WarpX.H"
+
+#include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/warn_manager/WarnManager.H>
+
+#include <AMReX.H>
+#include <AMReX_Box.H>
+#include <AMReX_BoxIterator.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_GpuContainers.H>
+#include <AMReX_GpuLaunch.H>
+#include <AMReX_GpuQualifiers.H>
+#include <AMReX_ParIter.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_ParmParse.H>
+#include <AMReX_REAL.H>
+#include <AMReX_Vector.H>
+
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <limits>
+#include <string>
+#include <utility>
+
+using namespace amrex;
+using warpx::fields::FieldType;
+
+bool
+PrescribedCurrentParticleContainer::is_enabled () {
+    bool enabled = false;
+    const ParmParse pp_warpx("warpx");
+    pp_warpx.query("current_injection", enabled);
+    if (!enabled) {
+        return false;
+    }
+
+    std::string source_type = "antenna";
+    pp_warpx.query("current_injection.type", source_type);
+    std::transform(
+        source_type.begin(), source_type.end(), source_type.begin(),
+        [] (unsigned char const value) { return std::tolower(value); });
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        source_type == "antenna",
+        "warpx.current_injection.type must be 'antenna'. Paired terminals use "
+        "the "
+        "separate warpx.current_controlled_port namespace.");
+    return enabled;
+}
+
+PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
+    AmrCore* amr_core, int ispecies)
+    : WarpXParticleContainer(amr_core, ispecies, "prescribed_current") {
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::electromagnetic_solver_id !=
+                                         ElectromagneticSolverAlgo::HybridPIC,
+                                     "The box-based warpx.current_injection "
+                                     "source is an impressed-current antenna, "
+                                     "not an ion species, and is not supported "
+                                     "by the Hybrid-PIC solver. Use "
+                                     "warpx.current_controlled_port for a "
+                                     "current carried by the hybrid plasma.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
+            WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor,
+        "The impressed-current antenna requires a charge-conserving current "
+        "deposition "
+        "scheme: algo.current_deposition = esirkepov or villasenor.");
+
+    m_charge = 1.0;
+    m_mass = std::numeric_limits<Real>::max();
+    AddIntComp("drive_id");
+
+    const ParmParse pp_warpx("warpx");
+
+    // Each pair_N entry identifies one independent antenna region; it does not
+    // imply a pair of circuit terminals.
+    warpx::utils::CurrentWaveform global_waveform;
+    std::string global_file;
+    const bool has_global_file =
+        pp_warpx.query("current_injection.file", global_file);
+    if (has_global_file) {
+        global_waveform.load(global_file);
+    }
+
+    int n_regions = 1;
+    pp_warpx.query("current_injection.n_pairs", n_regions);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        n_regions >= 1, "warpx.current_injection.n_pairs must be >= 1");
+
+    for (int region = 0; region < n_regions; ++region) {
+        const std::string base =
+            "current_injection.pair_" + std::to_string(region);
+
+        Drive drive;
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.xlo").c_str(),
+                                     drive.lo[0]);
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.xhi").c_str(),
+                                     drive.hi[0]);
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.ylo").c_str(),
+                                     drive.lo[1]);
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.yhi").c_str(),
+                                     drive.hi[1]);
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.zlo").c_str(),
+                                     drive.lo[2]);
+        utils::parser::getWithParser(pp_warpx, (base + ".drive.zhi").c_str(),
+                                     drive.hi[2]);
+        pp_warpx.query(base + ".drive.dir", drive.dir);
+        pp_warpx.query(base + ".drive.sign", drive.sign);
+
+        for (int d = 0; d < 3; ++d) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::isfinite(drive.lo[d]) && std::isfinite(drive.hi[d]) &&
+                    drive.lo[d] < drive.hi[d],
+                "current_injection drive bounds must be finite and satisfy lo "
+                "< hi");
+        }
+
+        // Area A is the physical cross-section perpendicular to the current.
+        // In RZ with dir = 0 (Jr) the imposed profile is the conserved-total-I
+        // 1/r coaxial profile Jr = I/(2*pi*r*dz), which has no single A, so A
+        // is unused and may be omitted. In every other case A is required.
+#ifdef WARPX_DIM_RZ
+        const bool a_required = (drive.dir != 0);
+#else
+        const bool a_required = true;
+#endif
+        if (a_required) {
+            utils::parser::getWithParser(pp_warpx, (base + ".drive.A").c_str(),
+                                         drive.A);
+        } else {
+            pp_warpx.query(base + ".drive.A", drive.A);
+        }
+
+        std::string waveform_file;
+        if (pp_warpx.query(base + ".file", waveform_file)) {
+            drive.waveform.load(waveform_file);
+        } else {
+            std::string msg = "warpx.current_injection: ";
+            msg += base;
+            msg += " needs ";
+            msg += base;
+            msg += ".file (or set the global warpx.current_injection.file).";
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(has_global_file, msg);
+            drive.waveform = global_waveform;
+        }
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            drive.dir >= 0 && drive.dir < 3,
+            "current_injection drive.dir must be 0, 1 or 2");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            drive.sign == -1 || drive.sign == 1,
+            "current_injection drive.sign must be -1 or 1");
+#ifdef WARPX_DIM_RZ
+        if (drive.dir == 0) {
+            // Jr coaxial drive: box must lie off-axis (r > 0); Jr ~ 1/r
+            // diverges at r = 0 and the inverse-volume scaling forces Jr = 0 on
+            // axis.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                drive.lo[0] > 0.,
+                "current_injection RZ drive (dir=0, Jr) needs xlo > 0 "
+                "(off-axis)");
+        } else {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                drive.A > 0., "current_injection drive.A must be > 0");
+        }
+#else
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            drive.A > 0., "current_injection drive.A must be > 0");
+#endif
+        m_drives.push_back(std::move(drive));
+    }
+
+    m_enabled = !m_drives.empty();
+}
+
+void
+PrescribedCurrentParticleContainer::compute_velocity_scale () {
+    Real I_peak = 0._rt;
+    Real charge_bound = 0._rt;
+    for (const Drive& drive : m_drives) {
+        I_peak = std::max(I_peak, drive.waveform.max_abs_current());
+        charge_bound =
+            std::max(charge_bound, drive.waveform.absolute_charge_bound());
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        I_peak > 0._rt,
+        "warpx.current_injection: all waveforms are identically zero.");
+
+    Real min_cell_size = std::numeric_limits<Real>::max();
+    for (int lev = 0; lev <= finestLevel(); ++lev) {
+        auto const cell_size = Geom(lev).CellSizeArray();
+        for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
+            min_cell_size = std::min(min_cell_size, cell_size[direction]);
+        }
+    }
+    Real const speed_limited = 0.05_rt * PhysConst::c / I_peak;
+    Real const displacement_limited =
+        charge_bound > 0.0_rt ? 0.05_rt * min_cell_size / charge_bound
+                              : speed_limited;
+    m_vel_coeff = std::min(speed_limited, displacement_limited);
+}
+
+void
+PrescribedCurrentParticleContainer::InitData () {
+    if (!m_enabled) {
+        return;
+    }
+
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ)
+    WARPX_ABORT_WITH_MESSAGE(
+        "Prescribed current injection requires 2D XZ, 3D, or RZ geometry.");
+#else
+    // Bound particle excursions using the finest spacing before assigning weights.
+    compute_velocity_scale();
+    WarpX const& warpx = WarpX::GetInstance();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        maxLevel() == 0 || ((warpx.evolve_scheme == EvolveScheme::Explicit ||
+                             warpx.evolve_scheme == EvolveScheme::Theta_Implicit_EM) &&
+                            !warpx.getdo_moving_window()),
+        "SMR current antennas require explicit or theta-implicit evolution and no moving window.");
+    for (int lev = 0; lev <= finestLevel(); ++lev) {
+        const auto& geom = Geom(lev);
+        const auto problo = geom.ProbLoArray();
+        const auto dx = geom.CellSizeArray();
+        auto const& level_boxes = warpx.boxArray(lev);
+        const Box domain = level_boxes.minimalBox();
+        amrex::BoxArray covered;
+        if (lev < finestLevel()) {
+            covered = amrex::coarsen(warpx.boxArray(lev + 1), warpx.refRatio(lev));
+        }
+        auto const active_cell = [&] (amrex::IntVect const& cell) {
+            return level_boxes.contains(cell) && !covered.contains(cell);
+        };
+
+        // Seed opposite charges at the leaf-cell center. Their weight
+        // represents the part of the physical drive inside this cell. Keeping
+        // the center keeps both particles on their original leaf within the
+        // excursion bound.
+        Vector<ParticleReal> xs, ys, zs, ws;
+        Vector<int> drive_ids;
+        Real const initial_time = warpx.gett_new(lev);
+        if (ParallelDescriptor::MyProc() == 0) {
+            for (int drive_id = 0; drive_id < static_cast<int>(m_drives.size());
+                 ++drive_id) {
+                auto const& drive = m_drives[drive_id];
+                Real const displacement = m_vel_coeff * drive.sign *
+                                          drive.waveform.integral(initial_time);
+#ifdef WARPX_DIM_RZ
+                // A radial current is shared by the whole physical drive, even
+                // when one refinement patch contains only a subset of its z
+                // range.
+                Real const axial_length =
+                    std::min(drive.hi[2], geom.ProbHi(1)) -
+                    std::max(drive.lo[2], geom.ProbLo(1));
+                int const n_spokes = std::max(1, WarpX::n_rz_azimuthal_modes);
+                Real const two_pi = 2._rt * MathConst::pi;
+#endif
+                for (auto const& cell : domain.iterator()) {
+                    amrex::GpuArray<Real, 3> center{};
+                    Real measure = 1._rt;
+#ifdef WARPX_DIM_RZ
+                    Real radial_midpoint = 0._rt;
+#endif
+                    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                        // In XZ and RZ the second mesh axis is physical z.
+                        int const axis =
+                            (AMREX_SPACEDIM == 2 && d == 1) ? 2 : d;
+                        Real const lo = std::max(drive.lo[axis],
+                                                 problo[d] + cell[d] * dx[d]);
+                        Real const hi = std::min(
+                            drive.hi[axis], problo[d] + (cell[d] + 1) * dx[d]);
+                        measure *= std::max(0._rt, hi - lo);
+                        center[axis] = problo[d] + (cell[d] + 0.5_rt) * dx[d];
+#ifdef WARPX_DIM_RZ
+                        if (d == 0) {
+                            radial_midpoint = 0.5_rt * (lo + hi);
+                        }
+#endif
+                    }
+                    if (measure == 0._rt || !active_cell(cell)) {
+                        continue;
+                    }
+#ifdef WARPX_DIM_RZ
+                    // For Jr the radial Jacobian cancels the 1/r current
+                    // profile. Jtheta and Jz integrate over the annular volume.
+                    Real const weight =
+                        0.5_rt * measure / (m_vel_coeff * n_spokes) *
+                        (drive.dir == 0 ? 1._rt / axial_length
+                                        : two_pi * radial_midpoint / drive.A);
+                    for (int spoke = 0; spoke < n_spokes; ++spoke) {
+                        Real const phase = two_pi * spoke / n_spokes;
+                        for (int const polarity : {-1, 1}) {
+                            Real const excursion = polarity * displacement;
+                            Real const radius =
+                                center[0] +
+                                (drive.dir == 0 ? excursion : 0._rt);
+                            Real const angle =
+                                phase + (drive.dir == 1 ? excursion / center[0]
+                                                        : 0._rt);
+                            xs.push_back(radius * std::cos(angle));
+                            ys.push_back(radius * std::sin(angle));
+                            zs.push_back(center[2] +
+                                         (drive.dir == 2 ? excursion : 0._rt));
+                            ws.push_back(polarity * weight);
+                            drive_ids.push_back(drive_id);
+                        }
+                    }
+#else
+                    // XZ current and area are both per unit invariant-y length.
+                    Real const weight =
+                        0.5_rt * measure / (m_vel_coeff * drive.A);
+                    for (int const polarity : {-1, 1}) {
+                        auto position = center;
+                        position[drive.dir] += polarity * displacement;
+                        xs.push_back(position[0]);
+                        ys.push_back(position[1]);
+                        zs.push_back(position[2]);
+                        ws.push_back(polarity * weight);
+                        drive_ids.push_back(drive_id);
+                    }
+#endif
+                }
+            }
+        }
+
+        const auto np = static_cast<long>(xs.size());
+        const Vector<ParticleReal> ux(np, 0.0), uy(np, 0.0), uz(np, 0.0);
+        Vector<Vector<ParticleReal>> attr;
+        attr.push_back(ws);
+        const Vector<Vector<int>> attr_int{drive_ids};
+        AddNParticles(lev, np, xs, ys, zs, ux, uy, uz, 1, attr, 1, attr_int, 1);
+    }
+
+    if (Verbose()) {
+        amrex::Print() << Utils::TextMsg::Info(
+            "PrescribedCurrentParticleContainer: " +
+            std::to_string(TotalNumberOfParticles()) +
+            " antenna particles over " + std::to_string(m_drives.size()) +
+            " antenna region(s)");
+    }
+
+    if (TotalNumberOfParticles() == 0) {
+        ablastr::warn_manager::WMRecordWarning(
+            "CurrentInjection",
+            "warpx.current_injection: no cells found inside any drive box.",
+            ablastr::warn_manager::WarnPriority::high);
+        m_enabled = false;
+    }
+#endif
+}
+
+void
+PrescribedCurrentParticleContainer::PostRestart () {
+    // This deterministic antenna is not checkpointed with physical species.
+    // Recreate it from the input boxes and waveform after loading a checkpoint.
+    InitData();
+}
+
+#ifdef WARPX_DIM_3D
+void
+PrescribedCurrentParticleContainer::SetInterfaceCurrentMask (
+    BoxArray const& collar, Array4<int const> mask)
+{
+    // A marker starts at a leaf-cell center and its waveform excursion is
+    // bounded to 0.05 fine cells. Its parent-cell index therefore stays fixed.
+    auto const lo = Geom(0).ProbLoArray();
+    auto const inv = Geom(0).InvCellSizeArray();
+    for (auto const& drive : m_drives) {
+        IntVect lower, upper;
+        for (int d = 0; d < 3; ++d) {
+            lower[d] = int(std::floor((drive.lo[d] - lo[d]) * inv[d]));
+            upper[d] = int(std::ceil((drive.hi[d] - lo[d]) * inv[d])) - 1;
+        }
+        if (collar.intersects(Box(lower, upper))) {
+            m_interface_current_mask = mask;
+            return;
+        }
+    }
+}
+
+void
+PrescribedCurrentParticleContainer::SelectInterfaceWeights (
+    WarpXParIter const& it, bool on_interface, RealVector& weights) const
+{
+    auto const n = it.numParticles();
+    weights.resize(n);
+    auto* const selected = weights.dataPtr();
+    auto const* const original = it.GetAttribs(PIdx::w).dataPtr();
+    auto const position = GetParticlePosition<PIdx>(it);
+    auto const lo = Geom(0).ProbLoArray();
+    auto const inv = Geom(0).InvCellSizeArray();
+    auto const mask = m_interface_current_mask;
+    amrex::ParallelFor(n, [=] AMREX_GPU_DEVICE (long ip) noexcept {
+        ParticleReal x, y, z;
+        position(ip, x, y, z);
+        int const i = int(amrex::Math::floor((x-lo[0])*inv[0]));
+        int const j = int(amrex::Math::floor((y-lo[1])*inv[1]));
+        int const k = int(amrex::Math::floor((z-lo[2])*inv[2]));
+        bool const at_face = mask.contains(i,j,k) && mask(i,j,k) != 0;
+        selected[ip] = (at_face == on_interface) ? original[ip] : 0._prt;
+    });
+}
+#endif
+
+void
+PrescribedCurrentParticleContainer::Evolve (
+    ablastr::fields::MultiFabRegister& fields, int lev,
+    const std::string& current_fp_string, Real t, Real dt,
+    SubcyclingHalf /*subcycling_half*/, bool skip_deposition,
+    PositionPushType /*position_push_type*/,
+    MomentumPushType /*momentum_push_type*/,
+    ImplicitOptions const* implicit_options) {
+    using ablastr::fields::Direction;
+
+    ABLASTR_PROFILE("PrescribedCurrentParticleContainer::Evolve()");
+
+    if (!m_enabled) {
+        return;
+    }
+
+    const PushType push_type =
+        (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dt > 0.0_rt, "Current antenna timestep must be positive.");
+
+    // Use the exact step-average current of the piecewise-linear waveform.
+    // Then the pair displacement, deposited J, and deposited endpoint charge
+    // obey the same finite-step continuity equation.
+    Real step_start = t;
+    if (implicit_options) {
+        Real time_bias = 0.5_rt;
+        if (WarpX::GetInstance().evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
+            amrex::ParmParse("implicit_evolve").query("theta", time_bias);
+        }
+        step_start -= time_bias * dt;
+    }
+    const int ndrives = static_cast<int>(m_drives.size());
+    Gpu::DeviceVector<Real> d_velocity(ndrives);
+    Gpu::DeviceVector<int> d_dir(ndrives);
+    {
+        Vector<Real> h_velocity(ndrives);
+        Vector<int> hdir(ndrives);
+        for (int drive = 0; drive < ndrives; ++drive) {
+            h_velocity[drive] = m_drives[drive].sign * m_vel_coeff *
+                                (m_drives[drive].waveform.integral(step_start + dt) -
+                                 m_drives[drive].waveform.integral(step_start)) /
+                                dt;
+            hdir[drive] = m_drives[drive].dir;
+        }
+        Gpu::copyAsync(Gpu::hostToDevice, h_velocity.begin(), h_velocity.end(),
+                       d_velocity.begin());
+        Gpu::copyAsync(Gpu::hostToDevice, hdir.begin(), hdir.end(),
+                       d_dir.begin());
+        Gpu::streamSynchronize();
+    }
+    const Real* const AMREX_RESTRICT velocity_f = d_velocity.dataPtr();
+    const int* const AMREX_RESTRICT dir_f = d_dir.dataPtr();
+    const Real c2 = PhysConst::c * PhysConst::c;
+
+    const int thread_num = 0;
+
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti) {
+        auto& attribs = pti.GetAttribs();
+        auto& wp = attribs[PIdx::w];
+        auto& uxp = attribs[PIdx::ux];
+        auto& uyp = attribs[PIdx::uy];
+        auto& uzp = attribs[PIdx::uz];
+
+        const long np = pti.numParticles();
+
+        const auto GetPosition = GetParticlePosition<PIdx>(pti);
+        auto SetPosition = SetParticlePosition<PIdx>(pti);
+
+        ParticleReal* const AMREX_RESTRICT ux_ptr = uxp.dataPtr();
+        ParticleReal* const AMREX_RESTRICT uy_ptr = uyp.dataPtr();
+        ParticleReal* const AMREX_RESTRICT uz_ptr = uzp.dataPtr();
+        ParticleReal const* const AMREX_RESTRICT weight_ptr = wp.dataPtr();
+        const int* const AMREX_RESTRICT drive_id_ptr =
+            pti.GetStructOfArrays().GetIntData("drive_id").dataPtr();
+
+        if (!skip_deposition && fields.has(FieldType::rho_fp, lev)) {
+            int const* const ion_lev = nullptr;
+            DepositCharge(pti, wp, ion_lev, fields.get(FieldType::rho_fp, lev),
+                          0, 0, np, thread_num, lev, lev);
+        }
+
+#ifndef WARPX_DIM_1D_Z
+        ParticleReal const* x_n = nullptr;
+        if (push_type == PushType::Implicit) {
+            x_n = pti.GetAttribs("x_n").dataPtr();
+        }
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+        ParticleReal const* y_n = nullptr;
+        if (push_type == PushType::Implicit) {
+            y_n = pti.GetAttribs("y_n").dataPtr();
+        }
+#endif
+        ParticleReal const* z_n = nullptr;
+        if (push_type == PushType::Implicit) {
+            z_n = pti.GetAttribs("z_n").dataPtr();
+        }
+
+        // Opposite-weight members receive opposite velocities. Their current
+        // contributions therefore add, while their separated charge supplies
+        // the polarization rho dictated by continuity.
+        amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) noexcept {
+            ParticleReal x, y, z;
+            if (push_type == PushType::Implicit) {
+#ifndef WARPX_DIM_1D_Z
+                x = x_n[ip];
+#else
+                x = ParticleReal{};
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
+                y = y_n[ip];
+#else
+                y = ParticleReal{};
+#endif
+                z = z_n[ip];
+            } else {
+                GetPosition(ip, x, y, z);
+            }
+            const int drive = drive_id_ptr[ip];
+            const int direction = dir_f[drive];
+            const Real polarity = weight_ptr[ip] >= 0.0_prt ? 1.0_rt : -1.0_rt;
+            const Real v = polarity * velocity_f[drive];
+            const Real u = v / std::sqrt(1._rt - v * v / c2);
+#ifdef WARPX_DIM_RZ
+            if (direction == 0) {
+                const Real r = std::sqrt(x * x + y * y);
+                const Real cos_theta = (r > 0._rt) ? x / r : 1._rt;
+                const Real sin_theta = (r > 0._rt) ? y / r : 0._rt;
+                ux_ptr[ip] = u * cos_theta;
+                uy_ptr[ip] = u * sin_theta;
+                uz_ptr[ip] = 0._rt;
+            } else if (direction == 1) {
+                const Real r = std::sqrt(x * x + y * y);
+                const Real cos_theta = (r > 0._rt) ? x / r : 1._rt;
+                const Real sin_theta = (r > 0._rt) ? y / r : 0._rt;
+                ux_ptr[ip] = -u * sin_theta;
+                uy_ptr[ip] = u * cos_theta;
+                uz_ptr[ip] = 0._rt;
+            } else {
+                ux_ptr[ip] = 0._rt;
+                uy_ptr[ip] = 0._rt;
+                uz_ptr[ip] = u;
+            }
+#else
+            ux_ptr[ip] = (direction == 0) ? u : 0._rt;
+            uy_ptr[ip] = (direction == 1) ? u : 0._rt;
+            uz_ptr[ip] = (direction == 2) ? u : 0._rt;
+#endif
+
+            // Explicit particles advance by a full step; implicit particles
+            // are placed at n+1/2 and completed by
+            // FinishImplicitParticleUpdate.
+            const Real ginv = 1._rt / std::sqrt(1._rt + (u * u) / c2);
+            const Real push_dt =
+                push_type == PushType::Implicit ? 0.5_rt * dt : dt;
+            x += ux_ptr[ip] * ginv * push_dt;
+            y += uy_ptr[ip] * ginv * push_dt;
+            z += uz_ptr[ip] * ginv * push_dt;
+            SetPosition(ip, x, y, z);
+        });
+
+        auto const* current_weights = &wp;
+#ifdef WARPX_DIM_3D
+        RealVector native_weights;
+        if (!skip_deposition && HasInterfaceCurrent()) {
+            SelectInterfaceWeights(pti, false, native_weights);
+            current_weights = &native_weights;
+        }
+#endif
+        if (!skip_deposition && !m_defer_trajectory_current) {
+            const Real relative_time = -0.5_rt * dt;
+            int const* const ion_lev = nullptr;
+            amrex::MultiFab* jx =
+                fields.get(current_fp_string, Direction{0}, lev);
+            amrex::MultiFab* jy =
+                fields.get(current_fp_string, Direction{1}, lev);
+            amrex::MultiFab* jz =
+                fields.get(current_fp_string, Direction{2}, lev);
+            DepositCurrent(pti, *current_weights, uxp, uyp, uzp, ion_lev, jx, jy, jz, 0, np,
+                           thread_num, lev, lev, dt, relative_time, push_type, WarpX::nox);
+        }
+
+        if (!skip_deposition && fields.has(FieldType::rho_fp, lev)) {
+            int const* const ion_lev = nullptr;
+            DepositCharge(pti, wp, ion_lev, fields.get(FieldType::rho_fp, lev),
+                          1, 0, np, thread_num, lev, lev);
+        }
+
+        amrex::Gpu::synchronize();
+    }
+}

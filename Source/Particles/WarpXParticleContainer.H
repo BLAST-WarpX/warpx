@@ -696,8 +696,15 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    [[nodiscard]] bool isPushed () const { return !do_not_push; }
     void setDoNotGather (int flag) { do_not_gather = flag; }
     void setDoNotDeposit (int flag) { do_not_deposit = flag; }
+
+    /** Ask Evolve to leave trajectory current deposition to the field solver.
+     * A container returning true still advances particles and deposits charge.
+     * Its end-of-step momenta and positions must describe its explicit push.
+     */
+    [[nodiscard]] virtual bool DeferTrajectoryCurrent () { return false; }
 
     bool HasiAttrib (const std::string& name)
     {

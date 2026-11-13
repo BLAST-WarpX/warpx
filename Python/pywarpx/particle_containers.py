@@ -408,7 +408,7 @@ class ParticleContainerWrapper(object):
         xp, cupy_status = load_cupy()
 
         if libwarpx.geometry_dim == "rz":
-            return self.get_particle_x(level, copy_to_host)
+            return self.get_particle_real_arrays("r", level, copy_to_host=copy_to_host)
         elif libwarpx.geometry_dim == "3d":
             x = self.get_particle_x(level, copy_to_host)
             y = self.get_particle_y(level, copy_to_host)

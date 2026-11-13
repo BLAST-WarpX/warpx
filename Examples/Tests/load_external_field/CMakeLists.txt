@@ -1,6 +1,50 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+foreach(ratio IN ITEMS "2 1" "1 2" "3 3" "2 2")
+    string(REPLACE " " "x" layout "${ratio}")
+    foreach(buffer IN ITEMS 0 2)
+        add_warpx_test(
+            test_2d_nodal_gather_${layout}_buffer${buffer}
+            2
+            1
+            "inputs_base_2d_nodal_gather 'amr.ref_ratio_vect=${ratio}' warpx.n_field_gather_buffer=${buffer}"
+            analysis_nodal_gather.py
+            OFF
+            OFF
+        )
+    endforeach()
+endforeach()
+
+foreach(style IN ITEMS constant parser)
+    foreach(levels IN ITEMS 0 1)
+        add_warpx_test(
+            test_3d_initial_field_${style}_level_${levels}  # name
+            3  # dims
+            1  # nprocs
+            "inputs_base_3d_initial_field_level.py --style ${style} --levels ${levels}"
+            OFF  # analysis (assertions in the script)
+            OFF  # checksum (analytic stationary-field oracle)
+            OFF  # dependency
+        )
+    endforeach()
+endforeach()
+
+if(WarpX_EB)
+    foreach(ratio IN ITEMS "2 2 1" "1 2 2" "2 2 2")
+        string(REPLACE " " "x" layout "${ratio}")
+        add_warpx_test(
+            test_3d_refined_magnetic_flux_${layout}
+            3
+            1
+            "inputs_base_3d_refined_magnetic_flux.py --ratio ${ratio}"
+            OFF
+            OFF
+            OFF
+        )
+    endforeach()
+endif()
+
 add_warpx_test(
     test_3d_load_external_field_grid_picmi  # name
     3  # dims

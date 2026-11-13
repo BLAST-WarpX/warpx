@@ -8,8 +8,15 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#ifdef WARPX_DIM_3D
+#   include "FieldSolver/FixedShapeCurrent.H"
+#endif
+#ifdef WARPX_DIM_RZ
+#   include "FieldSolver/RadialParticleCoupling.H"
+#endif
 #include "PhysicalParticleContainer.H"
 
+#include "FieldSolver/FixedShapeGather.H"
 #include "Fields.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/PlasmaInjector.H"
@@ -553,6 +560,12 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         !do_not_deposit
     );
     bool const deposit_current = (
+#ifdef WARPX_DIM_3D
+        !fields.has_vector(FixedShapeCurrent::raw_name, 1) &&
+#endif
+#ifdef WARPX_DIM_RZ
+        !warpx::radial_particles::enabled(fields) &&
+#endif
         !skip_deposition &&
         !do_not_deposit &&
         !(implicit_options && implicit_options->evolve_suborbit_particles_only)
@@ -1234,7 +1247,10 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
     if (do_not_push) { return; }
 
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
+    std::array<amrex::MultiFab const*, 6> const requested{&Ex, &Ey, &Ez, &Bx, &By, &Bz};
+    auto const fixed = get_fixed_shape_gather(WarpX::GetInstance(), lev, &requested);
+    int const gather_lev = fixed ? 1 : lev;
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev, 0));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
@@ -1244,16 +1260,17 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
         {
             amrex::Box box = pti.tilebox();
             box.grow(Ex.nGrowVect());
+            if (fixed) { box = fixed.box; }
 
             const long np = pti.numParticles();
 
             // Data on the grid
-            const FArrayBox& exfab = Ex[pti];
-            const FArrayBox& eyfab = Ey[pti];
-            const FArrayBox& ezfab = Ez[pti];
-            const FArrayBox& bxfab = Bx[pti];
-            const FArrayBox& byfab = By[pti];
-            const FArrayBox& bzfab = Bz[pti];
+            const FArrayBox& exfab = fixed ? *fixed.fields[0] : Ex[pti];
+            const FArrayBox& eyfab = fixed ? *fixed.fields[1] : Ey[pti];
+            const FArrayBox& ezfab = fixed ? *fixed.fields[2] : Ez[pti];
+            const FArrayBox& bxfab = fixed ? *fixed.fields[3] : Bx[pti];
+            const FArrayBox& byfab = fixed ? *fixed.fields[4] : By[pti];
+            const FArrayBox& bzfab = fixed ? *fixed.fields[5] : Bz[pti];
 
             const auto getPosition = GetParticlePosition<PIdx>(pti);
 
@@ -1267,7 +1284,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 #endif
-            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
 
             const Dim3 lo = lbound(box);
 
@@ -1430,8 +1447,17 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     // If no particles, do not do anything
     if (np_to_push == 0) { return; }
 
-    // Get cell size on gather_lev
-    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
+    auto const fixed = get_fixed_shape_gather(WarpX::GetInstance(), lev);
+    int const force_lev = fixed ? 1 : gather_lev;
+    if (fixed) {
+        exfab = fixed.fields[0];
+        eyfab = fixed.fields[1];
+        ezfab = fixed.fields[2];
+        bxfab = fixed.fields[3];
+        byfab = fixed.fields[4];
+        bzfab = fixed.fields[5];
+    }
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(force_lev, 0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -1445,6 +1471,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     // Add guard cells to the box.
     box.grow(ngEB);
+    if (fixed) { box = fixed.box; }
 
     // Auxiliary booleans
     bool const gather_fields = (
@@ -1470,7 +1497,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
 
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, force_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
@@ -1553,7 +1580,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #ifdef WARPX_QED
     const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
 #else
-    int qed_runtime_flag = no_qed;
+    const int qed_runtime_flag = no_qed;
 #endif
 
     // Loop over the particles and update their momentum.
