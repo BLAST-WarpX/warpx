@@ -1169,6 +1169,172 @@ void PML::Exchange (amrex::MultiFab* mf_pml,
     if (mf_pml && mf) { Exchange(*mf_pml, *mf, geom, do_pml_in_domain); }
 }
 
+namespace
+{
+    /** Split the boxes in `boxes` into disjoint boxes that cover the same cells
+     *
+     * Works for any index type (in contrast to amrex::BoxArray::removeOverlap).
+     */
+    amrex::BoxList
+    MakeDisjoint (amrex::BoxList const& boxes)
+    {
+        amrex::BoxList disjoint(boxes.ixType());
+        for (amrex::Box const& bx : boxes) {
+            amrex::BoxList pieces(bx);
+            for (amrex::Box const& accepted : disjoint) {
+                amrex::BoxList remaining(boxes.ixType());
+                for (amrex::Box const& piece : pieces) {
+                    remaining.join(amrex::boxDiff(piece, accepted));
+                }
+                pieces = std::move(remaining);
+            }
+            disjoint.join(pieces);
+        }
+        return disjoint;
+    }
+}
+
+PML::ExchangeLayout::ExchangeLayout (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                                     amrex::Periodicity const& a_period)
+    : reg_ba{reg.boxArray()}, reg_dm{reg.DistributionMap()},
+      pml_ba{pml.boxArray()}, pml_dm{pml.DistributionMap()},
+      pml_ngrow{pml.nGrowVect()}, pml_ncomp{pml.nComp()}, period{a_period}
+{}
+
+bool
+PML::ExchangeLayout::matches (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                              amrex::Periodicity const& a_period) const
+{
+    return reg_ba == reg.boxArray() && reg_dm == reg.DistributionMap() &&
+           pml_ba == pml.boxArray() && pml_dm == pml.DistributionMap() &&
+           pml_ngrow == pml.nGrowVect() && pml_ncomp == pml.nComp() &&
+           period == a_period;
+}
+
+bool
+PML::ExchangeLayout::same_objects (amrex::MultiFab const& pml, amrex::MultiFab const& reg) const
+{
+    return reg_ba.getRefID() == reg.boxArray().getRefID() &&
+           reg_dm.getRefID() == reg.DistributionMap().getRefID() &&
+           pml_ba.getRefID() == pml.boxArray().getRefID() &&
+           pml_dm.getRefID() == pml.DistributionMap().getRefID();
+}
+
+PML::ExchangePlan&
+PML::GetExchangePlan (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                      amrex::Periodicity const& period)
+{
+    auto const user_it = m_exchange_users.find(&pml);
+    if (user_it != m_exchange_users.end()) {
+        ExchangeUser& user = user_it->second;
+        if (user.layout.matches(pml, reg, period)) {
+            if (!user.layout.same_objects(pml, reg)) {
+                // same layout in new BoxArray/DistributionMapping objects (e.g., after load
+                // balancing): keep them, so that the next comparisons only compare references
+                // and the old objects can be released
+                user.layout = ExchangeLayout(pml, reg, period);
+                user.plan->layout = user.layout;
+            }
+            return *user.plan;
+        }
+
+        // the layout of this PML field changed (e.g., after load balancing): release its plan
+        ExchangePlan* const old_plan = user.plan;
+        m_exchange_users.erase(user_it);
+        if (--old_plan->n_users == 0) {
+            m_exchange_plans.remove_if(
+                [old_plan] (ExchangePlan const& p) { return &p == old_plan; });
+        }
+    }
+
+    ABLASTR_PROFILE("PML::GetExchangePlan");
+
+    // share the plan of other PML fields with the same layout, otherwise make a new one
+    auto plan_it = std::find_if(m_exchange_plans.begin(), m_exchange_plans.end(),
+        [&] (ExchangePlan const& p) { return p.layout.matches(pml, reg, period); });
+    if (plan_it == m_exchange_plans.end()) {
+        plan_it = m_exchange_plans.emplace(m_exchange_plans.end());
+        plan_it->layout = ExchangeLayout(pml, reg, period);
+        DefineExchangePlan(*plan_it, reg);
+    }
+    ++plan_it->n_users;
+    m_exchange_users.emplace(&pml, ExchangeUser{ExchangeLayout(pml, reg, period), &*plan_it});
+    return *plan_it;
+}
+
+void
+PML::DefineExchangePlan (ExchangePlan& plan, amrex::MultiFab const& reg)
+{
+    ExchangeLayout const& layout = plan.layout;
+
+    // Find the valid cells of the regular grid that the guard cells of the PML can receive
+    // data from: the cells of the regular-grid boxes that intersect the PML boxes grown by
+    // their guard cells, including periodic images.
+    // Periodic shifts larger than the extent of all these boxes cannot create intersections,
+    // so using all shifts up to this extent finds every regular-grid cell that
+    // ParallelCopy(pml, reg, ..., IntVect(0), pml.nGrowVect(), period) can read.
+    amrex::IndexType const ixtype = layout.reg_ba.ixType();
+    amrex::Box const extent = amrex::minBox(
+        amrex::grow(layout.pml_ba.minimalBox(), layout.pml_ngrow),
+        layout.reg_ba.minimalBox());
+    std::vector<amrex::IntVect> const pshifts = layout.period.shiftIntVect(extent.length());
+
+    // Only the regular-grid boxes near the PML can intersect. In large runs, these are much
+    // fewer than all regular-grid boxes: find them from the PML boxes first.
+    std::vector<std::pair<int, amrex::Box>> isects;
+    std::vector<int> near_reg_boxes;
+    for (int ipml = 0; ipml < static_cast<int>(layout.pml_ba.size()); ++ipml) {
+        amrex::Box const grown_pml_box = amrex::grow(layout.pml_ba[ipml], layout.pml_ngrow);
+        for (amrex::IntVect const& shift : pshifts) {
+            layout.reg_ba.intersections(grown_pml_box - shift, isects);
+            for (auto const& is : isects) {
+                near_reg_boxes.push_back(is.first);
+            }
+        }
+    }
+    std::sort(near_reg_boxes.begin(), near_reg_boxes.end());
+    near_reg_boxes.erase(std::unique(near_reg_boxes.begin(), near_reg_boxes.end()),
+                         near_reg_boxes.end());
+
+    // Each box of the result stays on the process that owns its regular-grid box.
+    amrex::BoxList bl_near(ixtype);
+    amrex::Vector<int> pmap_near;
+    amrex::Vector<int> parent_near; // global index of the regular-grid box containing each box
+    for (int const ireg : near_reg_boxes) {
+        amrex::Box const reg_box = layout.reg_ba[ireg];
+        amrex::BoxList bl_ireg(ixtype);
+        for (amrex::IntVect const& shift : pshifts) {
+            layout.pml_ba.intersections(reg_box + shift, isects, false, layout.pml_ngrow);
+            for (auto const& is : isects) {
+                bl_ireg.push_back(is.second - shift);
+            }
+        }
+        for (amrex::Box const& bx : MakeDisjoint(bl_ireg)) {
+            bl_near.push_back(bx);
+            pmap_near.push_back(layout.reg_dm[ireg]);
+            parent_near.push_back(ireg);
+        }
+    }
+    if (bl_near.isEmpty()) { return; }
+
+    // no data: Exchange allocates it per call, on the same BoxArray and DistributionMapping
+    plan.reg_near_pml.define(amrex::BoxArray(std::move(bl_near)),
+                             amrex::DistributionMapping(std::move(pmap_near)),
+                             layout.pml_ncomp, 0, amrex::MFInfo().SetAlloc(false));
+
+    // local index in reg of the parent box of each local box of reg_near_pml
+    amrex::Vector<int> const& local_near = plan.reg_near_pml.IndexArray();
+    amrex::Vector<int> parent_local(local_near.size());
+    for (int li = 0; li < static_cast<int>(local_near.size()); ++li) {
+        parent_local[li] = reg.localindex(parent_near[local_near[li]]);
+        AMREX_ALWAYS_ASSERT(parent_local[li] >= 0);
+    }
+    plan.reg_near_pml_parent.resize(parent_local.size());
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, parent_local.begin(), parent_local.end(),
+                          plan.reg_near_pml_parent.begin());
+    amrex::Gpu::streamSynchronize();
+}
+
 void
 PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
                 int do_pml_in_domain)
@@ -1180,15 +1346,28 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
     const int ncp = pml.nComp();
     const auto& period = geom.periodicity();
 
-    // Create temporary MultiFab to copy to and from the PML
-    MultiFab tmpregmf(reg.boxArray(), reg.DistributionMap(), ncp, ngr);
-    tmpregmf.setVal(0.0);
+    ExchangePlan const& plan = GetExchangePlan(pml, reg, period);
+
+    // The temporaries below are allocated per call, so that no memory is held between calls.
+    // They use the BoxArray and DistributionMapping objects of pml and of plan.reg_near_pml,
+    // which outlive this call, so that AMReX keeps its copy plans for them cached.
 
     // Create the sum of the split fields, in the PML
     MultiFab totpmlmf(pml.boxArray(), pml.DistributionMap(), 1, 0); // Allocate
-    MultiFab::LinComb(totpmlmf, 1.0, pml, 0, 1.0, pml, 1, 0, 1, 0); // Sum
-    if (ncp == 3) {
-        MultiFab::Add(totpmlmf,pml,2,0,1,0); // Sum the third split component
+    {
+        auto const& sum_arrs = totpmlmf.arrays();
+        auto const& pml_arrs = pml.const_arrays();
+        amrex::ParallelFor(totpmlmf, amrex::IntVect(0),
+            [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
+            {
+                auto const& split = pml_arrs[box_no];
+                amrex::Real sum = split(i,j,k,0) + split(i,j,k,1);
+                if (ncp == 3) {
+                    sum += split(i,j,k,2); // Sum the third split component
+                }
+                sum_arrs[box_no](i,j,k) = sum;
+            });
+        // no stream synchronization needed: the next GPU operations use the same stream
     }
 
     // Copy from the sum of PML split field to valid cells of regular grid
@@ -1204,38 +1383,34 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
         // Copy from valid cells of PML to ghost cells of regular grid
         // but avoid updating the outermost valid cell
         if (ngr.max() > 0) {
-            MultiFab::Copy(tmpregmf, reg, 0, 0, 1, ngr);
-            ablastr::utils::communication::ParallelCopy(tmpregmf, totpmlmf, 0, 0, 1, IntVect(0), ngr,
-                                   WarpX::do_single_precision_comms,
-                                                        period);
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-            for (MFIter mfi(reg); mfi.isValid(); ++mfi)
-            {
-                const FArrayBox& src = tmpregmf[mfi];
-                FArrayBox& dst = reg[mfi];
-                const auto srcarr = src.array();
-                auto dstarr = dst.array();
-                const BoxList& bl = amrex::boxDiff(dst.box(), mfi.validbox());
-                // boxDiff avoids the outermost valid cell
-                for (const Box& bx : bl) {
-                    amrex::ParallelFor(bx,
-                                       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                                       {
-                                           dstarr(i,j,k,0) = srcarr(i,j,k,0);
-                                       });
-                }
-            }
+            ablastr::utils::communication::ParallelCopyToGhost(
+                reg, totpmlmf, 0, 0, 1, amrex::IntVect(0), ngr,
+                WarpX::do_single_precision_comms, period);
         }
     }
+    totpmlmf.clear(); // free it before allocating the next temporary
 
     // Copy from valid cells of the regular grid to guard cells of the PML
     // (and outermost valid cell in the nodal direction)
     // More specifically, copy from regular data to PML's first component
     // Zero out the second (and third) component
-    MultiFab::Copy(tmpregmf,reg,0,0,1,0); // Fill first component of tmpregmf
-    tmpregmf.setVal(0.0, 1, ncp-1, 0); // Zero out the second (and third) component
+    // The temporary only covers the regular-grid cells that the PML can receive data from.
+    if (plan.reg_near_pml.empty()) { return; }
+    amrex::MultiFab tmpregmf(plan.reg_near_pml.boxArray(), plan.reg_near_pml.DistributionMap(),
+                             ncp, 0);
+    {
+        auto const& dst_arrs = tmpregmf.arrays();
+        auto const& reg_arrs = reg.const_arrays();
+        // local index (in reg) of the regular-grid box that contains box box_no of tmpregmf
+        int const* const parent = plan.reg_near_pml_parent.data();
+        amrex::ParallelFor(tmpregmf, amrex::IntVect(0), ncp,
+            [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k, int n) noexcept
+            {
+                // Fill first component of tmpregmf, zero out the second (and third) component
+                dst_arrs[box_no](i,j,k,n) = (n == 0) ? reg_arrs[parent[box_no]](i,j,k,0) : 0.0_rt;
+            });
+        // no stream synchronization needed: the next GPU operations use the same stream
+    }
     if (do_pml_in_domain){
         // Where valid cells of tmpregmf overlap with PML valid cells,
         // copy the PML (this is order to avoid overwriting PML valid cells,
@@ -1247,7 +1422,6 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
     ablastr::utils::communication::ParallelCopy(pml, tmpregmf, 0, 0, ncp, IntVect(0), ngp,
                                                 WarpX::do_single_precision_comms, period);
 }
-
 
 void
 PML::CopyToPML (MultiFab& pml, MultiFab& reg, const Geometry& geom)

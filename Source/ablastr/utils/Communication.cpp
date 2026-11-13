@@ -25,6 +25,55 @@
 namespace ablastr::utils::communication
 {
 
+namespace
+{
+    /** Implementation of ParallelCopy and ParallelCopyToGhost */
+    void
+    ParallelCopyImpl (amrex::MultiFab &dst, const amrex::MultiFab &src,
+                      int src_comp, int dst_comp, int num_comp,
+                      const amrex::IntVect &src_nghost, const amrex::IntVect &dst_nghost,
+                      bool do_single_precision_comms, const amrex::Periodicity &period,
+                      amrex::FabArrayBase::CpOp op, bool to_ghost_cells_only)
+    {
+        using ablastr::utils::communication::comm_float_type;
+        using float_fab_array = amrex::FabArray<amrex::BaseFab<comm_float_type>>;
+
+        AMREX_ALWAYS_ASSERT(!to_ghost_cells_only || op == amrex::FabArrayBase::COPY);
+
+        if (do_single_precision_comms)
+        {
+            float_fab_array src_tmp(src.boxArray(), src.DistributionMap(), num_comp, src_nghost);
+            mixedCopy(src_tmp, src, src_comp, 0, num_comp, src_nghost);
+
+            float_fab_array dst_tmp(dst.boxArray(), dst.DistributionMap(), num_comp, dst_nghost);
+
+            if (to_ghost_cells_only)
+            {
+                // only the guard cells of dst can change: do not round its valid cells
+                mixedCopy(dst_tmp, dst, dst_comp, 0, num_comp, dst_nghost, true);
+                dst_tmp.ParallelCopyToGhost(src_tmp, 0, 0, num_comp,
+                                            src_nghost, dst_nghost, period);
+                mixedCopy(dst, dst_tmp, 0, dst_comp, num_comp, dst_nghost, true);
+            }
+            else
+            {
+                mixedCopy(dst_tmp, dst, dst_comp, 0, num_comp, dst_nghost);
+                dst_tmp.ParallelCopy(src_tmp, 0, 0, num_comp, src_nghost, dst_nghost, period, op);
+                mixedCopy(dst, dst_tmp, 0, dst_comp, num_comp, dst_nghost);
+            }
+        }
+        else if (to_ghost_cells_only)
+        {
+            dst.ParallelCopyToGhost(src, src_comp, dst_comp, num_comp,
+                                    src_nghost, dst_nghost, period);
+        }
+        else
+        {
+            dst.ParallelCopy(src, src_comp, dst_comp, num_comp, src_nghost, dst_nghost, period, op);
+        }
+    }
+}
+
 void ParallelCopy(amrex::MultiFab &dst, const amrex::MultiFab &src, int src_comp, int dst_comp, int num_comp,
                   const amrex::IntVect &src_nghost, const amrex::IntVect &dst_nghost,
                   bool do_single_precision_comms, const amrex::Periodicity &period,
@@ -32,32 +81,8 @@ void ParallelCopy(amrex::MultiFab &dst, const amrex::MultiFab &src, int src_comp
 {
     BL_PROFILE("ablastr::utils::communication::ParallelCopy");
 
-    using ablastr::utils::communication::comm_float_type;
-
-    if (do_single_precision_comms)
-    {
-        amrex::FabArray<amrex::BaseFab<comm_float_type> > src_tmp(src.boxArray(),
-                                                                  src.DistributionMap(),
-                                                                  num_comp,
-                                                                  src_nghost);
-        mixedCopy(src_tmp, src, src_comp, 0, num_comp, src_nghost);
-
-        amrex::FabArray<amrex::BaseFab<comm_float_type> > dst_tmp(dst.boxArray(),
-                                                                  dst.DistributionMap(),
-                                                                  num_comp,
-                                                                  dst_nghost);
-
-        mixedCopy(dst_tmp, dst, dst_comp, 0, num_comp, dst_nghost);
-
-        dst_tmp.ParallelCopy(src_tmp, 0, 0, num_comp,
-                             src_nghost, dst_nghost, period, op);
-
-        mixedCopy(dst, dst_tmp, 0, dst_comp, num_comp, dst_nghost);
-    }
-    else
-    {
-        dst.ParallelCopy(src, src_comp, dst_comp, num_comp, src_nghost, dst_nghost, period, op);
-    }
+    ParallelCopyImpl(dst, src, src_comp, dst_comp, num_comp, src_nghost, dst_nghost,
+                     do_single_precision_comms, period, op, false);
 }
 
 void ParallelAdd(amrex::MultiFab &dst, const amrex::MultiFab &src, int src_comp, int dst_comp, int num_comp,
@@ -66,6 +91,17 @@ void ParallelAdd(amrex::MultiFab &dst, const amrex::MultiFab &src, int src_comp,
 {
     ablastr::utils::communication::ParallelCopy(dst, src, src_comp, dst_comp, num_comp, src_nghost, dst_nghost,
                                                 do_single_precision_comms, period, amrex::FabArrayBase::ADD);
+}
+
+void ParallelCopyToGhost (amrex::MultiFab &dst, const amrex::MultiFab &src,
+                          int src_comp, int dst_comp, int num_comp,
+                          const amrex::IntVect &src_nghost, const amrex::IntVect &dst_nghost,
+                          bool do_single_precision_comms, const amrex::Periodicity &period)
+{
+    BL_PROFILE("ablastr::utils::communication::ParallelCopyToGhost");
+
+    ParallelCopyImpl(dst, src, src_comp, dst_comp, num_comp, src_nghost, dst_nghost,
+                     do_single_precision_comms, period, amrex::FabArrayBase::COPY, true);
 }
 
 void FillBoundary (amrex::MultiFab &mf,
