@@ -294,6 +294,23 @@ Note that we currently obey the following snake\_case naming conventions for tes
 
 #. **Base input files** (that is, files collecting input parameters shared between two or more tests) are typically named ``inputs_base_1d``, ``inputs_base_2d``, ``inputs_base_3d`` or ``inputs_base_rz``, possibly followed by additional strings if need be.
 
+CDash dashboard
+---------------
+
+For every push to the ``development`` branch, the CPU tests on Azure Pipelines and the :ref:`GPU tests on GitLab CI <developers-testing-gpus>` submit build times, compiler warnings and errors, and test results to the `WarpX CDash dashboard <https://my.cdash.org/index.php?project=WarpX>`__.
+Each CI job shows up under its own build name, at site ``Azure`` or ``Frank_UO``.
+
+Results from other machines, e.g., an HPC system, can be added to the dashboard as well:
+
+.. code-block:: bash
+
+   cmake -S . -B build -DSITE=<machine> -DBUILDNAME=<build-name>
+   ctest --test-dir build -D ExperimentalBuild
+   ctest --test-dir build -D ExperimentalTest --output-on-failure
+   ctest --test-dir build -D ExperimentalSubmit
+
+``ctest -D ExperimentalBuild`` exits with ``0`` even if the build fails; check its error summary, or run ``cmake --build build`` afterwards.
+
 Other resources
 ---------------
 

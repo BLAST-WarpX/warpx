@@ -200,7 +200,7 @@ jobs:
         ${AMReX_CMAKE_FLAGS}                 \
         ${WARPX_CMAKE_FLAGS}                 \
         ${WARPX_TEST_FLAGS}
-      # build
+      # build: records build time and warnings for CDash; exits 0 even if the build fails
       ctest --test-dir build -D ExperimentalBuild -V
       cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     displayName: 'Build'
@@ -218,17 +218,23 @@ jobs:
       # allow oversubscription for Open MPI 4 and 5
       export OMPI_MCA_rmaps_base_oversubscribe=1
       export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
-      # determine if the build was triggered by a push to the development branch
-      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
-        # run tests (exclude pytest.AMReX when running Python tests)
-        # and submit results to CDash as Experimental
-        ctest --test-dir build --output-on-failure -E AMReX \
-          -D ExperimentalTest -D ExperimentalSubmit
-      else
-        # run tests (exclude pytest.AMReX when running Python tests)
-        ctest --test-dir build --output-on-failure -E AMReX
-      fi
+      # run tests (exclude pytest.AMReX when running Python tests)
+      # and record results for CDash (submitted in the next step)
+      ctest --test-dir build --output-on-failure -E AMReX -D ExperimentalTest
     displayName: 'Test'
+
+  - bash: |
+      # set options
+      set -euo pipefail
+      # submit build and test results to CDash as Experimental
+      if [[ -f build/DartConfiguration.tcl ]]; then
+        ctest --test-dir build -D ExperimentalSubmit
+      fi
+    displayName: 'Submit to CDash'
+    # pushes to the development branch, also if the build or tests failed;
+    # a CDash outage does not fail the job
+    condition: and(succeededOrFailed(), eq(variables['Build.SourceBranch'], 'refs/heads/development'))
+    continueOnError: true
 
   - bash: |
       # set options
