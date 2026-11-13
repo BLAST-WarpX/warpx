@@ -154,6 +154,8 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                 shared[i] = 0.0_rt;
             }
             __syncthreads();
+            // Deposit current into shared memory
+            // Each thread processes a different set of particles; runs over all particles within this bin
             for (unsigned int ip_orig = bin_start+threadIdx.x; ip_orig<bin_stop;
                  ip_orig += blockDim.x)
             {
@@ -161,6 +163,9 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                 deposit_particle.template deposit<(1 << N) - 1>(ip, buffers);
             }
             __syncthreads();
+            // Add current from shared memory into the current stored in global memory
+            // Operates on all components of J at the same time
+            // Each thread runs over a different set of cells
             for (int n = 0; n < N; ++n) {
                 addLocalToGlobal(tbox[n], arrays[n], buffers[n]);
             }
@@ -176,6 +181,8 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                     shared[i] = 0.0_rt;
                 }
                 __syncthreads();
+                // Deposit current into shared memory
+                // Each thread processes a different set of particles; runs over all particles within this bin
                 for (unsigned int ip_orig = bin_start+threadIdx.x; ip_orig<bin_stop;
                      ip_orig += blockDim.x)
                 {
@@ -183,6 +190,8 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
                     deposit_particle.template deposit<(1 << decltype(n)::value)>(ip, buffers);
                 }
                 __syncthreads();
+                // Add current from shared memory into the current stored in global memory
+                // Each thread runs over a different set of cells
                 addLocalToGlobal(tbox[n], arrays[n], buffer);
                 __syncthreads();
             });
