@@ -42,6 +42,7 @@
 #include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
+#include <AMReX_MultiFab.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_OpenMP.H>
@@ -211,6 +212,46 @@ void init_WarpX (py::module& m)
         .def("sync_mass_matrices",
             [](WarpX& wx){ wx.SyncMassMatrices(); },
             R"pbdoc(Sum the guard cells of the mass matrices into the valid cells)pbdoc"
+        )
+        .def("sync_mass_matrices_pc",
+            [](WarpX& wx){ wx.SyncMassMatricesPC(); },
+            R"pbdoc(Sum PC mass-matrix guard cells without folding physical boundaries)pbdoc"
+        )
+        .def("apply_mass_matrices_pc_boundary",
+            [](WarpX& wx, int const lev) {
+                const auto* solver = wx.get_pointer_ImplicitSolver();
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    solver != nullptr && solver->GetMassMatricesCoeff() != nullptr,
+                    "PC mass matrices must be enabled before applying their boundaries");
+                amrex::Array<amrex::IntVect,3> ncomp;
+                for (int idir = 0; idir < 3; ++idir) {
+                    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                        ncomp[idir][idim] = solver->GetMassMatricesPCnComp(idir, idim);
+                    }
+                }
+                const auto S = wx.GetMultiFabRegister().get_alldirs("MassMatrices_PC", lev);
+                wx.ApplyDiagonalMassMatricesBoundary(
+                    lev, S[0], S[1], S[2], ncomp[0], ncomp[1], ncomp[2], PatchType::fine);
+            },
+            py::arg("lev") = 0,
+            R"pbdoc(Fold physical PC mass-matrix boundaries without summing or volume scaling)pbdoc"
+        )
+        .def("fill_boundary_e",
+            [](WarpX& wx, int const lev, amrex::Real const time) {
+                const auto* Ex = wx.GetMultiFabRegister().get("Efield_fp", Direction{0}, lev);
+                wx.FillBoundaryE(lev, Ex->nGrowVect(), true);
+                wx.ApplyEfieldBoundary(lev, PatchType::fine, time);
+            },
+            py::arg("lev") = 0, py::arg("time") = 0.0,
+            R"pbdoc(Synchronize fine-patch E and fill its communication and physical guard cells)pbdoc"
+        )
+        .def("apply_jfield_boundary",
+            [](WarpX& wx, const std::string& name, int const lev) {
+                const auto J = wx.GetMultiFabRegister().get_alldirs(name, lev);
+                wx.ApplyJfieldBoundary(lev, J[0], J[1], J[2], PatchType::fine);
+            },
+            py::arg("name"), py::arg("lev") = 0,
+            R"pbdoc(Apply physical BCs to a fine-patch current-like field without a guard-cell sum)pbdoc"
         )
 
         // Expose functions used to sync the current and charge density multifabs
