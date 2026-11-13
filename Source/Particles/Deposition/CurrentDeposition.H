@@ -33,8 +33,8 @@
  *
  * Kernels with a \c components template parameter deposit only the components whose bits
  * are set, e.g. \c JComponents::x deposits only Jx. The shared memory depositions use this
- * to deposit one component at a time into a single buffer when the buffers for all three
- * components do not fit in shared memory.
+ * to deposit one component at a time into a single shared memory array when the shared
+ * memory arrays for all three components do not fit in shared memory.
  */
 namespace JComponents {
     enum : int { x = 1, y = 2, z = 4, all = x | y | z };
@@ -607,7 +607,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
         if (bin_start == bin_stop) { return; /*this bin has no particles*/ }
 
-        // These boxes define the index space for the shared memory buffers.
+        // These boxes define the index space for the shared memory arrays.
         // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
         amrex::Box buffer_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
 
@@ -1238,7 +1238,7 @@ struct EsirkepovParticleDeposit
 };
 
 /**
- * \brief Esirkepov current deposition using shared memory buffers. Particles are
+ * \brief Esirkepov current deposition using shared memory arrays. Particles are
  *        binned into tiles of bin_size cells, and each tile is processed by one GPU
  *        thread block, which accumulates the current in shared memory before adding
  *        it to the global arrays. Only available for CUDA and HIP.
@@ -1302,11 +1302,12 @@ void doEsirkepovDepositionSharedShapeN (
     using namespace amrex::literals;
 
     // With the CFL condition, a particle in a given cell touches nodes from depos_order
-    // cells below to depos_order+1 cells above that cell, so the buffers cover the tile
-    // grown by depos_order.
+    // cells below to depos_order+1 cells above that cell, so the shared memory arrays cover
+    // the tile grown by depos_order.
     // The new position is the current position (used for binning) pushed by
     // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
-    // grow the buffers by the number of cells that the particle can move in that time.
+    // grow the shared memory arrays by the number of cells that the particle can move in
+    // that time.
     const auto dxiarr = geom.InvCellSizeArray();
     const amrex::Real shift_time = std::abs(relative_time + 0.5_rt*dt);
     int ngrow = depos_order;
