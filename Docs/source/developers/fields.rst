@@ -109,6 +109,72 @@ This is mostly implemented in ``Source/Parallelization``, see the following func
 
 .. doxygenfunction:: WarpX::AddCurrentFromFineLevelandSumBoundary
 
+.. _developers-fields-coarsening-interpolation-helpers:
+
+Coarsening interpolation helpers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The fine-to-coarse helpers in ``Source/ablastr/coarsen`` implement two different
+operators. In the formulas below, :math:`i_c` is the coarse-grid index, :math:`i_f` is a
+fine-grid index, :math:`c_r` is the integer coarsening ratio, and :math:`s_f` and :math:`s_c`
+are the fine and coarse staggering flags in one direction (:math:`0` for cell-centered,
+:math:`1` for nodal). In multiple dimensions, WarpX applies the corresponding 1D
+weights as a tensor product.
+
+``ablastr::coarsen::sample`` is the I/O downsampling operator used by coarsened
+diagnostics. It can map between different fine and coarse staggering. For each
+coarse point, it samples one or two nearby fine points with equal weights:
+
+.. math::
+
+   g_c(i_c) = \frac{1}{n_p} \sum_{i_r=0}^{n_p-1} g_f(i_m+i_r).
+
+For :math:`c_r = 1`, this reduces to recentering without coarsening:
+
+.. math::
+
+   n_p = 1 + |s_f-s_c|,\qquad
+   i_m = i_c - s_c(1-s_f).
+
+For :math:`c_r > 1`, the implemented sampling stencil is:
+
+.. math::
+
+   n_p = 2 - s_f,\qquad
+   i_m = i_c c_r + \left\lfloor \frac{c_r}{2} \right\rfloor (1-s_c) - (1-s_f).
+
+Thus nodal to nodal selects the coincident fine node, nodal to cell-centered
+selects the fine node at the coarse cell center, cell-centered to nodal averages
+the two fine cell centers adjacent to the coarse node, and
+cell-centered to cell-centered averages the two fine cell centers closest to the
+coarse cell center.
+
+``ablastr::coarsen::average`` is the conservative fine-to-coarse operator used for
+mesh refinement data transfers. It requires identical fine and coarse staggering
+and treats values outside the grown fine domain as zero. Its implemented 1D stencil is:
+
+.. math::
+
+   n_p = c_r(1-s_f)(1-s_c) + \left[2(c_r-1)+1\right]s_f s_c,
+
+.. math::
+
+   i_m = i_c c_r(1-s_f)(1-s_c) + (i_c c_r-c_r+1)s_f s_c,
+
+.. math::
+
+   w_f(i_c,i_f) =
+      \frac{1}{c_r}(1-s_f)(1-s_c)
+      + \frac{\left|c_r-\left|i_f-i_c c_r\right|\right|}{c_r^2}s_f s_c,
+
+.. math::
+
+   g_c(i_c) = \sum_{i_r=0}^{n_p-1} w_f(i_c,i_m+i_r) g_f(i_m+i_r).
+
+For cell-centered data this is the average over the :math:`c_r` fine cells covered by
+the coarse cell. For nodal data it is the triangular, charge-conserving stencil
+over :math:`(2 c_r - 1)` fine nodes.
+
 Filter
 ------
 
