@@ -3244,6 +3244,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using two-product ``nuclearfusion`` with ``scattering_angle_model = legendre``, consider the reaction to be ordered as ``A + B -> C + D``, as described for :pp:param:`<collision_name>.species`.
     The first entry in ``product_species`` must be product ``C``, and the second must be product ``D``.
     For example, T(d,n)He4 corresponds to ``d + T -> n + He4``, so ``product_species`` must list the neutron first and helium4 second.
+    For two-product ``nuclearfusion`` reactions, the product macroparticles are created so that charge is conserved locally.
+    If each product has the same charge as one of the reactants (e.g. ``D + D -> T + p`` or ``D + He3 -> He4 + p``), one macroparticle is created per product, at the position of the reactant with the same charge.
+    Otherwise (e.g. ``D + T -> n + He4`` or ``D + D -> n + He3``), two macroparticles are created per product, one at the position of each reactant, each with half of the reaction weight.
 
 .. pp:param:: <collision_name>.ndt_supercycle
     :type: ``int``
