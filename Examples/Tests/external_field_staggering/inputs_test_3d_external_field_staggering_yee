@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# file written at the Yee staggering of each component: with the openPMD
+# position attribute honored, the reader samples it exactly
+warpx.read_fields_from_path = "../test_3d_external_field_staggering_prepare/ext_fields_yee.h5"
