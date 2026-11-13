@@ -1,5 +1,6 @@
 CEXE_sources += DarwinLinearFieldOperator.cpp
 CEXE_sources += ImplicitSolver.cpp
+CEXE_sources += MatrixMarketWriter.cpp
 CEXE_sources += SemiImplicitEM.cpp
 CEXE_sources += SemiImplicitDarwin.cpp
 CEXE_sources += SparseJacobianMatrix.cpp

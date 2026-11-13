@@ -16,6 +16,8 @@
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 struct WarpXSolverDOF;
 
@@ -124,6 +126,14 @@ public:
     void printParameters () const;
 
     /**
+     * \brief Write the matrix in MatrixMarket format (global DOF indices),
+     *        with a_header as metadata lines. Collective over all ranks.
+     */
+    void PrintMatrix (const std::string& a_filename,
+                      const std::vector<std::string>& a_header,
+                      const WarpXSolverDOF& a_dofs) const;
+
+    /**
      * \brief Core assembly routine. Returns 0 on success, positive int
      *        (actual_nnz - nnz_max) if storage is insufficient.
      */
@@ -149,6 +159,7 @@ private:
     int m_ndofs_g = 0;
     int m_pc_mat_nnz = 1;
     int m_num_realloc = 0;
+    amrex::Real m_theta_dt = 0;  /**< theta*dt of the last assembly */
 
     amrex::Gpu::DeviceVector<int> m_r_indices_g;
     amrex::Gpu::DeviceVector<int> m_num_nz;

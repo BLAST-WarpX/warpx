@@ -8,6 +8,7 @@
 #define EXTERNLIB_PC_H_
 
 #include "Fields.H"
+#include "MatrixPrintControl.H"
 #include "Preconditioner.H"
 #include "Utils/TextMsg.H"
 
@@ -80,6 +81,8 @@ class ExternLibPC : public Preconditioner<T,Ops>
 
         std::string m_name = "noname";
 
+        MatrixPrintControl m_print;
+
     private:
 
 };
@@ -88,6 +91,7 @@ template <class T, class Ops>
 void ExternLibPC<T,Ops>::printParameters () const
 {
     amrex::Print() << m_name << " (ExternLibPC): delegates to SparseJacobianMatrix\n";
+    m_print.printParameters();
 }
 
 template <class T, class Ops>
@@ -113,6 +117,8 @@ void ExternLibPC<T,Ops>::Define ( const T& a_U,
     const amrex::ParmParse pp("precon_mat");
     pp.query("verbose", m_verbose);
 
+    m_print.Define(m_name);
+
     m_is_defined = true;
 }
 
@@ -126,6 +132,10 @@ void ExternLibPC<T,Ops>::Update ()
         "ExternLibPC::Update() called on undefined object");
 
     m_ops->AssemblePCMatrix();
+
+    if (m_print.ShouldPrint(m_ops->GetCurrentStep())) {
+        m_ops->PrintPCMatrix(m_print.FileName(), m_print.HeaderLines());
+    }
 
     if (m_verbose) {
         amrex::Print() << "Updated " << m_name
