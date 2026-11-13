@@ -132,7 +132,7 @@ namespace
             amrex::ParticleReal & uz = dst.m_rdata[PIdx::uz][i_dst];
 
             if (m_boundary < 2*AMREX_SPACEDIM) {
-                int const idim = m_boundary / 2;
+                [[maybe_unused]] int const idim = m_boundary / 2;
                 int const iside = m_boundary % 2;
 
                 // Get the absorbed particle position
