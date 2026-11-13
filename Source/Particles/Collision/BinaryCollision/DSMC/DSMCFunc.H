@@ -153,13 +153,22 @@ public:
                     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
                         (m_process_count <= max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow up to 4). Update the max_process_count value in source code to allow more scattering processes."
                     );
+
+                    // If the target species (species 2) undergoes field ionization, retrieve its
+                    // current ionization level so that impact ionization of an already fully-ionized
+                    // target can be disabled (see WarpX discussion #6220). A negative value disables
+                    // this gate for target species that do not carry an ionization level.
+                    const int target_ion_lev = (m_target_ion_lev_comp >= 0) ?
+                        soa_2.m_runtime_idata[m_target_ion_lev_comp][ I2[i2] ] : -1;
+
                     CollisionPairFilter<max_process_count>(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
                         m1, m2, w1[ I1[i1] ], w2[ I2[i2] ],
                         dt, dV, static_cast<int>(pair_index), p_mask,
                         p_pair_reaction_weight, multiplier_ratio,
-                        m_process_count, m_scattering_processes_data, engine);
+                        m_process_count, m_scattering_processes_data,
+                        target_ion_lev, m_target_max_ion_lev, engine);
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {
@@ -184,9 +193,25 @@ public:
         bool m_need_product_data = false;
         bool m_isSameSpecies = false;
         ScatteringProcess::Executor* m_scattering_processes_data;
+        /** Runtime int component index of the "ionizationLevel" attribute on the target
+         *  species (species 2), or -1 if the target species does not undergo field ionization. */
+        int m_target_ion_lev_comp = -1;
+        /** Maximum ionization level (atomic number) of the target species. */
+        int m_target_max_ion_lev = 0;
     };
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
+
+    /**
+     * \brief Register the target species of DSMC impact ionization so that impact ionization
+     * of already fully-ionized particles can be skipped (relevant when the target species also
+     * undergoes field ionization, see WarpX discussion #6220). This must be called after the
+     * ionization module has been initialized (i.e. once collisions are performed), since the
+     * "ionizationLevel" runtime attribute does not exist at construction time.
+     *
+     * @param[in] target the target species of the collision (species 2)
+     */
+    void setIonizationTarget (WarpXParticleContainer& target);
 
     bool use_global_debye_length() { return false; }
 
@@ -195,6 +220,8 @@ private:
     amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
 
     bool m_isSameSpecies;
+    //! Whether this collision set includes an impact ionization process.
+    bool m_has_ionization_process = false;
 
     Executor m_exe;
 };

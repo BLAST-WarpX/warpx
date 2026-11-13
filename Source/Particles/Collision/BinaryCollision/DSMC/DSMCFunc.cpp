@@ -48,6 +48,7 @@ DSMCFunc::DSMCFunc (
         }
 
         if (process.type() == ScatteringProcessType::IONIZATION) {
+            m_has_ionization_process = true;
             // Ensure that the first product species is always an electron (which is assumed
             // during the scattering operation).
             amrex::Vector<std::string> product_species_names;
@@ -106,4 +107,17 @@ DSMCFunc::DSMCFunc (
     m_exe.m_scattering_processes_data = m_scattering_processes_exe.data();
     m_exe.m_process_count = static_cast<int>(m_scattering_processes_exe.size());
     m_exe.m_isSameSpecies = m_isSameSpecies;
+}
+
+void DSMCFunc::setIonizationTarget (WarpXParticleContainer& target)
+{
+    // The gate is only relevant if this collision set performs impact ionization and the
+    // target species also undergoes field ionization (in which case it carries a per-particle
+    // "ionizationLevel" attribute). In all other cases we disable the gate (m_target_ion_lev_comp < 0).
+    if (m_has_ionization_process && target.DoFieldIonization() && target.HasiAttrib("ionizationLevel")) {
+        m_exe.m_target_ion_lev_comp = target.GetIntCompIndex("ionizationLevel");
+        m_exe.m_target_max_ion_lev = target.getIonizationMaxLevel();
+    } else {
+        m_exe.m_target_ion_lev_comp = -1;
+    }
 }
