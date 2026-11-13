@@ -1,7 +1,8 @@
 #include "FlushFormatCatalyst.H"
 
-#include "WarpX.H"
+#include "Python/GIL.H"
 #include "Utils/TextMsg.H"
+#include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
@@ -106,6 +107,10 @@ FlushFormatCatalyst::FlushFormatCatalyst() {
     node["catalyst_load/implementation"].set_string(implementation);
     node["catalyst_load/search_paths/" + implementation].set_string(searchPaths);
 
+    // If WarpX is driven from Python, then Catalyst runs its Python pipeline scripts in the same
+    // interpreter and relies on its caller to hold the GIL.
+    const warpx::python::ScopedGIL gil;
+
     catalyst_status err = catalyst_initialize(conduit::c_node(&node));
     if (err != catalyst_status_ok)
     {
@@ -175,6 +180,8 @@ FlushFormatCatalyst::WriteToFile (
     ABLASTR_PROFILE_VAR_STOP(prof_catalyst_particles);
 
     // Execution
+    // see the constructor: Catalyst relies on its caller to hold the GIL
+    const warpx::python::ScopedGIL gil;
     ABLASTR_PROFILE_VAR("FlushFormatCatalyst::WriteToFile::execute", prof_catalyst_execute);
     catalyst_status err = catalyst_execute(conduit::c_node(&node));
     if (err != catalyst_status_ok)
@@ -194,6 +201,9 @@ FlushFormatCatalyst::WriteToFile (
 
 #ifdef AMREX_USE_CATALYST
 FlushFormatCatalyst::~FlushFormatCatalyst() {
+
+    // see the constructor: Catalyst relies on its caller to hold the GIL
+    const warpx::python::ScopedGIL gil;
 
     conduit::Node node;
     catalyst_status err = catalyst_finalize(conduit::c_node(&node));
