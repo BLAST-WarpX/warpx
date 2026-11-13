@@ -131,11 +131,11 @@ void doSharedDepositionImpl (const DepositParticle& deposit_particle,
 
         // These boxes define the index space for the shared memory arrays.
         // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
-        amrex::Box buffer_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
-        buffer_box.grow(ngrow);
+        amrex::Box shared_memory_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
+        shared_memory_box.grow(ngrow);
         amrex::GpuArray<amrex::Box, N> tbox;
         for (int n = 0; n < N; ++n) {
-            tbox[n] = amrex::convert(buffer_box, types[n]);
+            tbox[n] = amrex::convert(shared_memory_box, types[n]);
         }
 
         amrex::Gpu::SharedMemory<amrex::Real> gsm;

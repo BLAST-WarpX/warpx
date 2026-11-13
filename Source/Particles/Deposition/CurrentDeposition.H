@@ -609,12 +609,12 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
         // These boxes define the index space for the shared memory arrays.
         // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
-        amrex::Box buffer_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
+        amrex::Box shared_memory_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
 
-        buffer_box.grow(depos_order);
-        Box tbox_x = convert(buffer_box, jx_type);
-        Box tbox_y = convert(buffer_box, jy_type);
-        Box tbox_z = convert(buffer_box, jz_type);
+        shared_memory_box.grow(depos_order);
+        Box tbox_x = convert(shared_memory_box, jx_type);
+        Box tbox_y = convert(shared_memory_box, jy_type);
+        Box tbox_z = convert(shared_memory_box, jz_type);
 
         Gpu::SharedMemory<amrex::Real> gsm;
         amrex::Real* const shared = gsm.dataPtr();
