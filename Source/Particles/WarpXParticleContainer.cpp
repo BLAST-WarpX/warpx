@@ -135,9 +135,8 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level)
 {
 }
 
-WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
-    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
-                   info.SetDynamic(WarpX::do_dynamic_scheduling))
+WarpXParIter::WarpXParIter (ContainerType& pc, int level, const MFItInfo& info)
+    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level, info)
 {
 }
 
