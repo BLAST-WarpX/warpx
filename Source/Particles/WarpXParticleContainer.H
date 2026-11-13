@@ -116,7 +116,7 @@ public:
 
     WarpXParIter (ContainerType& pc, int level);
 
-    WarpXParIter (ContainerType& pc, int level, amrex::MFItInfo& info);
+    WarpXParIter (ContainerType& pc, int level, const amrex::MFItInfo& info);
 
     [[nodiscard]] const std::array<RealVector, PIdx::nattribs>& GetAttribs () const
     {

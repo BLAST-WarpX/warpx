@@ -79,7 +79,7 @@ Test output goes to `build/bin/<test_name>/`.
   which also runs `ctest` under the UB/address sanitizers.
 - **Runtime tests: `.azure-pipelines.yml`** — builds the `matrix:` of dimensionality/feature
   combinations and runs the full `ctest` suite for each.
-- **GPU tests: `.gitlab/ci.yaml`** — builds and runs one smoke test on NVIDIA H100 and AMD MI300
+- **GPU tests: `.gitlab/ci.yaml`** — builds and runs one smoke test on NVIDIA H200 and AMD MI300
   runners, through a GitHub-to-GitLab mirror. Only triggered on merges to `development` and on
   PRs labeled `bot: run GPU`, so it is absent from a default PR's checks.
 
