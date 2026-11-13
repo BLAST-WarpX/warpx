@@ -38,6 +38,19 @@ jobs:
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
 
+  codeowners:
+    # rules that match or apply to no file (e.g., after moving or removing a
+    # directory, or in the wrong order), invalid or unknown owners
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: CODEOWNERS
+      env:
+        GITHUB_TOKEN: ${{ github.token }}  # to check that the @users exist
+      run: .github/workflows/scripts/codeowners_reviewers.py --check
+
   zenodo:
     runs-on: ubuntu-latest
     steps:
