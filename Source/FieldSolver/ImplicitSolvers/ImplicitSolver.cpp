@@ -781,6 +781,21 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("max_particle_iterations", m_max_particle_iterations);
         pp.query("particle_tolerance", m_particle_tolerance);
         pp.query("particle_suborbits", m_particle_suborbits);
+        if (m_particle_suborbits && m_WarpX->maxLevel() > 0) {
+            // Sub-orbit particles in a field gather buffer gather from the coarse level and
+            // deposit their current there, into the current deposition buffer, since the
+            // sub-orbit push uses the same level for gather and deposition. This mirrors the
+            // allocation of these buffers in WarpX::AllocLevelMFs. The buffer sizes are final
+            // here, because the levels are allocated before the implicit solver is defined.
+            bool const has_gather_buffer = WarpX::n_field_gather_buffer > 0 ||
+                m_WarpX->GetPartContainer().nSpeciesGatherFromMainGrid() > 0;
+            bool const has_current_buffer = WarpX::n_current_deposition_buffer > 0;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!has_gather_buffer || has_current_buffer,
+                "implicit_evolve.particle_suborbits = 1 with mesh refinement does not support "
+                "field gather buffers without current deposition buffers. Set "
+                "warpx.n_current_deposition_buffer > 0, or do not use field gather buffers "
+                "(warpx.n_field_gather_buffer = 0 and no particles.gather_from_main_grid).");
+        }
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("suborbit_warning_threshold", m_suborbit_warning_threshold);
         pp.query("suborbit_statistics_interval", m_suborbit_statistics_interval);

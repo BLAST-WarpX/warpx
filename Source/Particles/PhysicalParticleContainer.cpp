@@ -824,6 +824,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         FArrayBox const* cbyfab = &cBy[pti];
                         FArrayBox const* cbzfab = &cBz[pti];
 
+                        // Allocated whenever gather buffers are: with sub-orbits,
+                        // ImplicitSolver::parseNonlinearSolverParams aborts for gather
+                        // buffers without current deposition buffers.
                         amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
                         amrex::MultiFab * cjy = fields.get(FieldType::current_buf, Direction{1}, lev);
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
