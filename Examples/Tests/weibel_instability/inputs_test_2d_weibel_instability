@@ -1,0 +1,74 @@
+# ===== Numerics / grid =====
+algo.particle_shape = 2                                  # quadratic (2nd-order) particle shape factor
+amr.blocking_factor_x = 64                               # min grid dimension along x
+amr.blocking_factor_y = 64                               # min grid dimension along z (2nd dim in 2D)
+amr.max_grid_size_x = 64                                 # max cells per grid block along x
+amr.max_grid_size_y = 64                                 # max cells per grid block along z (2nd dim in 2D)
+amr.max_level = 0                                        # no mesh refinement
+amr.n_cell = 128 128                                     # cells in x, z
+
+# ===== Boundary conditions =====
+boundary.field_hi = periodic periodic                    # periodic upper field boundaries
+boundary.field_lo = periodic periodic                    # periodic lower field boundaries
+boundary.particle_hi = periodic periodic                 # periodic upper particle boundaries
+boundary.particle_lo = periodic periodic                 # periodic lower particle boundaries
+
+# ===== Diagnostics =====
+diag1.diag_type = Full                                   # full diagnostic
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_electrons_1 rho_electrons_2 jx jy jz divE rho
+diag1.file_min_digits = 8                                # zero-padding of output step numbers
+diag1.format = openpmd                                   # openPMD output format
+diag1.intervals = 10                                     # dump every 10 steps (sampling for growth-rate fit)
+diag1.openpmd_backend = h5                               # HDF5 backend
+diagnostics.diags_names = diag1                          # active diagnostics
+
+# ===== Reduced diagnostics =====
+EF.intervals = 1                                         # compute every step
+EF.type = FieldEnergy                                    # total E and B field energy
+
+# ===== Electron beam 1 (drifting along +y) =====
+electrons_1.charge = -q_e                                # electron charge
+electrons_1.density = 1e25                               # number density [m^-3]
+electrons_1.injection_style = NUniformPerCell            # uniform placement per cell
+electrons_1.mass = m_e                                   # electron mass
+electrons_1.maxwellian_u_mean_distribution_type = constant
+electrons_1.maxwellian_u_std_distribution_type = constant
+electrons_1.momentum_distribution_type = maxwellian      # drifting Maxwellian
+electrons_1.num_particles_per_cell_each_dim = 4 4        # macroparticles per cell in x, z
+electrons_1.profile = constant                           # uniform density
+electrons_1.ux_mean = 0                                  # no x drift
+electrons_1.ux_std = 0.0001414213562373095               # thermal spread in u_x (isotropic)
+electrons_1.uy_mean = 0.010000500037503125               # +y drift, u = gamma*beta with beta = 0.01 (out of plane)
+electrons_1.uy_std = 0.0001414213562373095               # thermal spread in u_y (isotropic)
+electrons_1.uz_mean = 0                                  # no z drift
+electrons_1.uz_std = 0.0001414213562373095               # thermal spread in u_z (isotropic)
+
+# ===== Electron beam 2 (drifting along -y) =====
+electrons_2.charge = -q_e                                # electron charge
+electrons_2.density = 1e25                               # number density [m^-3]
+electrons_2.injection_style = NUniformPerCell            # uniform placement per cell
+electrons_2.mass = m_e                                   # electron mass
+electrons_2.maxwellian_u_mean_distribution_type = constant
+electrons_2.maxwellian_u_std_distribution_type = constant
+electrons_2.momentum_distribution_type = maxwellian      # drifting Maxwellian
+electrons_2.num_particles_per_cell_each_dim = 4 4        # macroparticles per cell in x, z
+electrons_2.profile = constant                           # uniform density
+electrons_2.ux_mean = 0                                  # no x drift
+electrons_2.ux_std = 0.0001414213562373095               # thermal spread in u_x (isotropic)
+electrons_2.uy_mean = -0.010000500037503125              # -y drift, counter-streaming with beam 1
+electrons_2.uy_std = 0.0001414213562373095               # thermal spread in u_y (isotropic)
+electrons_2.uz_mean = 0                                  # no z drift
+electrons_2.uz_std = 0.0001414213562373095               # thermal spread in u_z (isotropic)
+
+# ===== Geometry =====
+geometry.dims = 2                                        # 2D (x-z) simulation
+geometry.prob_hi =  17.25e-6 92.0e-6                     # domain upper bounds in x, z [m]
+geometry.prob_lo = -17.25e-6  0.0e-6                     # domain lower bounds in x, z [m]
+
+# ===== Run control =====
+max_step = 900                                           # number of timesteps
+particles.species_names = electrons_1 electrons_2        # all species
+warpx.cfl = 0.9999                                       # Courant number
+warpx.random_seed = 1                                    # fixed seed for reproducible checksums
+warpx.reduced_diags_names = EF                           # active reduced diagnostics
+warpx.verbose = 1                                        # verbose console output
