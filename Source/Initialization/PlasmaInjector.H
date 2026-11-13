@@ -119,6 +119,7 @@ public:
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
+    std::string m_external_file_species_name;
 #ifdef WARPX_USE_OPENPMD
     //! openPMD::Series to load from in external_file injection
     std::any m_openpmd_input_series;
