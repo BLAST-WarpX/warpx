@@ -124,3 +124,4 @@ AMReX data structures (e.g., ``MultiFab``, ``ParticleContainer``, ``Geometry``),
 - I/O and diagnostic code that interacts with AMReX plotfiles or openPMD
 
 For instructions on configuring Context7 as an MCP server in your coding assistant (Claude Code, Cursor, VS Code, Windsurf, Codex CLI, and others), see the `Context7 client documentation <https://context7.com/docs/resources/all-clients>`__ and the :ref:`ai_input_design` page.
+Berkeley Lab (LBNL) users can access Context7 under a commercial license through the laboratory's `CBorg AI Portal <https://cborg.lbl.gov/mcp_servers/>`__; see the tip on the :ref:`ai_input_design` page for details.
