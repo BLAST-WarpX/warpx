@@ -1299,6 +1299,11 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid, WarpXGridBase):
         default=None,
         description="Blocking factor (which controls the block size) in the z direction (the second axis of the grid, y in PICMI)",
     )
+    particle_boundary_eb: str | None = Field(
+        default=None,
+        alias="warpx_boundary_particle_eb",
+        description="The boundary condition applied to the particles when they reach the surface of the embedded boundary. Absorbing, Reflecting, or Transparent",
+    )
     # option names (warpx_potential_lo/hi_x/z) differ from the field names:
     potential_xmin: float | str | None = Field(
         default=None,
@@ -1361,6 +1366,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid, WarpXGridBase):
         pywarpx.amr.blocking_factor_y = self.blocking_factor_y
 
         # Boundary conditions
+        pywarpx.boundary.particle_eb = self.particle_boundary_eb
         pywarpx.boundary.field_lo = [
             BC_map[bc] for bc in self.lower_boundary_conditions
         ]
@@ -1430,6 +1436,11 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid, WarpXGridBase):
     blocking_factor_z: int | None = Field(
         default=None,
         description="Blocking factor (which controls the block size) in the z direction",
+    )
+    particle_boundary_eb: str | None = Field(
+        default=None,
+        alias="warpx_boundary_particle_eb",
+        description="The boundary condition applied to the particles when they reach the surface of the embedded boundary. Absorbing, Reflecting, or Transparent",
     )
     potential_xmin: float | str | None = Field(
         default=None,
@@ -1501,6 +1512,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid, WarpXGridBase):
         pywarpx.amr.blocking_factor_z = self.blocking_factor_z
 
         # Boundary conditions
+        pywarpx.boundary.particle_eb = self.particle_boundary_eb
         pywarpx.boundary.field_lo = [
             BC_map[bc] for bc in self.lower_boundary_conditions
         ]

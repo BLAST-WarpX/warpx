@@ -298,8 +298,9 @@ void WarpX::MakeWarpX ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             eb_particle_boundary == ParticleBoundaryType::Absorbing ||
             eb_particle_boundary == ParticleBoundaryType::Reflecting ||
-            eb_particle_boundary == ParticleBoundaryType::Thermal,
-            "boundary.particle_eb must be Absorbing, Reflecting, or Thermal");
+            eb_particle_boundary == ParticleBoundaryType::Thermal ||
+            eb_particle_boundary == ParticleBoundaryType::None,
+            "boundary.particle_eb must be Absorbing, Reflecting, Thermal, or None");
     }
 
     CheckGriddingForRZSpectral();
