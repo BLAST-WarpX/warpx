@@ -599,6 +599,7 @@ Diagnostics::InitBaseData ()
     // allocate vector of buffers and vector of levels for each buffer for summation multifab for TimeAveragedDiagnostics
     if (m_diag_type == DiagTypes::TimeAveraged) {
         m_sum_mf_output.resize(m_num_buffers);
+        m_num_summed_steps.resize(m_num_buffers, 0);
         for (int i = 0; i < m_num_buffers; ++i) {
             m_sum_mf_output[i].resize( nmax_lev );
         }
@@ -657,6 +658,9 @@ Diagnostics::ComputeAndPack ()
                 ablastr::utils::communication::FillBoundary(m_mf_output[i_buffer][lev], WarpX::do_single_precision_comms,
                                                             warpx.Geom(lev).periodicity());
             }
+        }
+        if (m_diag_type == DiagTypes::TimeAveraged) {
+            ++m_num_summed_steps[i_buffer];
         }
         // Call Particle functor
         for (int isp = 0; isp < m_all_particle_functors.size(); ++isp) {
