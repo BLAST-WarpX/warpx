@@ -511,7 +511,6 @@ void doDepositionShapeNImplicit([[maybe_unused]] const amrex::ParticleReal * con
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  * \param a_bins             bins used for particle sorting
  * \param box                the current box
- * \param geom               the geometry of the current level
  * \param a_tbox_max_size    the maximum size of a tilebox
  * \param threads_per_block  number of threads to use per block in shared deposition
  * \param bin_size           tileSize to use for shared current deposition operations
@@ -535,7 +534,6 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                int n_rz_azimuthal_modes,
                                const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
                                const amrex::Box& box,
-                               const amrex::Geometry& geom,
                                const amrex::IntVect& a_tbox_max_size,
                                const int threads_per_block,
                                const amrex::IntVect bin_size)
@@ -560,10 +558,6 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     constexpr int CELL = amrex::IndexType::CELL;
 
     // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
-    const auto dxiarr = geom.InvCellSizeArray();
-    const auto plo = geom.ProbLoArray();
-    const auto domain = geom.Domain();
-
     amrex::Box sample_tbox(IntVect(AMREX_D_DECL(0,0,0)), a_tbox_max_size - 1);
     sample_tbox.grow(depos_order);
 
@@ -593,25 +587,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
         if (bin_start == bin_stop) { return; /*this bin has no particles*/ }
 
         // These boxes define the index space for the shared memory buffers
-        amrex::Box buffer_box;
-        {
-            ParticleReal xp, yp, zp;
-            GetPosition(permutation[bin_start], xp, yp, zp);
-#if defined(WARPX_DIM_3D)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((yp-plo[1]) * dxiarr[1]) ),
-                                 int( amrex::Math::floor((zp-plo[2]) * dxiarr[2]) ));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((zp-plo[1]) * dxiarr[1]) ));
-#elif defined(WARPX_DIM_1D_Z)
-            IntVect iv = IntVect(int( amrex::Math::floor((zp-plo[0]) * dxiarr[0]) ));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ));
-#endif
-            iv += domain.smallEnd();
-            getTileIndex(iv, box, true, bin_size, buffer_box);
-        }
+        amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
 
         buffer_box.grow(depos_order);
         Box tbox_x = convert(buffer_box, jx_type);
@@ -682,7 +658,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     ignore_unused(
         GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
         np_to_deposit, relative_time, dinv, xyzmin, lo, q,
-        n_rz_azimuthal_modes, a_bins, box, geom, a_tbox_max_size,
+        n_rz_azimuthal_modes, a_bins, box, a_tbox_max_size,
         threads_per_block, bin_size);
     WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
 #endif

@@ -429,6 +429,29 @@ add_warpx_test(
     OFF  # dependency
 )
 
+# The shared-memory current deposition is only available on GPU
+if(WarpX_COMPUTE STREQUAL CUDA OR WarpX_COMPUTE STREQUAL HIP)
+    add_warpx_test(
+        test_rz_langmuir_multi_direct  # name
+        RZ  # dims
+        2  # nprocs
+        inputs_test_rz_langmuir_multi_direct  # inputs
+        "analysis_rz.py diags/diag1000080"  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+
+    add_warpx_test(
+        test_rz_langmuir_multi_direct_shared_mem  # name
+        RZ  # dims
+        2  # nprocs
+        inputs_test_rz_langmuir_multi_direct_shared_mem  # inputs
+        "analysis_compare_shared_mem.py diags/diag1000080 ../test_rz_langmuir_multi_direct/diags/diag1000080"  # analysis
+        OFF  # checksum
+        test_rz_langmuir_multi_direct  # dependency
+    )
+endif()
+
 add_warpx_test(
     test_rz_langmuir_multi_picmi  # name
     RZ  # dims
