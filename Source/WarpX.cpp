@@ -1060,12 +1060,16 @@ WarpX::ReadParameters ()
         pp_warpx.query("do_pml_dive_cleaning", do_pml_dive_cleaning);
         pp_warpx.query("do_pml_divb_cleaning", do_pml_divb_cleaning);
 
-        // TODO Implement div(B) cleaning in PML with FDTD and remove ASSERT
-        if (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD)
+        if (do_pml_divb_cleaning && electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                do_pml_divb_cleaning == false,
-                "warpx.do_pml_divb_cleaning = true not implemented for FDTD solver");
+                evolve_scheme == EvolveScheme::Explicit && m_do_subcycling == 0 &&
+                    grid_type == GridType::Staggered,
+                "FDTD magnetic PML cleaning requires explicit staggered grids without subcycling");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC,
+                "FDTD magnetic PML cleaning requires the Yee or CKC solver");
         }
 
         // Divergence cleaning in PMLs for PSATD solver implemented only

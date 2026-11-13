@@ -75,20 +75,22 @@ void FiniteDifferenceSolver::EvolveEPML (
             fields.get(FieldType::pml_F_fp, level) : fields.get(FieldType::pml_F_cp, level);
     }
 
+    bool const divb_cleaning = fields.has(FieldType::pml_G_fp, level);
+
     if (m_grid_type == GridType::Collocated) {
 
         EvolveEPMLCartesian <CartesianNodalAlgorithm> (
-            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles );
+            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles, divb_cleaning );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee || m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
         EvolveEPMLCartesian <CartesianYeeAlgorithm> (
-            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles );
+            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles, divb_cleaning );
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         EvolveEPMLCartesian <CartesianCKCAlgorithm> (
-            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles );
+            Efield, Bfield, Jfield, eb_update_E, Ffield, sigba, dt, pml_has_particles, divb_cleaning );
 
     } else {
         WARPX_ABORT_WITH_MESSAGE("EvolveEPML: Unknown algorithm");
@@ -107,7 +109,7 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
     std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const& eb_update_E,
     amrex::MultiFab* const Ffield,
     MultiSigmaBox const& sigba,
-    amrex::Real const dt, bool pml_has_particles ) {
+    amrex::Real const dt, bool pml_has_particles, bool divb_cleaning ) {
 
     Real constexpr c2 = PhysConst::c2;
 
@@ -155,10 +157,12 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
 
                 Ex(i, j, k, PMLComp::xz) -= c2 * dt * (
                     T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k, PMLComp::yx)
-                  + T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k, PMLComp::yz) );
+                  + T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k, PMLComp::yz)
+                  + (divb_cleaning ? T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k, PMLComp::yy) : 0._rt) );
                 Ex(i, j, k, PMLComp::xy) += c2 * dt * (
                     T_Algo::DownwardDy(Bz, coefs_y, n_coefs_y, i, j, k, PMLComp::zx)
-                  + T_Algo::DownwardDy(Bz, coefs_y, n_coefs_y, i, j, k, PMLComp::zy) );
+                  + T_Algo::DownwardDy(Bz, coefs_y, n_coefs_y, i, j, k, PMLComp::zy)
+                  + (divb_cleaning ? T_Algo::DownwardDy(Bz, coefs_y, n_coefs_y, i, j, k, PMLComp::zz) : 0._rt) );
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
@@ -168,10 +172,12 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
 
                 Ey(i, j, k, PMLComp::yx) -= c2 * dt * (
                     T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k, PMLComp::zx)
-                  + T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k, PMLComp::zy) );
+                  + T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k, PMLComp::zy)
+                  + (divb_cleaning ? T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k, PMLComp::zz) : 0._rt) );
                 Ey(i, j, k, PMLComp::yz) += c2 * dt * (
                     T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k, PMLComp::xy)
-                  + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k, PMLComp::xz) );
+                  + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k, PMLComp::xz)
+                  + (divb_cleaning ? T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k, PMLComp::xx) : 0._rt) );
             },
 
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
@@ -180,10 +186,12 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
 
                 Ez(i, j, k, PMLComp::zy) -= c2 * dt * (
                     T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k, PMLComp::xy)
-                  + T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k, PMLComp::xz) );
+                  + T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k, PMLComp::xz)
+                  + (divb_cleaning ? T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k, PMLComp::xx) : 0._rt) );
                 Ez(i, j, k, PMLComp::zx) += c2 * dt * (
                     T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k, PMLComp::yx)
-                  + T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k, PMLComp::yz) );
+                  + T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k, PMLComp::yz)
+                  + (divb_cleaning ? T_Algo::DownwardDx(By, coefs_x, n_coefs_x, i, j, k, PMLComp::yy) : 0._rt) );
             }
 
         );
