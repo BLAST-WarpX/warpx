@@ -4796,7 +4796,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :default: ``0``
     :optional:
 
-    Whether to save all modes when in RZ.  When ``openpmd_backend = openpmd``, this parameter is ignored and all modes are saved.
+    Whether to save all modes when in RZ.  When :pp:param:`<diag_name>.format` is ``openpmd``, this parameter is ignored and all modes are saved.
 
 .. pp:param:: <diag_name>.particle_fields_to_plot
     :type: list of ``strings``

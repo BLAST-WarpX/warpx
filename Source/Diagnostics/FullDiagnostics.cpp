@@ -654,6 +654,9 @@ FullDiagnostics::AddRZModeNamesToDiags ()
 {
 #ifdef WARPX_DIM_RZ
     if (!m_dump_rz_modes) { return; }
+    // openPMD writes all modes natively and builds its own names, see
+    // InitializeFieldFunctorsRZopenPMD
+    if (m_format == "openpmd") { return; }
 
     const int ncomp_multimodefab = RZModesNComp();
 
