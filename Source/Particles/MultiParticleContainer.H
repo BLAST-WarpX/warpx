@@ -249,7 +249,6 @@ public:
     */
     void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
 
-#ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every
      * timestep in Evolve and is used to create Schwinger electron-positron pairs.
      * Within this function we loop over all cells to calculate the number of
@@ -264,7 +263,6 @@ public:
      * object (to make the link between Real and int quantities).
      */
     [[nodiscard]] amrex::Box ComputeSchwingerGlobalBox () const;
-#endif
 
     void Restart (const std::string& dir);
 
@@ -515,6 +513,37 @@ protected:
      */
     void BreitWheelerGenerateTable();
 
+#endif
+
+private:
+
+    // physical particles (+ laser)
+    amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
+
+    void ReadParameters ();
+
+    /** Guards ReadParameters against running twice for this instance.
+     */
+    bool m_params_initialized = false;
+
+    void mapSpeciesProduct ();
+
+    bool m_do_back_transformed_particles = false;
+
+    /**
+    * Should be called right after mapSpeciesProduct in InitData.
+    * It checks the physical correctness of product particle species
+    * selected by the user for ionization process.
+    */
+    void CheckIonizationProductSpecies();
+
+    /**
+    * Should be called right after mapSpeciesProduct in InitData.
+    * It checks the physical correctness of product particle species
+    * selected by the user for QED processes.
+    */
+    void CheckQEDProductSpecies();
+
     /** Whether or not to activate Schwinger process */
     bool m_do_qed_schwinger = false;
     /** Name of Schwinger electron product species */
@@ -542,38 +571,6 @@ protected:
     amrex::Real m_qed_schwinger_zmin = std::numeric_limits<amrex::Real>::lowest();
     amrex::Real m_qed_schwinger_zmax = std::numeric_limits<amrex::Real>::max();
 
-#endif
-
-private:
-
-    // physical particles (+ laser)
-    amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
-
-    void ReadParameters ();
-
-    /** Guards ReadParameters against running twice for this instance.
-     */
-    bool m_params_initialized = false;
-
-    void mapSpeciesProduct ();
-
-    bool m_do_back_transformed_particles = false;
-
-    /**
-    * Should be called right after mapSpeciesProduct in InitData.
-    * It checks the physical correctness of product particle species
-    * selected by the user for ionization process.
-    */
-    void CheckIonizationProductSpecies();
-
-#ifdef WARPX_QED
-    /**
-    * Should be called right after mapSpeciesProduct in InitData.
-    * It checks the physical correctness of product particle species
-    * selected by the user for QED processes.
-    */
-    void CheckQEDProductSpecies();
-#endif
 
 
 };
