@@ -13,6 +13,8 @@
 #include <AMReX_GpuContainers.H>
 #include <AMReX_TypeTraits.H>
 
+#include <WarpX.H>
+
 /**
  * \brief Apply a filter, copy, and transform operation to the particles
  * in src, in that order, writing the result to dst, starting at dst_index.
@@ -74,6 +76,8 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
     const auto src_data = src.getParticleTileData();
     const auto dst_data = dst.getParticleTileData();
 
+    const auto step = WarpX::GetInstance().getistep(0);
+
     amrex::ParallelForRNG(np,
     [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
     {
@@ -82,7 +86,7 @@ Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
             for (int j = 0; j < N; ++j) {
                 copy(dst_data, src_data, i, N*p_offsets[i] + dst_index + j, engine);
             }
-            transform(dst_data, src_data, i, N*p_offsets[i] + dst_index, engine);
+            transform(dst_data, src_data, i, N*p_offsets[i] + dst_index, step, engine);
         }
     });
 
