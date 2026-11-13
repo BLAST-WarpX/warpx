@@ -1,0 +1,130 @@
+# Reviewers requested automatically when a pull request touches these paths.
+# Paths without an entry get no automatic request; review still happens as
+# described in GOVERNANCE.md and CONTRIBUTING.md.
+#
+# Owners are often the original authors and regular contributors of a path.
+# GitHub only requests reviews automatically from owners with write access to the
+# repository, i.e., members of the technical and steering committees (see
+# GOVERNANCE.md). On pull requests without other assigned reviewers, once they
+# are ready for review (not a draft, no `[WIP]` title), the workflow
+# .github/workflows/codeowners.yml contacts the other owners once: it requests
+# their review if they are members of the GitHub organization and mentions them
+# in a single comment otherwise. It does not re-add de-assigned reviewers.
+# Initial assignments can be de-assigned, e.g., if for a few select PRs the reviewers
+# are not a good choice.
+#
+# The last matching pattern wins, so keep any broader pattern above the
+# narrower ones it should not override.
+
+# Field solvers
+/Source/FieldSolver/ElectrostaticSolvers/                        @roelof-groenewald @RemiLehe @dpgrote
+/Source/FieldSolver/WarpXSolveFieldsES.cpp                       @roelof-groenewald @RemiLehe @dpgrote
+/Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/       @roelof-groenewald @prkkumar-he @clarkse-he
+/Source/FieldSolver/FiniteDifferenceSolver/HybridPICSolveE.cpp   @roelof-groenewald @prkkumar-he @clarkse-he
+/Source/FieldSolver/WarpXPushFieldsHybridPIC.cpp                 @roelof-groenewald @prkkumar-he @clarkse-he
+/Source/FieldSolver/ImplicitSolvers/                             @JustinRayAngus @dpgrote @RemiLehe
+/Source/FieldSolver/SpectralSolver/                              @EZoni @RemiLehe @dpgrote @oshapoval
+/Source/NonlinearSolvers/                                        @debog @JustinRayAngus @WeiqunZhang
+
+# Particles
+/Source/Particles/Collision/                                     @RemiLehe @dpgrote @JustinRayAngus
+/Source/Particles/Collision/BackgroundMCC/                       @roelof-groenewald @RemiLehe
+/Source/Particles/Collision/BinaryCollision/DSMC/                @roelof-groenewald @RemiLehe
+/Source/Particles/Collision/BinaryCollision/LinearBreitWheeler/  @aeriforme @RemiLehe @lucafedeli88
+/Source/Particles/Collision/BinaryCollision/LinearCompton/       @aeriforme @RemiLehe @lucafedeli88
+/Source/Particles/Deposition/                                    @JustinRayAngus @dpgrote @ax3l
+/Source/Particles/Gather/                                        @JustinRayAngus @dpgrote @ax3l
+/Source/Particles/Pusher/                                        @JustinRayAngus @dpgrote @ax3l
+/Source/Particles/ElementaryProcess/QED*.H                       @lucafedeli88 @aeriforme
+/Source/Particles/ElementaryProcess/QED*.cpp                     @lucafedeli88 @aeriforme
+/Source/Particles/ElementaryProcess/QEDInternals/                @lucafedeli88 @aeriforme
+/Tools/QedTablesUtils/                                           @lucafedeli88 @aeriforme
+/Source/Particles/ParticleThermalizer/                           @atmyers
+/Source/Particles/Resampling/                                    @roelof-groenewald
+/Source/Particles/Sorting/                                       @RemiLehe @atmyers
+
+# Other subsystems
+/Source/ablastr/                                                 @ax3l @lucafedeli88
+/Source/AcceleratorLattice/                                      @dpgrote @ax3l
+/Source/Diagnostics/ReducedDiags/                                @dpgrote @aeriforme @ax3l
+/Source/Diagnostics/OpenPMDHelpFunction.*                        @ax3l
+/Source/Diagnostics/WarpXOpenPMD.*                               @ax3l
+/Source/Diagnostics/FlushFormats/FlushFormatOpenPMD.*            @ax3l
+/Source/EmbeddedBoundary/                                        @RemiLehe @WeiqunZhang
+/Source/Laser/                                                   @lucafedeli88
+
+# Python bindings and PICMI interface
+/Source/Python/                                                  @ax3l @roelof-groenewald
+/Python/                                                         @dpgrote @ax3l @roelof-groenewald
+
+# Documentation
+/Docs/source/theory/                                             @RemiLehe @jlvay @JustinRayAngus @roelof-groenewald
+
+# Governance changes are voted on by the SC
+/GOVERNANCE.md                                                   @jlvay @RemiLehe @ax3l
+
+# Build system, dependencies and developer tooling
+/CMakeLists.txt                                                  @ax3l @EZoni
+/cmake/                                                          @ax3l @EZoni
+/setup.py                                                        @ax3l @EZoni
+/pyproject.toml                                                  @ax3l @EZoni
+/dependencies.json                                               @EZoni @ax3l
+/Tools/Release/                                                  @ax3l @EZoni
+/.clang-tidy                                                     @lucafedeli88 @ax3l @EZoni
+/Tools/Linter/                                                   @lucafedeli88 @ax3l @EZoni
+
+# HPC machine profiles and their install documentation. Owners of a machine
+# have access to it, so they can test changes: they added, updated or tested
+# its profile. Each machine keeps at least one owner with write access, so
+# that a review is requested. The first two lines cover machines that do not
+# have their own entry yet.
+/Tools/machines/                                                 @ax3l @EZoni
+/Docs/source/install/hpc/                                        @ax3l @EZoni
+/Tools/machines/adastra-cines/                                   @lucafedeli88 @grobertdautun @phsikorski-source @ax3l
+/Docs/source/install/hpc/adastra.rst                             @lucafedeli88 @grobertdautun @phsikorski-source @ax3l
+/Tools/machines/aurora-alcf/                                     @zippylab @ax3l @roelof-groenewald @Noerr
+/Docs/source/install/hpc/aurora.rst                              @zippylab @ax3l @roelof-groenewald @Noerr
+/Tools/machines/crusher-olcf/                                    @ax3l @n01r @atmyers
+/Docs/source/install/hpc/crusher.rst                             @ax3l @n01r @atmyers
+/Tools/machines/dane-llnl/                                       @dpgrote @ax3l @JustinRayAngus @debog
+/Docs/source/install/hpc/dane.rst                                @dpgrote @ax3l @JustinRayAngus @debog
+/Tools/machines/desktop/                                         @ax3l @EZoni
+/Tools/machines/frontier-olcf/                                   @ax3l @WeiqunZhang @titoiride @Noerr @aarontran @Pierre-Bartoli
+/Docs/source/install/hpc/frontier.rst                            @ax3l @WeiqunZhang @titoiride @Noerr @aarontran @Pierre-Bartoli
+/Tools/machines/fugaku-riken/                                    @lucafedeli88
+/Docs/source/install/hpc/fugaku.rst                              @lucafedeli88
+/Tools/machines/greatlakes-umich/                                @ax3l @archermarx @bstassel
+/Docs/source/install/hpc/greatlakes.rst                          @ax3l @archermarx @bstassel
+/Tools/machines/hpc3-uci/                                        @ax3l @floresv299 @Aquios7
+/Docs/source/install/hpc/hpc3.rst                                @ax3l @floresv299 @Aquios7
+/Tools/machines/juwels-jsc/                                      @ax3l @AlexanderSinn @MaxThevenet
+/Docs/source/install/hpc/juwels.rst                              @ax3l @AlexanderSinn @MaxThevenet
+/Tools/machines/karolina-it4i/                                   @ax3l @berceanu @spadova-a
+/Docs/source/install/hpc/karolina.rst                            @ax3l @berceanu @spadova-a
+/Tools/machines/lawrencium-lbnl/                                 @ax3l
+/Docs/source/install/hpc/lawrencium.rst                          @ax3l
+/Tools/machines/leonardo-cineca/                                 @lucafedeli88 @ax3l @MartaGalbi
+/Docs/source/install/hpc/leonardo.rst                            @lucafedeli88 @ax3l @MartaGalbi
+/Tools/machines/lonestar6-tacc/                                  @ax3l @rupenether
+/Docs/source/install/hpc/lonestar6.rst                           @ax3l @rupenether
+/Tools/machines/lumi-csc/                                        @lucafedeli88 @ax3l @huixingjian
+/Docs/source/install/hpc/lumi.rst                                @lucafedeli88 @ax3l @huixingjian
+/Tools/machines/lxplus-cern/                                     @SeverinDiederichs @ax3l @lgiacome
+/Docs/source/install/hpc/lxplus.rst                              @SeverinDiederichs @ax3l @lgiacome
+/Tools/machines/ookami-sbu/                                      @ax3l @lucafedeli88
+/Docs/source/install/hpc/ookami.rst                              @ax3l @lucafedeli88
+/Tools/machines/perlmutter-nersc/                                @ax3l @kngott @EZoni @n01r @RemiLehe @aeriforme
+/Docs/source/install/hpc/perlmutter.rst                          @ax3l @kngott @EZoni @n01r @RemiLehe @aeriforme
+/Tools/machines/pitzer-osc/                                      @Wang-Zhongwei @ax3l
+/Docs/source/install/hpc/pitzer.rst                              @Wang-Zhongwei @ax3l
+/Tools/machines/polaris-alcf/                                    @roelof-groenewald @ax3l @WeiqunZhang @zippylab @ppiot
+/Docs/source/install/hpc/polaris.rst                             @roelof-groenewald @ax3l @WeiqunZhang @zippylab @ppiot
+/Tools/machines/taurus-zih/                                      @ax3l @tmiethlinger @BrianMarre
+/Docs/source/install/hpc/taurus.rst                              @ax3l @tmiethlinger @BrianMarre
+/Tools/machines/tuolumne-llnl/                                   @ax3l @eebasso @titoiride @JustinRayAngus @debog
+/Docs/source/install/hpc/tuolumne.rst                            @ax3l @eebasso @titoiride @JustinRayAngus @debog
+
+# CI, issue templates and repository configuration (including this file)
+/.github/                                                        @ax3l @EZoni
+/.azure-pipelines.yml                                            @EZoni @ax3l
+/.gitlab/                                                        @EZoni @ax3l
