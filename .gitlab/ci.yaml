@@ -49,16 +49,16 @@ variables:
     - python3 -m pip install --upgrade -r Regression/requirements.txt
     - python3 -m pip cache purge
 
-NVIDIA-H100:
+NVIDIA-H200:
   extends: .install-dependencies
   variables:
     BLASPP_GPU_BACKEND: cuda
-  tags: [nvidia-h100]
+  tags: [nvidia-h200]
   image: nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu24.04
   script:
     - |
       cmake -S . -B build                                  \
-          -DBUILDNAME=GPU-H100-CUDA-DP                     \
+          -DBUILDNAME=GPU-H200-CUDA-DP                     \
           -DSITE=Frank_UO                                  \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"        \
