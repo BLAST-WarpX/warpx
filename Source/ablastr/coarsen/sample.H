@@ -13,7 +13,6 @@
 #include <AMReX_Extension.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IntVect.H>
-#include <AMReX_Math.H>
 #include <AMReX_REAL.H>
 
 #include <AMReX_BaseFwd.H>
@@ -65,16 +64,14 @@ namespace ablastr::coarsen::sample
         // Number of points and starting indices of source array (fine)
         int np[3], idx_min[3];
 
-        // Compute number of points
-        for ( int l = 0; l < 3; ++l ) {
-            if ( cr[l] == 1 ) { np[l] = 1+amrex::Math::abs(sf[l]-sc[l]); // no coarsening
-            } else {            np[l] = 2-sf[l]; }
-        }
-
-        // Compute starting indices of source array (fine)
-        for ( int l = 0; l < 3; ++l ) {
-            if ( cr[l] == 1 ) { idx_min[l] = ic[l]-sc[l]*(1-sf[l]); // no coarsening
-            } else {            idx_min[l] = ic[l]*cr[l]+static_cast<int>(cr[l]/2)*(1-sc[l])-(1-sf[l]); }
+        // In fine half-cell units, a coarse sample is offset from fine index
+        // ic[l]*cr[l] by this signed amount. Coincident samples need one
+        // point. A half-index sample needs both surrounding points.
+        for (int l = 0; l < 3; ++l) {
+            int const offset_twice = cr[l] * (1-sc[l]) - (1-sf[l]);
+            int const lower_offset = amrex::coarsen(offset_twice, 2);
+            idx_min[l] = ic[l]*cr[l] + lower_offset;
+            np[l] = 1 + (offset_twice - 2*lower_offset);
         }
 
         // Auxiliary integer variables

@@ -1,6 +1,19 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+foreach(ratio IN ITEMS "3 1" "1 3" "3 2" "2 2" "1 1")
+    string(REPLACE " " "x" layout "${ratio}")
+    add_warpx_test(
+        test_2d_coarsened_field_samples_${layout}
+        2
+        1
+        "inputs_base_2d_coarsened_field_samples 'diag1.coarsening_ratio=${ratio}'"
+        "analysis_coarsened_field_samples.py diags/diag1000000"
+        OFF
+        OFF
+    )
+endforeach()
+
 add_warpx_test(
     test_3d_load_external_field_grid_picmi  # name
     3  # dims
