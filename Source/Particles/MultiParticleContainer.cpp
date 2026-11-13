@@ -1247,6 +1247,7 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
 
     auto & warpx = WarpX::GetInstance();
 
+    // Gather absorbed particles in the particle boundary buffer
     if (not do_eb) {
         m_secondary_emission_buffer->gatherParticlesFromDomainBoundaries(*this, cur_time);
     } else {
@@ -1254,6 +1255,7 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
             *this, warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
     }
 
+    // Set to loop over the domain boundaries, or the EB boundary
 #ifdef AMREX_USE_EB
     int const boundary_start = do_eb ? 2*AMREX_SPACEDIM : 0;
     int const boundary_stop = do_eb ? 2*AMREX_SPACEDIM + 1 : 2*AMREX_SPACEDIM;
@@ -1263,11 +1265,17 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
     int const boundary_stop = 2*AMREX_SPACEDIM;
 #endif
 
+    // With EB boundaries, a call is needed to Redistribute.
+    // Save the species that should be redistributed.
+    // (Redistribute already done afterwards for domain boundaries)
     std::set<int> product_species_to_redistribute;
+
     for (int boundary = boundary_start; boundary < boundary_stop; ++boundary) {
+
         if (!m_secondary_emission_buffer->isDefinedForAnySpecies(boundary)) { continue; }
 
         for (int source_species = 0; source_species < nSpecies(); ++source_species) {
+
             int const product_species = m_secondary_emission_product_species[source_species];
             if (product_species < 0) { continue; }
 
@@ -1278,10 +1286,16 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
             auto& product_pc = GetParticleContainer(product_species);
             const SmartCopyFactory copy_factory(*source_pc, product_pc);
             const auto copy = copy_factory.getSmartCopy();
+
+            // normal_index is only needed with EB
             int const normal_index =
                 source_pc->GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
+
+            // The filter flags which particles will yield secondaries
             auto const filter = SecondaryEmissionFilter{m_secondary_emission_yield[source_species]};
+
             auto const& geom = WarpX::GetInstance().Geom(0);
+
             auto const uth = static_cast<amrex::ParticleReal>(std::sqrt(
                 PhysConst::q_e*m_secondary_emission_energy_eV[source_species]/product_pc.getMass()) /
                 PhysConst::c);
@@ -1294,15 +1308,12 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
             info.SetDynamic(true);
 #endif
             for (int lev = 0; lev <= source_pc->finestLevel(); ++lev) {
+
                 for (WarpXParIter pti(*source_pc, lev, info); pti.isValid(); ++pti) {
                     product_pc.DefineAndReturnParticleTile(lev, pti.index(), pti.LocalTileIndex());
                 }
 
-                amrex::Box domain_box = warpx.Geom(lev).Domain();
-
-                // Make sure that domain_box includes the upper boundary node
-                domain_box.surroundingNodes();
-
+                // Setup flag specify whether to do cropping (only on PEC boundaries)
                 auto const & field_boundary_lo = warpx.GetFieldBoundaryLo();
                 auto const & field_boundary_hi = warpx.GetFieldBoundaryHi();
 
@@ -1318,20 +1329,27 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
                 for (WarpXParIter pti(*source_pc, lev, info); pti.isValid(); ++pti) {
+
                     auto& src_tile = source_pc->ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     if (src_tile.numParticles() == 0) { continue; }
 
                     const auto GetPosition = GetParticlePosition<PIdx>(pti);
+
+                    // The transform fixes the emitted particles position to the boundary
+                    // and generates the new velocity
                     auto const transform = SecondaryEmissionTransform{
                         boundary, geom.ProbLoArray(), geom.ProbHiArray(),
-                        geom.RoundOffLo(), geom.RoundOffHi(),
-                        normal_index, uth, GetPosition, dt, product_pc.getMass(), do_cropping};
+                        geom.RoundOffLo(), geom.RoundOffHi(), normal_index,
+                        uth, GetPosition, dt, product_pc.getMass(), do_cropping};
 
                     auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
                     const auto np_dst = dst_tile.numParticles();
+
+                    // Now add the emitted particles
                     const auto num_added = filterCopyTransformParticles<1>(
                         product_pc, dst_tile, src_tile, np_dst, filter, copy, transform);
                     setNewParticleIDs(dst_tile, np_dst, num_added);
+
                 }
             }
 
