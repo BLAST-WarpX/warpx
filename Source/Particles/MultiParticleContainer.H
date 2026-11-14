@@ -591,22 +591,6 @@ private:
 
     bool m_do_back_transformed_particles = false;
 
-    void MFItInfoCheckTiling(const WarpXParticleContainer& /*pc_src*/) const noexcept
-    {}
-
-    template<typename First, typename ...Args>
-    void MFItInfoCheckTiling(const WarpXParticleContainer& pc_src,
-                             First const& pc_dst, Args const&... others) const noexcept
-    {
-        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc_dst.do_tiling,
-                "For particle creation processes, either all or none of the "
-                "particle species must use tiling.");
-        }
-
-        MFItInfoCheckTiling(pc_src, others...);
-    }
-
     /**
     * Should be called right after mapSpeciesProduct in InitData.
     * It checks the physical correctness of product particle species

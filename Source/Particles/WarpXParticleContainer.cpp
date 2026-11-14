@@ -91,9 +91,8 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level)
 {
 }
 
-WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
-    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
-                   info.SetDynamic(WarpX::do_dynamic_scheduling))
+WarpXParIter::WarpXParIter (ContainerType& pc, int level, const MFItInfo& info)
+    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level, info)
 {
 }
 
@@ -433,19 +432,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // are not trivial, this check might be too relaxed and we might include a particle that should
     // deposit part of its current in a neighboring box. However, this should catch particles
     // traveling many cells away, for example with algorithms that allow for large time steps.
-
-#if   defined(WARPX_DIM_1D_Z)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_3D)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#endif
+    const amrex::IntVect shape_extent(particle_shape/2);
 
     // On CPU: particles deposit on tile arrays, which have a small number of guard cells ng_J
     // On GPU: particles deposit directly on the J arrays, which usually have a larger number of guard cells
@@ -606,8 +593,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
     ABLASTR_PROFILE_VAR_START(blp_deposit);
 
-    // If doing shared mem current deposition, get tile info
-    if (WarpX::do_shared_mem_current_deposition) {
+    // If doing shared mem current deposition, get tile info.
+    // The shared-memory kernel bins particles on the grid of level lev, so it cannot deposit
+    // in the buffers of the coarser level (depos_lev<lev): the normal kernels are used instead.
+    if (WarpX::do_shared_mem_current_deposition && (depos_lev == lev)) {
         const Geometry& geom = Geom(lev);
         const auto dxi = geom.InvCellSizeArray();
         const auto plo = geom.ProbLoArray();
@@ -626,11 +615,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
             const int ntiles = numTilesInBox(box, true, bin_size);
 
-            bins.build(ptile.numParticles(), ptd, ntiles,
-                    [=] AMREX_GPU_HOST_DEVICE (const ParticleType& p) -> unsigned int
+            // Only bin the particles [offset, offset+np_to_deposit): the bin permutation then
+            // indexes from offset, like GetPosition and the particle attributes in the kernel.
+            bins.build(np_to_deposit, ptd, ntiles,
+                    [=] AMREX_GPU_HOST_DEVICE (ParticleTileType::ParticleTileDataType const & a_ptd,
+                                               long const ip) -> unsigned int
                     {
                         Box tbox;
-                        auto iv = getParticleCell(p, plo, dxi, domain);
+                        auto iv = getParticleCell(a_ptd, static_cast<int>(ip + offset),
+                                                  plo, dxi, domain);
                         AMREX_ASSERT(box.contains(iv));
                         auto tid = getTileIndex(iv, box, true, bin_size, tbox);
                         return static_cast<unsigned int>(tid);
@@ -703,7 +696,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             ABLASTR_PROFILE_VAR_STOP(direct_current_dep_kernel);
         }
     }
-    // If not doing shared memory deposition, call normal kernels
+    // If not doing shared memory deposition (or depositing in the buffers), call normal kernels
     else {
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
             if (push_type == PushType::Explicit) {
@@ -1531,12 +1524,10 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         ": not enough components allocated (" + std::to_string(rho->nComp()) + "!"
     );
 
-    if (WarpX::do_shared_mem_charge_deposition)
+    // The shared-memory kernel bins particles on the grid of level lev, so it cannot deposit
+    // in the buffers of the coarser level (depos_lev<lev): the kernels below are used instead.
+    if (WarpX::do_shared_mem_charge_deposition && (depos_lev == lev))
     {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
-                                         (depos_lev==(lev  )),
-                                         "Deposition buffers only work for lev-1");
-
         // If no particles, do not do anything
         if (np_to_deposit == 0) { return; }
 
@@ -1582,15 +1573,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCharge::Accumulate", blp_accumulate);
 
         // Get tile box where charge is deposited.
-        // The tile box is different when depositing in the buffers (depos_lev<lev)
-        // or when depositing inside the level (depos_lev=lev)
-        Box tilebox;
-        if (lev == depos_lev) {
-            tilebox = pti.tilebox();
-        } else {
-            const IntVect& ref_ratio = WarpX::RefRatio(depos_lev);
-            tilebox = amrex::coarsen(pti.tilebox(),ref_ratio);
-        }
+        Box tilebox = pti.tilebox();
 
         const auto ix_type = rho->ixType().toIntVect();
 #ifndef AMREX_USE_GPU
@@ -1648,11 +1631,15 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
             const amrex::IntVect bin_size = WarpX::shared_tilesize;
             const int ntiles = numTilesInBox(box, true, bin_size);
 
-            bins.build(ptile.numParticles(), ptd, ntiles,
-                       [=] AMREX_GPU_HOST_DEVICE (ParticleType const & p) -> unsigned int
+            // Only bin the particles [offset, offset+np_to_deposit): the bin permutation then
+            // indexes from offset, like GetPosition, wp and ion_lev in the deposition kernel.
+            bins.build(np_to_deposit, ptd, ntiles,
+                       [=] AMREX_GPU_HOST_DEVICE (ParticleTileType::ParticleTileDataType const & a_ptd,
+                                                  long const ip) -> unsigned int
                        {
                            Box tbx;
-                           auto iv = getParticleCell(p, plo, dxi, domain);
+                           auto iv = getParticleCell(a_ptd, static_cast<int>(ip + offset),
+                                                     plo, dxi, domain);
                            AMREX_ASSERT(box.contains(iv));
                            auto tid = getTileIndex(iv, box, true, bin_size, tbx);
                            return static_cast<unsigned int>(tid);
@@ -1684,7 +1671,7 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                    const auto bin_stop = offsets_ptr[ibin+1];
                                    if (bin_start < bin_stop) {
                                        // static_cast until https://github.com/AMReX-Codes/amrex/pull/3684
-                                       auto const i = static_cast<int>(permutation[bin_start]);
+                                       auto const i = static_cast<int>(permutation[bin_start] + offset);
                                        Box tbx;
                                        auto iv = getParticleCell(ptd, i, plo, dxi, domain);
                                        AMREX_ASSERT(box.contains(iv));

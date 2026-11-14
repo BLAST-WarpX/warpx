@@ -549,8 +549,7 @@ namespace ParticleUtils {
         int pair_offset = 0;
         T_index i1 = cell_start + pair_offset;
         bool correction_failed = false;
-        bool deltaE_is_zero = false;
-        while (!deltaE_is_zero) {
+        while (true) {
 
             T_index i2 = i1 + 1;
             if (i2 == cell_stop) {
@@ -612,28 +611,39 @@ namespace ParticleUtils {
                 // Compute coefficients for quadratic equation for alpha.
                 const amrex::ParticleReal a = A*A*dbetasq - ptdotu*ptdotu;
                 const amrex::ParticleReal b = D*ptdotu - 2.0_prt*A*A*p2dotu;
-                const amrex::ParticleReal c = A*A*E2*E2 - D*D/4.0_prt;
+                // Factor A*A*E2*E2 - D*D/4 to retain small energy corrections
+                // without subtracting nearly equal rest-energy-scale quantities.
+                const amrex::ParticleReal c = 0.25_prt*deltaEpair
+                    *(2.0_prt*E1 - deltaEpair)*(2.0_prt*E2 - deltaEpair)
+                    *(2.0_prt*Etot - deltaEpair);
 
                 const amrex::ParticleReal root = b*b - 4.0_prt*a*c;
-                if (root >= 0.0_prt && amrex::Math::abs(a) > 0.0_prt) {
+                if (std::isfinite(a) && std::isfinite(b) && std::isfinite(c) &&
+                    std::isfinite(root) && root >= 0.0_prt && amrex::Math::abs(a) > 0.0_prt) {
 
-                    // Update particle velocities.
-                    const amrex::ParticleReal alpha = (-b + std::sqrt(root))/(2.0_prt*a);
-                    const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
-                    const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
-                    uxp[ indices[i1] ] += ratio1*ux;
-                    uyp[ indices[i1] ] += ratio1*uy;
-                    uzp[ indices[i1] ] += ratio1*uz;
-                    uxp[ indices[i2] ] -= ratio2*ux;
-                    uyp[ indices[i2] ] -= ratio2*uy;
-                    uzp[ indices[i2] ] -= ratio2*uz;
+                    // Preserve the selected root while avoiding cancellation when b > 0.
+                    const amrex::ParticleReal sqrt_root = std::sqrt(root);
+                    const amrex::ParticleReal alpha = (b > 0.0_prt)
+                        ? -2.0_prt*c/(b + sqrt_root)
+                        : (-b + sqrt_root)/(2.0_prt*a);
+                    if (std::isfinite(alpha)) {
 
-                    // Update energy violation.
-                    if (deltaE_finishes) {
-                        deltaE = 0.0_prt;
-                        deltaE_is_zero = true;
-                    }
-                    else {
+                        // Update particle velocities.
+                        const amrex::ParticleReal ratio1 = alpha/(wpmp1*c2);
+                        const amrex::ParticleReal ratio2 = alpha/(wpmp2*c2);
+                        uxp[ indices[i1] ] += ratio1*ux;
+                        uyp[ indices[i1] ] += ratio1*uy;
+                        uzp[ indices[i1] ] += ratio1*uz;
+                        uxp[ indices[i2] ] -= ratio2*ux;
+                        uyp[ indices[i2] ] -= ratio2*uy;
+                        uzp[ indices[i2] ] -= ratio2*uz;
+
+                        if (deltaE_finishes) {
+                            deltaE = 0.0_prt;
+                            break;
+                        }
+
+                        // Update energy violation.
                         deltaE -= deltaEpair;
                     }
 

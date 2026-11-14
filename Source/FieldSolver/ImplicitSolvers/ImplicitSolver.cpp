@@ -28,7 +28,7 @@ void ImplicitSolver::FinishImplicitParticleUpdate (
     amrex::Real const time,
     int const step)
 {
-    m_WarpX->FinishImplicitParticleUpdate(time);
+    m_WarpX->FinishImplicitParticleUpdate(time, m_dt);
 
     std::map<std::string, amrex::Long> local_suborbit_counts;
     for (auto const& pc : m_WarpX->GetPartContainer()) {
@@ -1298,20 +1298,24 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
     const amrex::Real pc_factor = PhysConst::c2 * PhysConst::mu0 * a_theta_dt;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
+        MMxx_PC->mult(pc_factor, 0, MMxx_PC->nComp());
+#if !defined(WARPX_DIM_RSPHERE)
         amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);
         amrex::MultiFab* MMzz_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev);
-        MMxx_PC->mult(pc_factor, 0, MMxx_PC->nComp());
         MMyy_PC->mult(pc_factor, 0, MMyy_PC->nComp());
         MMzz_PC->mult(pc_factor, 0, MMzz_PC->nComp());
+#endif
         const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
         if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
             // Need to add 1 to the diagonal terms for the curl_curl pc
             const int diag_comp_Mxx = (MMxx_PC->nComp()-1)/2;
+            MMxx_PC->plus(1.0_rt, diag_comp_Mxx, 1, 0);
+#if !defined(WARPX_DIM_RSPHERE)
             const int diag_comp_Myy = (MMyy_PC->nComp()-1)/2;
             const int diag_comp_Mzz = (MMzz_PC->nComp()-1)/2;
-            MMxx_PC->plus(1.0_rt, diag_comp_Mxx, 1, 0);
             MMyy_PC->plus(1.0_rt, diag_comp_Myy, 1, 0);
             MMzz_PC->plus(1.0_rt, diag_comp_Mzz, 1, 0);
+#endif
         }
     }
 

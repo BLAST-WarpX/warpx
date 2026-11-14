@@ -263,6 +263,42 @@ namespace
             }
         }
     };
+
+    void MFItInfoCheckTiling(const WarpXParticleContainer& /*pc_src*/) noexcept
+    {}
+
+    template<typename First, typename ...Args>
+    void MFItInfoCheckTiling(const WarpXParticleContainer& pc_src,
+                             First const& pc_dst, Args const&... others) noexcept
+    {
+        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc_dst.do_tiling,
+                "For particle creation processes, either all or none of the "
+                "particle species must use tiling.");
+        }
+
+        MFItInfoCheckTiling(pc_src, others...);
+    }
+
+    template<typename ...Args>
+    [[nodiscard]]
+    amrex::MFItInfo getMFItInfo (const WarpXParticleContainer& pc_src,
+                                 Args const&... pc_dsts) noexcept
+    {
+        amrex::MFItInfo info;
+
+        MFItInfoCheckTiling(pc_src, pc_dsts...);
+
+        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+            info.EnableTiling(WarpXParticleContainer::tile_size);
+        }
+
+#ifdef AMREX_USE_OMP
+        info.SetDynamic(WarpX::do_dynamic_scheduling);
+#endif
+
+        return info;
+    }
 }
 
 MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
@@ -1517,7 +1553,7 @@ MultiParticleContainer::doFieldIonization (int lev,
         pc_source ->defineAllParticleTiles();
         pc_product->defineAllParticleTiles();
 
-        auto info = getMFItInfo(*pc_source, *pc_product);
+        auto info = ::getMFItInfo(*pc_source, *pc_product);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -2166,7 +2202,7 @@ void MultiParticleContainer::doQedBreitWheeler (int lev,
         pc_product_pos->defineAllParticleTiles();
         pc_product_ele->defineAllParticleTiles();
 
-        auto info = getMFItInfo(*pc_source, *pc_product_ele, *pc_product_pos);
+        auto info = ::getMFItInfo(*pc_source, *pc_product_ele, *pc_product_pos);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -2243,7 +2279,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
         pc_source ->defineAllParticleTiles();
         pc_product_phot->defineAllParticleTiles();
 
-        auto info = getMFItInfo(*pc_source, *pc_product_phot);
+        auto info = ::getMFItInfo(*pc_source, *pc_product_phot);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
