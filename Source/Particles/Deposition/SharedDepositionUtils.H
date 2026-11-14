@@ -9,6 +9,7 @@
 
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
+#include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #ifdef WARPX_DIM_RZ
@@ -16,6 +17,17 @@
 #endif
 
 #include <AMReX.H>
+#include <AMReX_Array.H>
+#include <AMReX_Array4.H>
+#include <AMReX_Box.H>
+#include <AMReX_ConstexprFor.H>
+#include <AMReX_GpuDevice.H>
+#include <AMReX_GpuLaunch.H>
+#include <AMReX_GpuMemory.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_ParticleUtil.H>
+
+#include <cstddef>
 
 /*
  * \brief gets the maximum width, height, or length of a tilebox. In number of cells.
@@ -58,6 +70,202 @@ void addLocalToGlobal (const amrex::Box& bx,
         if (amrex::Math::abs(local(i, j, k)) > 0.0_rt) {
             amrex::Gpu::Atomic::AddNoRet( &global(i, j, k), local(i, j, k));
         }
+    }
+}
+#endif
+
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+/**
+ * \brief Implementation of doSharedDeposition, for a given choice of the use of shared
+ *        memory: launches one thread block per bin, which deposits the particles of the bin
+ *        into shared memory arrays, then adds the shared memory arrays to the global arrays.
+ *
+ * \tparam fused  if true, deposit into all the arrays in a single pass, with one shared memory
+ *                array per global array; otherwise, deposit into them one at a time using a
+ *                single shared memory array, which requires less shared memory but deposits
+ *                each particle N times.
+ * \tparam N      number of arrays to deposit into
+ * \tparam DepositParticle  type of deposit_particle, see doSharedDeposition
+ * \tparam Bins   type of the bins (amrex::DenseBins)
+ * \param deposit_particle  functor that deposits one particle, see doSharedDeposition
+ * \param arrays            the global arrays to deposit into
+ * \param types             index types of the shared memory arrays
+ * \param a_bins            bins used for particle sorting
+ * \param box               the current box
+ * \param threads_per_block number of threads to use per block in shared deposition
+ * \param bin_size          tileSize to use for shared current deposition operations
+ * \param ngrow             number of cells by which the tiles are grown for the shared memory
+ *                          arrays
+ * \param npts              number of points of the largest shared memory array, for the
+ *                          unfused version
+ * \param shared_mem_bytes  size of shared memory per block
+ */
+template <bool fused, int N, typename DepositParticle, typename Bins>
+void doSharedDepositionImpl (const DepositParticle& deposit_particle,
+                             const amrex::GpuArray<amrex::Array4<amrex::Real>, N>& arrays,
+                             const amrex::GpuArray<amrex::IntVect, N>& types,
+                             const Bins& a_bins,
+                             const amrex::Box& box,
+                             const int threads_per_block,
+                             const amrex::IntVect bin_size,
+                             const int ngrow,
+                             const amrex::Long npts,
+                             const std::size_t shared_mem_bytes)
+{
+    using namespace amrex::literals;
+
+    auto permutation = a_bins.permutationPtr();
+    const int nblocks = a_bins.numBins();
+    const auto offsets_ptr = a_bins.offsetsPtr();
+
+    // Launch one thread-block per bin
+    amrex::launch(
+            nblocks, threads_per_block, shared_mem_bytes, amrex::Gpu::gpuStream(),
+            [=] AMREX_GPU_DEVICE () noexcept {
+        const int bin_id = blockIdx.x;
+        const unsigned int bin_start = offsets_ptr[bin_id];
+        const unsigned int bin_stop = offsets_ptr[bin_id+1];
+
+        if (bin_start == bin_stop) { return; /*this bin has no particles*/ }
+
+        // These boxes define the index space for the shared memory arrays.
+        // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
+        amrex::Box shared_memory_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
+        shared_memory_box.grow(ngrow);
+        amrex::GpuArray<amrex::Box, N> tbox;
+        for (int n = 0; n < N; ++n) {
+            tbox[n] = amrex::convert(shared_memory_box, types[n]);
+        }
+
+        amrex::Gpu::SharedMemory<amrex::Real> gsm;
+        amrex::Real* const shared_memory_pointer = gsm.dataPtr();
+
+        // Note: not `if constexpr`, since nvcc does not allow an extended __device__ lambda
+        // to first-capture variables in a constexpr-if context. `fused` is a template
+        // parameter, so the branch is still resolved at compile time.
+        if (fused) {
+            // Deposit into one shared memory array per global array, then add them to the
+            // global arrays
+            amrex::GpuArray<amrex::Array4<amrex::Real>, N> shared_memory_arrays;
+            int nshared = 0;
+            for (int n = 0; n < N; ++n) {
+                shared_memory_arrays[n] = amrex::Array4<amrex::Real>(
+                    shared_memory_pointer + nshared,
+                    amrex::begin(tbox[n]), amrex::end(tbox[n]), 1);
+                nshared += static_cast<int>(tbox[n].numPts());
+            }
+            for (int i = threadIdx.x; i < nshared; i += blockDim.x) {
+                shared_memory_pointer[i] = 0.0_rt;
+            }
+            __syncthreads();
+            // Deposit current into shared memory
+            // Each thread processes a different set of particles; runs over all particles within this bin
+            for (unsigned int ip_orig = bin_start+threadIdx.x; ip_orig<bin_stop;
+                 ip_orig += blockDim.x)
+            {
+                const unsigned int ip = permutation[ip_orig];
+                deposit_particle.template deposit<(1 << N) - 1>(ip, shared_memory_arrays);
+            }
+            __syncthreads();
+            // Add current from shared memory into the current stored in global memory
+            // Operates on all components of J at the same time
+            // Each thread runs over a different set of cells
+            for (int n = 0; n < N; ++n) {
+                addLocalToGlobal(tbox[n], arrays[n], shared_memory_arrays[n]);
+            }
+        } else {
+            // Deposit into one array at a time: deposit into the shared memory array, then
+            // add the shared memory array to the global array
+            amrex::constexpr_for<0, N>([&] (auto n) {
+                amrex::Array4<amrex::Real> const shared_memory_array(shared_memory_pointer,
+                    amrex::begin(tbox[n]), amrex::end(tbox[n]), 1);
+                amrex::GpuArray<amrex::Array4<amrex::Real>, N> shared_memory_arrays;
+                for (int m = 0; m < N; ++m) { shared_memory_arrays[m] = shared_memory_array; }
+                for (int i = threadIdx.x; i < npts; i += blockDim.x) {
+                    shared_memory_pointer[i] = 0.0_rt;
+                }
+                __syncthreads();
+                // Deposit current into shared memory
+                // Each thread processes a different set of particles; runs over all particles within this bin
+                for (unsigned int ip_orig = bin_start+threadIdx.x; ip_orig<bin_stop;
+                     ip_orig += blockDim.x)
+                {
+                    const unsigned int ip = permutation[ip_orig];
+                    deposit_particle.template deposit<(1 << decltype(n)::value)>(
+                        ip, shared_memory_arrays);
+                }
+                __syncthreads();
+                // Add current from shared memory into the current stored in global memory
+                // Each thread runs over a different set of cells
+                addLocalToGlobal(tbox[n], arrays[n], shared_memory_array);
+                __syncthreads();
+            });
+        }
+    });
+}
+
+/**
+ * \brief Deposition using shared memory arrays. Particles are binned into tiles of bin_size
+ *        cells, and each tile is processed by one GPU thread block, which accumulates the
+ *        deposited quantities in shared memory before adding them to the global arrays.
+ *        Only available for CUDA and HIP.
+ *
+ * The deposition of each particle is done by deposit_particle, with a member function
+ * template deposit, templated on a bitmask of the arrays to deposit into (bit n for array n),
+ * that takes the index of the particle and an amrex::GpuArray of N Array4. The arrays that
+ * are not in the bitmask must not be accessed. The deposition is done in one pass if the
+ * shared memory arrays for all the arrays fit in shared memory, otherwise one array at a time.
+ *
+ * \tparam N      number of arrays to deposit into
+ * \tparam DepositParticle  type of deposit_particle
+ * \tparam Bins   type of the bins (amrex::DenseBins)
+ * \param deposit_particle  functor that deposits one particle
+ * \param arrays            the global arrays to deposit into
+ * \param types             index types of the shared memory arrays
+ * \param ngrow             number of cells by which the tiles are grown for the shared memory
+ *                          arrays, so that they contain the deposition stencils of the particles
+ * \param a_bins            bins used for particle sorting
+ * \param box               the current box
+ * \param a_tbox_max_size   the maximum size of a tilebox
+ * \param threads_per_block number of threads to use per block in shared deposition
+ * \param bin_size          tileSize to use for shared current deposition operations
+ */
+template <int N, typename DepositParticle, typename Bins>
+void doSharedDeposition (const DepositParticle& deposit_particle,
+                         const amrex::GpuArray<amrex::Array4<amrex::Real>, N>& arrays,
+                         const amrex::GpuArray<amrex::IntVect, N>& types,
+                         const int ngrow,
+                         const Bins& a_bins,
+                         const amrex::Box& box,
+                         const amrex::IntVect& a_tbox_max_size,
+                         const int threads_per_block,
+                         const amrex::IntVect bin_size)
+{
+    amrex::Box sample_tbox(amrex::IntVect(AMREX_D_DECL(0,0,0)), a_tbox_max_size - 1);
+    sample_tbox.grow(ngrow);
+    amrex::Long npts = 0;
+    amrex::Long npts_fused = 0;
+    for (int n = 0; n < N; ++n) {
+        const amrex::Long np = amrex::convert(sample_tbox, types[n]).numPts();
+        npts = amrex::max(npts, np);
+        npts_fused += np;
+    }
+
+    const std::size_t max_shared_mem_bytes = amrex::Gpu::Device::sharedMemPerBlock();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(npts*sizeof(amrex::Real) <= max_shared_mem_bytes,
+                                     "Tile size too big for GPU shared memory current deposition");
+
+    // Deposit into all the arrays in a single pass if their shared memory arrays fit in
+    // shared memory
+    const bool fused = (npts_fused*sizeof(amrex::Real) <= max_shared_mem_bytes);
+    const std::size_t shared_mem_bytes = (fused ? npts_fused : npts)*sizeof(amrex::Real);
+    if (fused) {
+        doSharedDepositionImpl<true, N>(deposit_particle, arrays, types, a_bins, box,
+            threads_per_block, bin_size, ngrow, npts, shared_mem_bytes);
+    } else {
+        doSharedDepositionImpl<false, N>(deposit_particle, arrays, types, a_bins, box,
+            threads_per_block, bin_size, ngrow, npts, shared_mem_bytes);
     }
 }
 #endif
