@@ -687,6 +687,10 @@ Overall simulation parameters
     self-field MLMG solve. Setting this to a low value leaves a larger problem
     to the bottom solver; setting it to 0 turns MLMG into a single-level solve
     performed entirely by the bottom solver.
+    The setup solves of the :ref:`electrode voltage clamp <usage-electrode-voltage-clamp>`
+    use this option too; there, the default is 1 instead of the AMReX default
+    (see :ref:`its setup solves <usage-electrode-voltage-clamp-setup-solves>` for
+    the interplay with :pp:param:`warpx.self_fields_bottom_max_iters`).
 
 .. pp:param:: warpx.self_fields_agglomeration
     :type: ``bool``
