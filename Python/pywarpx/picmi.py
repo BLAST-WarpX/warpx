@@ -2007,7 +2007,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
     particle_suborbits: bool | None = Field(
         default=None, description="Whether to use particle suborbits during the solve"
     )
-    print_unconverged_particle_detail: bool | None = Field(
+    print_unconverged_particle_details: bool | None = Field(
         default=None,
         description="Whether to print the details of unconverged particles during suborbits",
     )
@@ -2038,8 +2038,8 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
         implicit_evolve.max_particle_iterations = self.max_particle_iterations
         implicit_evolve.particle_tolerance = self.particle_tolerance
         implicit_evolve.particle_suborbits = self.particle_suborbits
-        implicit_evolve.print_unconverged_particle_detail = (
-            self.print_unconverged_particle_detail
+        implicit_evolve.print_unconverged_particle_details = (
+            self.print_unconverged_particle_details
         )
         implicit_evolve.use_mass_matrices_jacobian = self.use_mass_matrices_jacobian
         implicit_evolve.skip_particle_picard_init = self.skip_particle_picard_init
