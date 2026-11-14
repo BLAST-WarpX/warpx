@@ -28,7 +28,7 @@ void
 parse_temperature_in_eV (
     amrex::ParmParse const& pp,
     std::string const& source_name,
-    [[maybe_unused]] amrex::Geometry const& geom,
+    amrex::Geometry const& geom,
     std::string const& dist_type_param,
     std::string const& mom_dist_s,
     TemperatureProperties& temp)
@@ -76,8 +76,10 @@ parse_temperature_in_eV (
         temp.m_type = TempParserFunction;
     }
     else if (temperature_in_eV_dist_s == "read_from_file") {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if !defined(WARPX_USE_OPENPMD)
+        WARPX_ABORT_WITH_MESSAGE(
+            dist_type_param + " = read_from_file requires WarpX built with openPMD support.");
+#endif
         if (WarpX::gamma_boost > 1.0) {
             WARPX_ABORT_WITH_MESSAGE(
                 dist_type_param + " = read_from_file is not "
@@ -98,12 +100,6 @@ parse_temperature_in_eV (
         amrex::DistributionMapping const dmap;
         temp.m_temperature_in_eV_reader->prepare(grids, dmap, amrex::IntVect(0));
         temp.m_type = TempFromFileValue;
-#else
-        WARPX_ABORT_WITH_MESSAGE(
-            dist_type_param + " = read_from_file requires "
-            "WarpX built with openPMD support and is not supported in "
-            "RZ/RCYLINDER/RSPHERE geometries.");
-#endif
     }
     else {
         std::stringstream ss;

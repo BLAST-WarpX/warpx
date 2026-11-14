@@ -19,12 +19,9 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
     else if (m_type == TempParserFunction) {
         m_temperature_parser = temp.m_ptr_temperature_parser->compile<3>();
     }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     else if (m_type == TempFromFileValue) {
         m_temperature_in_eV_from_file = temp.m_temperature_in_eV_reader->getView();
     }
-#endif
 }
 
 // Constructor for three-component (vector) temperature
