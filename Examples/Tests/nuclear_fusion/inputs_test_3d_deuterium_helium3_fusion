@@ -2,9 +2,7 @@
 ####### GENERAL PARAMETERS ######
 #################################
 ## With these parameters, each cell has a size of exactly 1 by 1 by 1
-# Run two steps. The first step to check the fusion collisions, the
-# second step to provide a comparison for the rerun.
-max_step = 2
+max_step = 1
 amr.n_cell = 8 8 16
 amr.max_grid_size = 8
 amr.blocking_factor = 8
@@ -137,12 +135,7 @@ DHeF2.create_products = 1
 DHeF2.save_particle_production = 1
 
 # Diagnostics
-diagnostics.diags_names = diag1 checkpoint
+diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
 diag1.fields_to_plot = rho DHeF1_particle_production DHeF2_particle_production
-
-checkpoint.format = checkpoint
-checkpoint.diag_type = Full
-checkpoint.intervals = 1:1:1
-checkpoint.dump_last_timestep = 0

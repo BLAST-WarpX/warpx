@@ -298,19 +298,22 @@ def check_id(data):
         assert complex_id.shape == np.unique(complex_id).shape
 
 
+def as_rows(pos):
+    ## View each row (one particle position) as a single element, so that whole positions
+    ## can be compared with vectorized numpy functions
+    pos = np.ascontiguousarray(pos)
+    return pos.view(np.dtype((np.void, pos.dtype.itemsize * pos.shape[1]))).ravel()
+
+
 def check_product_positions(data):
     ## The reactants are not pushed, so the product macroparticles must be located exactly
     ## at the position of one of the reactant macroparticles that collided.
     reactant_positions = [
-        set(map(tuple, data[species_name + "_pos_start"]))
-        for species_name in reactant_species
+        as_rows(data[species_name + "_pos_start"]) for species_name in reactant_species
     ]
     for product_name in product_species:
-        positions = list(map(tuple, data[product_name + "_pos_end"]))
-        at_reactant = [
-            np.array([pos in reactant_positions[r] for pos in positions], dtype=bool)
-            for r in range(2)
-        ]
+        positions = as_rows(data[product_name + "_pos_end"])
+        at_reactant = [np.isin(positions, reactant_positions[r]) for r in range(2)]
         # Each product is at the position of a reactant
         assert np.all(at_reactant[0] | at_reactant[1])
         if products_per_fusion_event == 1:
