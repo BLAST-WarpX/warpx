@@ -233,15 +233,15 @@ jobs:
         export OMP_NUM_THREADS=2
 
         echo "=================================================================================================== "
-        echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
-        echo "=================================================================================================== "
-        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
-        rm -rf ./diags
-
-        echo "=================================================================================================== "
         echo "=======================  Examples/Physics_applications/free_electron_laser ======================== "
         echo "=================================================================================================== "
         mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/free_electron_laser/inputs_test_1d_fel warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
+        echo "=================================================================================================== "
+        mpirun -n 2 ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d warpx.serialize_initial_conditions = 0
         rm -rf ./diags
 
         echo "=================================================================================================== "
@@ -314,6 +314,22 @@ jobs:
         ulimit -c unlimited
 
         echo "=================================================================================================== "
+        echo "======================  Examples/Physics_applications/capacitive_discharge ======================== "
+        echo "=================================================================================================== "
+        git clone https://github.com/BLAST-WarpX/warpx-data.git
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "==================================  Examples/Tests/embedded_circle ================================ "
+        echo "=================================================================================================== "
+        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
+        cd Examples/Tests/embedded_circle
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        cd -
+
+        echo "=================================================================================================== "
         echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
         echo "=================================================================================================== "
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
@@ -328,19 +344,11 @@ jobs:
         rm -rf ./diags
 
         echo "=================================================================================================== "
-        echo "==================================  Examples/Tests/embedded_circle ================================ "
+        echo "=======================  Examples/Physics_applications/plasma_acceleration ======================== "
         echo "=================================================================================================== "
-        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
-        cd Examples/Tests/embedded_circle
-        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_acceleration/inputs_test_2d_plasma_acceleration_boosted warpx.serialize_initial_conditions = 0
         rm -rf ./diags
-        cd -
-
-        echo "=================================================================================================== "
-        echo "======================  Examples/Physics_applications/capacitive_discharge ======================== "
-        echo "=================================================================================================== "
-        git clone https://github.com/BLAST-WarpX/warpx-data.git
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc warpx.serialize_initial_conditions = 0
+        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
         rm -rf ./diags
 
         echo "=================================================================================================== "
@@ -348,16 +356,6 @@ jobs:
         echo "=================================================================================================== "
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_mirror/inputs_test_2d_plasma_mirror warpx.serialize_initial_conditions = 0
         rm -rf ./diags
-
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/plasma_acceleration ======================== "
-        echo "=================================================================================================== "
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_acceleration/inputs_test_2d_plasma_acceleration_boosted warpx.serialize_initial_conditions = 0
-        rm -rf ./diags
-
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/plasma_acceleration/inputs_base_2d warpx.serialize_initial_conditions = 0
-        rm -rf ./diags
-
 
   thread_sanitizer_3D:
     name: Thread sanitizer 3D
@@ -422,6 +420,18 @@ jobs:
         export OMP_NUM_THREADS=2
 
         echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/beam_beam_collision ======================== "
+        echo "=================================================================================================== "
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+
+        echo "=================================================================================================== "
+        echo "=======================  Examples/Physics_applications/ion_beam_extraction ======================== "
+        echo "=================================================================================================== "
+        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/ion_beam_extraction/inputs_test_3d_ion_beam_extraction warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+
+        echo "=================================================================================================== "
         echo "========================  Examples/Physics_applications/laser_acceleration ======================== "
         echo "=================================================================================================== "
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d warpx.serialize_initial_conditions = 0
@@ -433,14 +443,3 @@ jobs:
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer warpx.serialize_initial_conditions = 0
         rm -rf ./diags
 
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/beam_beam_collision ======================== "
-        echo "=================================================================================================== "
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision warpx.serialize_initial_conditions = 0
-        rm -rf ./diags
-
-        echo "=================================================================================================== "
-        echo "=======================  Examples/Physics_applications/ion_beam_extraction ======================== "
-        echo "=================================================================================================== "
-        mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/ion_beam_extraction/inputs_test_3d_ion_beam_extraction warpx.serialize_initial_conditions = 0
-        rm -rf ./diags
