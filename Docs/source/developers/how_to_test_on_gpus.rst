@@ -8,7 +8,7 @@ These GPU tests are **optional**: they do not run by default on pull requests an
 
 The GPU runners cover the three GPU backends that WarpX supports:
 
-* **NVIDIA** (CUDA), on H100 GPUs;
+* **NVIDIA** (CUDA), on H200 GPUs;
 * **AMD** (HIP/ROCm), on MI300 GPUs;
 * **Intel** (SYCL), on Data Center Max (PVC) GPUs.
 

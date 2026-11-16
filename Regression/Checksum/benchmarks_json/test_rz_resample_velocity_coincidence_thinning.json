@@ -1,0 +1,12 @@
+{
+  "lev=0": {},
+  "ring": {
+    "particle_momentum_x": 1.495868903358282e-22,
+    "particle_momentum_y": 1.3479554972661882e-22,
+    "particle_momentum_z": 3.8420344314192036e-29,
+    "particle_position_x": 0.005015782828282892,
+    "particle_position_y": 0.0010000000000000087,
+    "particle_theta": 12.340935852844,
+    "particle_weight": 490873.8521234009
+  }
+}

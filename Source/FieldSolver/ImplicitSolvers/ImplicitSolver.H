@@ -110,13 +110,12 @@ public:
                        const WarpXSolverVec& a_E,
                              amrex::Real     a_time,
                              int             a_nl_iter,
-                             bool            a_from_jacobian,
-                             bool            update_pc = true) = 0;
+                             bool            a_from_jacobian) = 0;
 
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve (bool update_pc = true);
+    void PreLinearSolve (bool update_pc);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -197,6 +196,15 @@ public:
         const ablastr::fields::MultiLevelVectorField* a_baseline = nullptr,
         amrex::Real a_scale = 1.0,
         bool a_zero_out_first = false );
+
+    /**
+     * \brief Half-width, in cells and per direction, of the stencil that
+     *  ApplyMassMatrices() gathers over: evaluating the mass matrices at a cell
+     *  reads the input field no further than this many cells away.
+     *
+     *  Only valid after InitializeMassMatrices() has run.
+     */
+    [[nodiscard]] amrex::IntVect MassMatricesStencilHalfWidth () const;
 
     /**
      * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
@@ -380,8 +388,11 @@ protected:
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     *
+     * \param[in] particle_shape order of the particle shape factors used to deposit the
+     *            current and the mass matrices; this sets the width of the mass matrices stencil
      */
-    void InitializeMassMatrices ();
+    void InitializeMassMatrices (int particle_shape);
 
     void InitializeImplicitOptions ();
 
@@ -393,8 +404,7 @@ protected:
     void PreRHSOp (amrex::Real a_cur_time,
                    int         a_nl_iter,
                    bool        a_from_jacobian,
-                   amrex::Real a_dt_scale,
-                   bool        update_pc = true);
+                   amrex::Real a_dt_scale);
 
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
