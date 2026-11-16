@@ -66,8 +66,8 @@
 /Source/Laser/                                                   @RemiLehe @lucafedeli88
 
 # Python bindings and PICMI interface
-/Source/Python/                                                  @ax3l @roelof-groenewald
-/Python/                                                         @dpgrote @ax3l @roelof-groenewald
+/Source/Python/                                                  @ax3l @roelof-groenewald @dpgrote @atmyers
+/Python/                                                         @dpgrote @ax3l @roelof-groenewald @atmyers
 
 # Documentation
 /Docs/source/theory/                                             @RemiLehe @jlvay @JustinRayAngus @roelof-groenewald
