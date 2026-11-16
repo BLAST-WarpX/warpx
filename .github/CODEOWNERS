@@ -63,8 +63,7 @@
 /Source/Diagnostics/WarpXOpenPMD.*                               @ax3l
 /Source/Diagnostics/FlushFormats/FlushFormatOpenPMD.*            @ax3l
 /Source/EmbeddedBoundary/                                        @RemiLehe @WeiqunZhang
-/Source/Laser/                                                   @lucafedeli88
-/Source/Laser/LaserProfilesImpl/LaserProfileFromFile.cpp         @lucafedeli88 @RemiLehe
+/Source/Laser/                                                   @RemiLehe @lucafedeli88
 
 # Python bindings and PICMI interface
 /Source/Python/                                                  @ax3l @roelof-groenewald
