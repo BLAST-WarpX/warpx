@@ -12,6 +12,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
 #include <AMReX_Extension.H>
@@ -49,12 +50,15 @@ JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/
         auto& mypc = warpx.GetPartContainer();
         mypc.DepositCurrent(current_fp_temp, warpx.getdt(m_lev), 0.0);
 
-        // sum values in guard cells - note that this does not filter the
-        // current density.
+        // Sum deposited guard contributions without filtering.
         for (int idim = 0; idim < 3; ++idim) {
             auto& J = *current_fp_temp[0][idim];
             WarpXSumGuardCells(J, warpx.Geom(m_lev).periodicity(), J.nGrowVect(), 0, J.nComp());
         }
+
+        warpx.FinalizeJOnLevel(m_lev,
+            current_fp_temp[0][0], current_fp_temp[0][1], current_fp_temp[0][2],
+            PatchType::fine);
     }
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mf_src != nullptr, "m_mf_src can't be a nullptr.");

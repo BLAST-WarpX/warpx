@@ -24,7 +24,7 @@ using namespace amrex;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 namespace
 {
-    // Radial factor removed by ApplyInverseVolumeScalingToChargeDensity.
+    // Radial factor removed by charge/current inverse-volume scaling.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real RadialVolumeFactor (amrex::Real r, amrex::Real dr, bool use_axis_correction)
     {
@@ -1436,7 +1436,9 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
     // Assertion, make sure rho is at the same location as N
     AMREX_ALWAYS_ASSERT(rho.ixType().nodeCentered());
 
-    // Deposit fluid charge in the unscaled PIC representation
+    // Multiply physical fluid charge density by the volume factor to match
+    // the raw charge deposited by PIC particles. The inverse-volume scaling
+    // in FinalizeRho restores physical charge density.
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1464,7 +1466,6 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
 #else
                     const amrex::Real volume_factor = 1.0_rt;
 #endif
-                    // Match PIC deposits before radial inverse-volume scaling.
                     rho_arr(i,j,k,icomp) += volume_factor*q*N_arr(i,j,k);
                 }
             }
@@ -1509,6 +1510,10 @@ void WarpXFluidContainer::DepositCurrent(
     auto const &owner_mask_x = amrex::OwnerMask(jx, period);
     auto const &owner_mask_y = amrex::OwnerMask(jy, period);
     auto const &owner_mask_z = amrex::OwnerMask(jz, period);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::Real dr = WarpX::CellSize(lev)[0];
+    const bool use_axis_correction = warpx.UseVerboncoeurAxisCorrection();
+#endif
 
     // Calculate j at the nodes
 #ifdef AMREX_USE_OMP
@@ -1567,31 +1572,70 @@ void WarpXFluidContainer::DepositCurrent(
         const amrex::Array4<int> owner_mask_y_arr = owner_mask_y->array(mfi);
         const amrex::Array4<int> owner_mask_z_arr = owner_mask_z->array(mfi);
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Box tile_box = mfi.tilebox(fields.get(name_mf_N, lev)->ixType().toIntVect());
+        const amrex::Real rmin = WarpX::LowerCorner(tile_box, lev, 0.0_rt).x;
+        const int irmin = amrex::lbound(tile_box).x;
+        const amrex::Real rmin_x = rmin
+            + (jx_type[0] == amrex::IndexType::NODE ? 0.0_rt : 0.5_rt*dr);
+        const amrex::Real rmin_y = rmin
+            + (jy_type[0] == amrex::IndexType::NODE ? 0.0_rt : 0.5_rt*dr);
+        const amrex::Real rmin_z = rmin
+            + (jz_type[0] == amrex::IndexType::NODE ? 0.0_rt : 0.5_rt*dr);
+#endif
+
         // When using the `Interp` function, one needs to specify whether coarsening is desired.
         // Here, we do not perform any coarsening.
         const amrex::GpuArray<int, 3U> coarsening_ratio = {1, 1, 1};
 
 
-        // Interpolate fluid current and deposit it
+        // Interpolate physical fluid current density, then multiply by the volume
+        // factor at each destination component's location to match the raw current
+        // deposited by PIC particles. The inverse-volume scaling in FinalizeJ
+        // restores physical current density.
         // ( mask double counting )
         amrex::ParallelFor( tile_box_x, tile_box_y, tile_box_z,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
                 const amrex::Real jx_tmp = ablastr::coarsen::sample::Interp(tmp_jx_fluid_arr,
                     j_nodal_type, jx_type, coarsening_ratio, i, j, k, 0);
-                if ( owner_mask_x_arr(i,j,k) ) { jx_arr(i, j, k) += jx_tmp; }
+                if (owner_mask_x_arr(i,j,k)) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real volume_factor = RadialVolumeFactor(
+                        rmin_x + (i - irmin)*dr, dr, use_axis_correction);
+#else
+                    const amrex::Real volume_factor = 1.0_rt;
+#endif
+                    jx_arr(i, j, k) += volume_factor*jx_tmp;
+                }
             },
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
                 const amrex::Real jy_tmp = ablastr::coarsen::sample::Interp(tmp_jy_fluid_arr,
                     j_nodal_type, jy_type, coarsening_ratio, i, j, k, 0);
-                if ( owner_mask_y_arr(i,j,k) ) { jy_arr(i, j, k) += jy_tmp; }
+                if (owner_mask_y_arr(i,j,k)) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real volume_factor = RadialVolumeFactor(
+                        rmin_y + (i - irmin)*dr, dr, use_axis_correction);
+#else
+                    const amrex::Real volume_factor = 1.0_rt;
+#endif
+                    jy_arr(i, j, k) += volume_factor*jy_tmp;
+                }
             },
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
                 const amrex::Real jz_tmp = ablastr::coarsen::sample::Interp(tmp_jz_fluid_arr,
                     j_nodal_type, jz_type, coarsening_ratio, i, j, k, 0);
-                if ( owner_mask_z_arr(i,j,k) ) { jz_arr(i, j, k) += jz_tmp; }
+                if (owner_mask_z_arr(i,j,k)) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real volume_factor = RadialVolumeFactor(
+                        rmin_z + (i - irmin)*dr, dr, use_axis_correction);
+#else
+                    const amrex::Real volume_factor = 1.0_rt;
+#endif
+                    jz_arr(i, j, k) += volume_factor*jz_tmp;
+                }
             }
         );
     }

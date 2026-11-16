@@ -213,6 +213,10 @@ int SparseJacobianMatrix::Assemble (
 
         const auto& geom = a_geom[lev];
         const auto dxi = geom.InvCellSizeArray();
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+        const amrex::Real rmin_over_dr = geom.ProbLo(0) * dxi[0];
+        const int radial_domain_lo = geom.Domain().smallEnd(0);
+#endif
 
         Gpu::Buffer<int> nnz_actual_d({nnz_max});
         auto* nnz_actual_ptr = nnz_actual_d.data();
@@ -257,7 +261,7 @@ int SparseJacobianMatrix::Assemble (
 
 #if defined(WARPX_DIM_RSPHERE)
                     // 1D spherical geometry is electrostatic
-                    amrex::ignore_unused(dxi);
+                    amrex::ignore_unused(dxi, alpha, a_bc_masks);
 #else
                     const amrex::MultiFab* BC_mask_Edir = a_bc_masks[lev][dir];
                     AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);
@@ -329,14 +333,16 @@ int SparseJacobianMatrix::Assemble (
                         // dir = 1: that\cdot[\nabla\times\nabla E] = -d/dr[1/r*d/dr(r*Et)]
                         // dir = 2: zhat\cdot[\nabla\times\nabla E] = -1/r*d/dr[r*dEz/dr]
                         if (dir != 0) {
-                            const auto i_real = static_cast<amrex::Real>(i);
+                            // Nodal radius in units of dr; i == 0 need not be the axis.
+                            const amrex::Real r_over_dr = rmin_over_dr + (i - radial_domain_lo);
                             {
                                 // diagonal component (i) of 2nd derivative operator
                                 int cidx_g_rhs = dof_arr(i,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
                                     // r_{i} / r_{i-1/2} + r_{i} / r_{i+1/2}
-                                    geom_factor = i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt);
+                                    geom_factor = r_over_dr / (r_over_dr - 0.5_rt)
+                                                + r_over_dr / (r_over_dr + 0.5_rt);
                                 }
                                 else if (dir == 2) {
                                     geom_factor = 2.0_rt; // (r_{i+1/2} + r_{i-1/2}) / r_{i}
@@ -353,10 +359,11 @@ int SparseJacobianMatrix::Assemble (
                                 int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
-                                    geom_factor = (i_real - 1.0_rt) / (i_real - 0.5_rt); // r_{i-1} / r_{i-1/2}
+                                    // r_{i-1} / r_{i-1/2}
+                                    geom_factor = (r_over_dr - 1.0_rt) / (r_over_dr - 0.5_rt);
                                 }
-                                else if (dir == 2 && i != 0) {
-                                    geom_factor = 1.0_rt - 0.5_rt / i_real; // r_{i-1/2} / r_{i}
+                                else if (dir == 2 && r_over_dr != 0.0_rt) {
+                                    geom_factor = 1.0_rt - 0.5_rt / r_over_dr; // r_{i-1/2} / r_{i}
                                 }
                                 amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
@@ -370,10 +377,11 @@ int SparseJacobianMatrix::Assemble (
                                 int cidx_g_rhs = dof_arr(i+1,j,k,1);
                                 amrex::Real geom_factor = 1.0_rt;
                                 if (dir == 1) {
-                                    geom_factor = (i_real + 1.0_rt) / (i_real + 0.5_rt); // r_{i+1} / r_{i+1/2}
+                                    // r_{i+1} / r_{i+1/2}
+                                    geom_factor = (r_over_dr + 1.0_rt) / (r_over_dr + 0.5_rt);
                                 }
-                                else if (dir == 2 && i != 0) {
-                                    geom_factor = 1.0_rt + 0.5_rt / i_real; // r_{i+1/2} / r_{i}
+                                else if (dir == 2 && r_over_dr != 0.0_rt) {
+                                    geom_factor = 1.0_rt + 0.5_rt / r_over_dr; // r_{i+1/2} / r_{i}
                                 }
                                 amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
@@ -393,7 +401,8 @@ int SparseJacobianMatrix::Assemble (
                         // dir = 1: that\cdot[\nabla\times\nabla E] = -[d2/dz2]Et - d/dr[1/r*d/dr(r*Et)]
                         // dir = 2: zhat\cdot[\nabla\times\nabla E] = 1/r*d/dr[r*dEr/dz] - 1/r*d/dr[r*dEz/dr]
 #if defined(WARPX_DIM_RZ)
-                        const auto i_real = static_cast<amrex::Real>(i);
+                        // Nodal radius in units of dr; i == 0 need not be the axis.
+                        const amrex::Real r_over_dr = rmin_over_dr + (i - radial_domain_lo);
 #endif
                         {
                             // diagonal component (i,j) of second derivative operator
@@ -405,7 +414,8 @@ int SparseJacobianMatrix::Assemble (
                                 val = 2.0_rt * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
                             } else if (dir == 1) {
 #if defined(WARPX_DIM_RZ)
-                                const amrex::Real geom_factor = i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt);
+                                const amrex::Real geom_factor = r_over_dr / (r_over_dr - 0.5_rt)
+                                                              + r_over_dr / (r_over_dr + 0.5_rt);
 #else
                                 const amrex::Real geom_factor = 2.0_rt;
 #endif
@@ -422,7 +432,8 @@ int SparseJacobianMatrix::Assemble (
                             {
                                 // left component (i-1,j) or (i,j-1) of second derivative operator
 #if defined(WARPX_DIM_RZ)
-                                const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
+                                const amrex::Real geom_factor =
+                                    (dir == 2 && r_over_dr != 0.0_rt ? 1.0_rt - 0.5_rt / r_over_dr : 1.0_rt);
 #else
                                 const amrex::Real geom_factor = 1.0_rt;
 #endif
@@ -437,7 +448,8 @@ int SparseJacobianMatrix::Assemble (
                             {
                                 // right component (i+1,j) or (i,j+1) of second derivative operator
 #if defined(WARPX_DIM_RZ)
-                                const amrex::Real geom_factor = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
+                                const amrex::Real geom_factor =
+                                    (dir == 2 && r_over_dr != 0.0_rt ? 1.0_rt + 0.5_rt / r_over_dr : 1.0_rt);
 #else
                                 const amrex::Real geom_factor = 1.0_rt;
 #endif
@@ -457,8 +469,10 @@ int SparseJacobianMatrix::Assemble (
                             // dir = 0: d/dr(dEz/dz) at Er(i,j) with Er centered in r and nodal in z
                             // dir = 2: 1/r*d/dr[r*dEr/dz] at Ez(i,j) with Ez centered in z and nodal in r
 #if defined(WARPX_DIM_RZ)
-                            const amrex::Real geom_m = (dir == 2 && i != 0 ? 1.0_rt - 0.5_rt / i_real : 1.0_rt);
-                            const amrex::Real geom_p = (dir == 2 && i != 0 ? 1.0_rt + 0.5_rt / i_real : 1.0_rt);
+                            const amrex::Real geom_m =
+                                (dir == 2 && r_over_dr != 0.0_rt ? 1.0_rt - 0.5_rt / r_over_dr : 1.0_rt);
+                            const amrex::Real geom_p =
+                                (dir == 2 && r_over_dr != 0.0_rt ? 1.0_rt + 0.5_rt / r_over_dr : 1.0_rt);
 #else
                             const amrex::Real geom_m = 1.0_rt;
                             const amrex::Real geom_p = 1.0_rt;
@@ -503,7 +517,8 @@ int SparseJacobianMatrix::Assemble (
                             for (int jdir = 0; jdir <= 2; jdir+=2) {
                                 {
 #if defined(WARPX_DIM_RZ)
-                                    const amrex::Real geom_factor = (jdir == 0 ? (i_real - 1.0_rt) / (i_real - 0.5_rt) : 1.0_rt);
+                                    const amrex::Real geom_factor =
+                                        (jdir == 0 ? (r_over_dr - 1.0_rt) / (r_over_dr - 0.5_rt) : 1.0_rt);
 #else
                                     const amrex::Real geom_factor = 1.0_rt;
 #endif
@@ -517,7 +532,8 @@ int SparseJacobianMatrix::Assemble (
                                 }
                                 {
 #if defined(WARPX_DIM_RZ)
-                                    const amrex::Real geom_factor = (jdir == 0 ? (i_real + 1.0_rt) / (i_real + 0.5_rt) : 1.0_rt);
+                                    const amrex::Real geom_factor =
+                                        (jdir == 0 ? (r_over_dr + 1.0_rt) / (r_over_dr + 0.5_rt) : 1.0_rt);
 #else
                                     const amrex::Real geom_factor = 1.0_rt;
 #endif
