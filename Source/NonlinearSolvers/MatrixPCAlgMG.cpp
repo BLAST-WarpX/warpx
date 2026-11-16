@@ -27,10 +27,14 @@ struct MatrixPCAlgMG::Impl
     int m_max_iter = 1;
     int m_verbose = 0;
     amrex::AlgMGSmoother m_smoother = amrex::AlgMGSmoother::chebyshev;
-    int m_cheby_degree = 4;
+    int m_cheby_degree = 8;
+    RT m_cheby_ratio = RT(50);
     RT m_strong_threshold = RT(0.25);
     int m_aggressive_levels = 0;
     int m_max_levels = 25;
+    int m_nu1 = 1;          // smoother sweeps before and after the coarse correction,
+    int m_nu2 = 1;          // and at the bottom when it is not solved directly;
+    int m_nu_bottom = 4;    // defaults set from the smoother in the constructor
 
     amrex::AlgPartition m_partition;
     std::unique_ptr<amrex::SpMatrix<RT>> m_mat;
@@ -51,9 +55,16 @@ MatrixPCAlgMG::MatrixPCAlgMG (const std::string& a_name,
     pp.query("algmg_verbose", d.m_verbose);
     pp.query_enum_case_insensitive("smoother", d.m_smoother);
     pp.query("chebyshev_degree", d.m_cheby_degree);
+    pp.query("chebyshev_ratio", d.m_cheby_ratio);
     pp.query("strong_threshold", d.m_strong_threshold);
     pp.query("aggressive_levels", d.m_aggressive_levels);
     pp.query("max_levels", d.m_max_levels);
+    const bool cheby = (d.m_smoother == amrex::AlgMGSmoother::chebyshev);
+    d.m_nu1 = d.m_nu2 = cheby ? 1 : 2;
+    d.m_nu_bottom = cheby ? 4 : 8;
+    pp.query("nu1", d.m_nu1);
+    pp.query("nu2", d.m_nu2);
+    pp.query("nu_bottom", d.m_nu_bottom);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(d.m_max_iter >= 1,
         a_name + ".max_iter must be at least 1");
 
@@ -71,9 +82,13 @@ void MatrixPCAlgMG::printParameters () const
     amrex::Print() << d.m_name << " smoother:               "
                    << amrex::getEnumNameString(d.m_smoother) << "\n";
     amrex::Print() << d.m_name << " chebyshev_degree:       " << d.m_cheby_degree << "\n";
+    amrex::Print() << d.m_name << " chebyshev_ratio:        " << d.m_cheby_ratio << "\n";
     amrex::Print() << d.m_name << " strong_threshold:       " << d.m_strong_threshold << "\n";
     amrex::Print() << d.m_name << " aggressive_levels:      " << d.m_aggressive_levels << "\n";
     amrex::Print() << d.m_name << " max_levels:             " << d.m_max_levels << "\n";
+    amrex::Print() << d.m_name << " nu1:                    " << d.m_nu1 << "\n";
+    amrex::Print() << d.m_name << " nu2:                    " << d.m_nu2 << "\n";
+    amrex::Print() << d.m_name << " nu_bottom:              " << d.m_nu_bottom << "\n";
 }
 
 void MatrixPCAlgMG::Setup (int a_nrows, int a_ncols_max, const int* a_num_nz,
@@ -115,9 +130,13 @@ void MatrixPCAlgMG::Setup (int a_nrows, int a_ncols_max, const int* a_num_nz,
     d.m_algmg->setVerbose(d.m_verbose);
     d.m_algmg->setSmoother(d.m_smoother);
     d.m_algmg->setChebyshevDegree(d.m_cheby_degree);
+    d.m_algmg->setChebyshevRatio(d.m_cheby_ratio);
     d.m_algmg->setStrongThreshold(d.m_strong_threshold);
     d.m_algmg->setAggressiveNumLevels(d.m_aggressive_levels);
     d.m_algmg->setMaxLevels(d.m_max_levels);
+    d.m_algmg->setPreSmooth(d.m_nu1);
+    d.m_algmg->setPostSmooth(d.m_nu2);
+    d.m_algmg->setBottomSmooth(d.m_nu_bottom);
     d.m_algmg->setFixedIter(d.m_max_iter);
     d.m_algmg->setup();
 }

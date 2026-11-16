@@ -8,6 +8,7 @@
 #ifndef PETSC_SNES_WRAPPER_H_
 #define PETSC_SNES_WRAPPER_H_
 
+#include "Initialization/WarpXInit.H"
 #include "NewtonSolverParams.H"
 #include "NonlinearSolver.H"
 #include "WarpX_PETSc.H"
@@ -121,6 +122,15 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
         void InvalidatePreconditioner () override
         {
             m_solver->invalidatePreconditioner();
+        }
+
+        //! Destroy and recreate the PETSc objects around a finalize and re-initialize of PETSc
+        bool ReinitializePETSc () override
+        {
+            m_solver->destroyObjects();
+            warpx::initialization::reinitialize_petsc();
+            m_solver->createObjects();
+            return true;
         }
 
     private:

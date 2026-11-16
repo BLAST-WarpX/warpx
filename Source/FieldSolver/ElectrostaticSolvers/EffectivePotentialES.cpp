@@ -120,7 +120,7 @@ void EffectivePotentialES::ComputeSigma (
     // The "coarsening is just 1 i.e. no coarsening"
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
 
-    // GetChargeDensity returns a nodal multifab
+    // GetChargeDensityOnLevel returns a nodal multifab
     // Below we set all the unused dimensions to have cell-centered values for
     // rho since these values will be interpolated onto a cell-centered grid
     // - if this is not done the Interp function returns nonsense values.
@@ -162,12 +162,13 @@ void EffectivePotentialES::ComputeSigma (
         // grab the charge density for this species
         // Note: local deposition is done since the guard cells values are added
         // to the valid cells after filtering in `ApplyFilterandSumBoundaryRho` below.
-        // The rho boundary condition and inverse volume scaling for RZ is done
-        // within the `GetChargeDensity` function.
-        auto rho = pc->GetChargeDensity(lev, true);
+        // Defer physical boundary folding and volume scaling until after filtering.
+        auto rho = pc->GetChargeDensityOnLevel(lev, true, /*finalize*/false);
 
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
+        // Apply boundary conditions to rho, and then apply volume scaling
+        warpx.FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
 
         // Add rho for this species to the total charge density MultiFab,
         // but only over the guard region that exists in both MultiFabs
