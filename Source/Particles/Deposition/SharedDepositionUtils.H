@@ -43,40 +43,6 @@ int getMaxTboxAlongDim (int nCells, int tilesize){
 }
 
 /*
- * \brief gets the box of a tile from its index, as returned by amrex::getTileIndex.
- * \param tile_index : Index of the tile
- * \param box : Box that is split into tiles
- * \param tile_size : The tile size
- */
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Box getTileBoxFromIndex (int tile_index, const amrex::Box& box,
-                                const amrex::IntVect& tile_size) noexcept
-{
-    amrex::IntVect tile_lo, tile_hi;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        // Must be consistent with the tiling_1d function in amrex::getTileIndex
-        const int lo = box.smallEnd(idim);
-        const int ncells = box.length(idim);
-        const int ntile = amrex::max(ncells/tile_size[idim], 1);
-        const int itile = tile_index % ntile;
-        tile_index /= ntile;
-        const int ts_right = ncells/ntile;
-        const int ts_left = ts_right+1;
-        const int nleft = ncells - ntile*ts_right;
-        if (itile < nleft) {
-            // tiles on the left have size of ts_left
-            tile_lo[idim] = lo + itile*ts_left;
-            tile_hi[idim] = tile_lo[idim] + ts_left - 1;
-        } else {
-            // tiles on the right have size of ts_right
-            tile_lo[idim] = lo + itile*ts_right + nleft;
-            tile_hi[idim] = tile_lo[idim] + ts_right - 1;
-        }
-    }
-    return amrex::Box(tile_lo, tile_hi);
-}
-
-/*
  * \brief atomically add the values from the local deposition buffer back to the global array.
  * \param bx : Box defining the index space of the local buffer
  * \param global : The global array
