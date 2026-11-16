@@ -43,15 +43,28 @@
 /Source/Particles/Resampling/                                    @roelof-groenewald
 /Source/Particles/Sorting/                                       @RemiLehe @atmyers
 
+# ABLASTR, the library shared with ImpactX. fields/ holds the Poisson solvers
+# that the electrostatic solvers call, so it has their owners.
+/Source/ablastr/                                                 @ax3l
+/Source/ablastr/coarsen/                                         @WeiqunZhang @ax3l @RemiLehe
+/Source/ablastr/fields/                                          @roelof-groenewald @RemiLehe @dpgrote @WeiqunZhang @ax3l @cemitch99 @aeriforme
+/Source/ablastr/fields/MultiFabRegister.*                        @ax3l @dpgrote @lucafedeli88
+/Source/ablastr/math/                                            @ax3l @lucafedeli88
+/Source/ablastr/parallelization/                                 @lucafedeli88 @ax3l @WeiqunZhang @RemiLehe
+/Source/ablastr/particles/                                       @ax3l @lucafedeli88
+/Source/ablastr/profiler/                                        @WeiqunZhang @ax3l
+/Source/ablastr/utils/                                           @ax3l @lucafedeli88
+/Source/ablastr/warn_manager/                                    @lucafedeli88 @ax3l
+
 # Other subsystems
-/Source/ablastr/                                                 @ax3l @lucafedeli88
 /Source/AcceleratorLattice/                                      @dpgrote @ax3l
-/Source/Diagnostics/ReducedDiags/                                @dpgrote @aeriforme @ax3l
+/Source/Diagnostics/ReducedDiags/                                @dpgrote @aeriforme @ax3l @n01r
 /Source/Diagnostics/OpenPMDHelpFunction.*                        @ax3l
 /Source/Diagnostics/WarpXOpenPMD.*                               @ax3l
 /Source/Diagnostics/FlushFormats/FlushFormatOpenPMD.*            @ax3l
 /Source/EmbeddedBoundary/                                        @RemiLehe @WeiqunZhang
 /Source/Laser/                                                   @lucafedeli88
+/Source/Laser/LaserProfilesImpl/LaserProfileFromFile.cpp         @lucafedeli88 @RemiLehe
 
 # Python bindings and PICMI interface
 /Source/Python/                                                  @ax3l @roelof-groenewald
