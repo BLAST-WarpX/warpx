@@ -1904,10 +1904,15 @@ Particle initialization
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field with the name given by ``<species_name>.density_mesh_name``
-      (default ``density``). See
-      `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file. There is
-      another optional parameter,
+      (default ``density``). See the following files for examples of how to prepare
+      the openPMD data file in each geometry:
+      `1D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_1d_load_density_prepare.py>`__,
+      `2D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_2d_load_density_prepare.py>`__,
+      `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__,
+      `RZ <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rz_load_density_prepare.py>`__
+      and
+      `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rsphere_load_density_prepare.py>`__.
+      There is another optional parameter,
       ``<species_name>.read_density_distributed=true``, which controls how the
       openPMD data are distributed among processes. If it is set to false, the
       openPMD data are loaded and duplicated on every process. If it is set to
@@ -2066,12 +2071,14 @@ Particle initialization
         * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
           from an openPMD file and converted to an isotropic vector
           :math:`u_\mathrm{std}` at the particle positions (requires a WarpX build with openPMD;
-          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          not supported yet in ``RZ`` / ``RCYLINDER``). The following is required:
           ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
           contain a scalar openPMD mesh with the name given by
-          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
-          for an example of how to prepare the openPMD data file.
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
+          following files for examples of how to prepare the openPMD data file in each geometry:
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          and
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
       More specifically, the plasma is initialized with a Maxwell-Juttner distribution
@@ -2122,13 +2129,15 @@ Particle initialization
         * If ``parser``, the following is required:
           ``<species_name>.temperature_in_eV_function(x,y,z)``.
         * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
-          from an openPMD file (requires a WarpX build with openPMD; not supported yet in ``RZ`` / ``RCYLINDER`` /
-          ``RSPHERE``). The following is required:
+          from an openPMD file (requires a WarpX build with openPMD; not supported yet in ``RZ`` /
+          ``RCYLINDER``). The following is required:
           ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
           contain a scalar openPMD mesh with the name given by
-          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
-          for an example of how to prepare the openPMD data file.
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
+          following files for examples of how to prepare the openPMD data file in each geometry:
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          and
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
@@ -4632,7 +4641,8 @@ Additional parameters
     memory, which is faster than the usual ``__global__``
     memory. Performance impact will depend on the relative overhead
     of assigning the particles to bins small enough to fit in the
-    space available for the temporary buffers.
+    space available for the temporary buffers. With CUDA and HIP, this
+    cannot be used with more than one azimuthal mode in RZ geometry.
 
 .. pp:param:: warpx.do_shared_mem_current_deposition
     :type: ``bool``
@@ -4989,7 +4999,8 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Reduce size of the selected diagnostic fields output by this ratio in each dimension.
-    (For a ratio of N, this is done by averaging the fields over N or (N+1) points depending on the staggering).
+    Coarsening uses ``ablastr::coarsen::sample``, which samples one or two nearby source points per dimension, depending on the field staggering.
+    See :ref:`developers-fields-coarsening-interpolation-helpers`.
     If ``blocking_factor`` and ``max_grid_size`` are used for the domain decomposition, as detailed in
     the :ref:`domain decomposition <usage_domain_decomposition>` section, ``coarsening_ratio`` should be an integer
     divisor of ``blocking_factor``. If :pp:param:`warpx.numprocs` is used instead, the total number of cells in a given
