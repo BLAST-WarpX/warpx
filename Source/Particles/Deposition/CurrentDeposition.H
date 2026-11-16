@@ -2477,37 +2477,37 @@ void doVillasenorDepositionShapeNExplicitKernel (const long ip,
 {
     using namespace amrex::literals;
 
-            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
-                                                               + uyp[ip]*uyp[ip]*inv_c2
-                                                               + uzp[ip]*uzp[ip]*inv_c2);
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+    const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                       + uyp[ip]*uyp[ip]*inv_c2
+                                                       + uzp[ip]*uzp[ip]*inv_c2);
 
-            // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
-            // (do_ionization=1)
-            bool const do_ionization = ion_lev;
+    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
+    // (do_ionization=1)
+    bool const do_ionization = ion_lev;
 
-            amrex::Real wq = q*wp[ip];
-            if (do_ionization){
-                wq *= ion_lev[ip];
-            }
+    amrex::Real wq = q*wp[ip];
+    if (do_ionization){
+        wq *= ion_lev[ip];
+    }
 
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(ip, xp, yp, zp);
+    amrex::ParticleReal xp, yp, zp;
+    GetPosition(ip, xp, yp, zp);
 
-            // computes current and old position
-            amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
-            amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
-            amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
-            amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
-            amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+    // computes current and old position
+    amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+    amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
+    amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+    amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+    amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+    amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
 
-            VillasenorDepositionShapeNKernel<depos_order, components>(
-                xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                          uxp[ip], uyp[ip], uzp[ip], gaminv,
-                                                          Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain_double, do_cropping,
-                                                          lo, invvol, n_rz_azimuthal_modes);
+    VillasenorDepositionShapeNKernel<depos_order, components>(
+        xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+        uxp[ip], uyp[ip], uzp[ip], gaminv,
+        Jx_arr, Jy_arr, Jz_arr,
+        dt, dinv, xyzmin, domain_double, do_cropping,
+        lo, invvol, n_rz_azimuthal_modes);
 }
 
 /**
