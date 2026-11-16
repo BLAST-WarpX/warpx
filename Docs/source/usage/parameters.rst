@@ -4641,7 +4641,8 @@ Additional parameters
     memory, which is faster than the usual ``__global__``
     memory. Performance impact will depend on the relative overhead
     of assigning the particles to bins small enough to fit in the
-    space available for the temporary buffers.
+    space available for the temporary buffers. With CUDA and HIP, this
+    cannot be used with more than one azimuthal mode in RZ geometry.
 
 .. pp:param:: warpx.do_shared_mem_current_deposition
     :type: ``bool``

@@ -88,6 +88,8 @@ NVIDIA-H200:
         test_rcylinder_langmuir_multi
         test_rsphere_langmuir_multi
         test_rz_electrostatic_sphere_eb
+        test_rz_langmuir_multi_direct
+        test_rz_langmuir_multi_direct_shared_mem
       )
       # Join the test names with "|" to form regex alternatives.
       GPU_TESTS_REGEX=""
@@ -152,6 +154,8 @@ AMD-MI300:
         test_rcylinder_langmuir_multi
         test_rsphere_langmuir_multi
         test_rz_electrostatic_sphere_eb
+        test_rz_langmuir_multi_direct
+        test_rz_langmuir_multi_direct_shared_mem
       )
       # Join the test names with "|" to form regex alternatives.
       GPU_TESTS_REGEX=""
