@@ -44,7 +44,7 @@ HankelTransform::HankelTransform (int const hankel_order,
 
     GetBesselRoots(azimuthal_mode, m_nk, alphas, alpha_errors);
     // Add of check of alpha_errors, should be all zeros
-    AMREX_ALWAYS_ASSERT(std::all_of(alpha_errors.begin(), alpha_errors.end(), [](int i) { return i == 0; }));
+    AMREX_ALWAYS_ASSERT(std::ranges::all_of(alpha_errors, [](int i) { return i == 0; }));
 
     // Calculate the spectral grid
     amrex::Vector<amrex::Real> kr(m_nk);

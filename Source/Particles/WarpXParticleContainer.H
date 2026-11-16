@@ -116,7 +116,7 @@ public:
 
     WarpXParIter (ContainerType& pc, int level);
 
-    WarpXParIter (ContainerType& pc, int level, amrex::MFItInfo& info);
+    WarpXParIter (ContainerType& pc, int level, const amrex::MFItInfo& info);
 
     [[nodiscard]] const std::array<RealVector, PIdx::nattribs>& GetAttribs () const
     {
@@ -702,7 +702,7 @@ public:
     bool HasiAttrib (const std::string& name)
     {
         std::vector<std::string> const & int_names = GetIntSoANames();
-        auto const pos = std::find(int_names.begin(), int_names.end(), name);
+        auto const pos = std::ranges::find(int_names, name);
         return (pos != int_names.end());
     }
 

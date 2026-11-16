@@ -16,6 +16,7 @@
 
 #ifdef AMREX_USE_PETSC
 #   include <petscconf.h>
+#   include <petscversion.h>
 #endif
 
 #include <algorithm>
@@ -733,6 +734,14 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 {
 
     pp.get("nonlinear_solver", m_nlsolver_type);
+#ifdef AMREX_USE_PETSC
+    // PETSc 3.26.1 fixed the host memory growth that the re-initialization works around.
+    // Not PETSC_VERSION_GE(), which is always true on the PETSc main branch.
+#   if PETSC_VERSION_MAJOR > 3 || (PETSC_VERSION_MAJOR == 3 && (PETSC_VERSION_MINOR > 26 || \
+        (PETSC_VERSION_MINOR == 26 && PETSC_VERSION_SUBMINOR >= 1)))
+    m_petsc_reinit_interval = 0;
+#   endif
+#endif
     const bool reinit_interval_set = pp.query("petsc_reinit_interval", m_petsc_reinit_interval);
 #if defined(AMREX_USE_PETSC) && defined(PETSC_HAVE_KOKKOS)
     // PETSc uses Kokkos on the device (e.g. in PetscSF), and Kokkos cannot be initialized twice
