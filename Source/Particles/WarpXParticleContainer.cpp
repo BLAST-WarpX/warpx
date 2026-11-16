@@ -675,8 +675,6 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         }
         ABLASTR_PROFILE_VAR_STOP(blp_sort);
         ABLASTR_PROFILE_VAR_START(blp_get_max_tilesize);
-            //get the maximum size necessary for shared mem
-            // get tile boxes
         //get the maximum size necessary for shared mem
 #if AMREX_SPACEDIM > 0
         const int sizeX = getMaxTboxAlongDim(box.size()[0], WarpX::shared_tilesize[0]);
