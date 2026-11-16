@@ -184,8 +184,8 @@ namespace
     {
         constexpr auto is_pml = [](const FieldBoundaryType fbt) {return (fbt == FieldBoundaryType::PML);};
         const auto is_any_pml =
-            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), is_pml) ||
-            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), is_pml);
+            std::ranges::any_of(field_boundary_lo, is_pml) ||
+            std::ranges::any_of(field_boundary_hi, is_pml);
         return is_any_pml;
     }
 
@@ -598,16 +598,16 @@ WarpX::ReadParameters ()
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
         (
-            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
-            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PEC;})
+            std::ranges::none_of(field_boundary_lo, [](auto fb){ return fb == FieldBoundaryType::PEC;})  &&
+            std::ranges::none_of(field_boundary_hi, [](auto fb){ return fb == FieldBoundaryType::PEC;})
         ),
         "PEC boundary not implemented for PSATD, yet!");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) ||
         (
-            std::none_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
-            std::none_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){ return fb == FieldBoundaryType::PMC;})
+            std::ranges::none_of(field_boundary_lo, [](auto fb){ return fb == FieldBoundaryType::PMC;})  &&
+            std::ranges::none_of(field_boundary_hi, [](auto fb){ return fb == FieldBoundaryType::PMC;})
         ),
         "PMC boundary not implemented for PSATD, yet!");
 
@@ -804,8 +804,8 @@ WarpX::ReadParameters ()
 #endif
 
         const bool is_any_boundary_open =
-            std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
-            std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
+            std::ranges::any_of(field_boundary_lo, [](auto fb){return (fb == FieldBoundaryType::Open ); }) ||
+            std::ranges::any_of(field_boundary_hi, [](auto fb){return (fb == FieldBoundaryType::Open ); }) ;
 
         if(is_any_boundary_open){
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -997,18 +997,18 @@ WarpX::ReadParameters ()
         }
 
         const auto at_least_one_boundary_is_pml =
-            (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
+            (std::ranges::any_of(WarpX::field_boundary_lo,
                 [](const auto& cc){return cc == FieldBoundaryType::PML;})
             ||
-            std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
+            std::ranges::any_of(WarpX::field_boundary_hi,
                 [](const auto& cc){return cc == FieldBoundaryType::PML;})
             );
 
         const auto at_least_one_boundary_is_silver_mueller =
-            (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
+            (std::ranges::any_of(WarpX::field_boundary_lo,
                 [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             ||
-            std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
+            std::ranges::any_of(WarpX::field_boundary_hi,
                 [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             );
 
@@ -1158,6 +1158,11 @@ WarpX::ReadParameters ()
         utils::parser::queryWithParser(pp_warpx, "n_rz_azimuthal_modes", n_rz_azimuthal_modes);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( n_rz_azimuthal_modes > 0,
             "The number of azimuthal modes (n_rz_azimuthal_modes) must be at least 1");
+        // The shared memory arrays hold a single component
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_shared_mem_current_deposition || n_rz_azimuthal_modes == 1,
+            "Shared memory current deposition (warpx.do_shared_mem_current_deposition) "
+            "cannot be used with more than 1 azimuthal mode.");
 #endif
 
         // Check whether fluid species will be used
@@ -1830,12 +1835,10 @@ WarpX::ReadParameters ()
         for (auto& vv : m_v_comoving) { vv*= PhysConst::c; }
 
         const auto v_galilean_is_zero =
-            std::all_of(m_v_galilean.begin(), m_v_galilean.end(),
-            [](const auto& val){return val == 0.;});
+            std::ranges::all_of(m_v_galilean, [](const auto& val){return val == 0.;});
 
         const auto v_comoving_is_zero =
-            std::all_of(m_v_comoving.begin(), m_v_comoving.end(),
-            [](const auto& val){return val == 0.;});
+            std::ranges::all_of(m_v_comoving, [](const auto& val){return val == 0.;});
 
 
         // Galilean and comoving algorithms should not be used together

@@ -702,7 +702,7 @@ public:
     bool HasiAttrib (const std::string& name)
     {
         std::vector<std::string> const & int_names = GetIntSoANames();
-        auto const pos = std::find(int_names.begin(), int_names.end(), name);
+        auto const pos = std::ranges::find(int_names, name);
         return (pos != int_names.end());
     }
 
