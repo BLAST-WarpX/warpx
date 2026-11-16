@@ -1906,10 +1906,15 @@ Particle initialization
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field with the name given by ``<species_name>.density_mesh_name``
-      (default ``density``). See
-      `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file. There is
-      another optional parameter,
+      (default ``density``). See the following files for examples of how to prepare
+      the openPMD data file in each geometry:
+      `1D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_1d_load_density_prepare.py>`__,
+      `2D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_2d_load_density_prepare.py>`__,
+      `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__,
+      `RZ <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rz_load_density_prepare.py>`__
+      and
+      `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rsphere_load_density_prepare.py>`__.
+      There is another optional parameter,
       ``<species_name>.read_density_distributed=true``, which controls how the
       openPMD data are distributed among processes. If it is set to false, the
       openPMD data are loaded and duplicated on every process. If it is set to
@@ -4638,7 +4643,8 @@ Additional parameters
     memory, which is faster than the usual ``__global__``
     memory. Performance impact will depend on the relative overhead
     of assigning the particles to bins small enough to fit in the
-    space available for the temporary buffers.
+    space available for the temporary buffers. With CUDA and HIP, this
+    cannot be used with more than one azimuthal mode in RZ geometry.
 
 .. pp:param:: warpx.do_shared_mem_current_deposition
     :type: ``bool``
