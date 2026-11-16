@@ -1734,6 +1734,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
  * \tparam depos_order  deposition order
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
  * \param wq           Pointer to array of particle weights.
@@ -1749,7 +1751,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param invvol                One over cell volume
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
-template <int depos_order>
+template <int depos_order, int components = JComponents::all>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal const xp_old,
                                        [[maybe_unused]] amrex::ParticleReal const yp_old,
@@ -1776,6 +1778,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 {
 
     using namespace amrex::literals;
+
+    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr);
 
 #if (AMREX_SPACEDIM > 1)
     amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
@@ -2027,6 +2031,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
         const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         amrex::Real this_Jx;
         for (int i=0; i<=depos_order-1; i++) {
@@ -2040,7 +2045,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                 }
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::y)) {
         // deposit Jy for this segment
         amrex::Real this_Jy;
         for (int i=0; i<=depos_order; i++) {
@@ -2054,7 +2061,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                 }
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         amrex::Real this_Jz;
         for (int i=0; i<=depos_order; i++) {
@@ -2065,6 +2074,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                                              + sx_new_node[i]*sy_old_node[j]*one_sixth
                                              + sx_new_node[i]*sy_new_node[j]*one_third )*seg_factor_z;
                     amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), this_Jz);
+                }
                 }
             }
         }
@@ -2174,6 +2184,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
         const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         amrex::Real this_Jx;
         for (int i=0; i<=depos_order-1; i++) {
@@ -2192,7 +2203,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::y)) {
         // deposit out-of-plane Jy for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         amrex::Real this_Jy;
@@ -2216,7 +2229,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         amrex::Real this_Jz;
         for (int i=0; i<=depos_order; i++) {
@@ -2233,6 +2248,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                     xy_mid = xy_mid*xy_mid0;
                 }
 #endif
+            }
             }
         }
 
@@ -2302,14 +2318,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         // deposit out-of-plane Jx and Jy for this segment
         for (int k=0; k<=depos_order; k++) {
             const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
+            if constexpr (JComponents::has(components, JComponents::x)) {
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+            }
         }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         for (int k=0; k<=depos_order-1; k++) {
             const amrex::Real this_Jz = wqz*sz_cell[k]*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k0_cell+k, 0, 0), this_Jz);
+        }
         }
 
         // update old segment values
@@ -2377,14 +2399,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         // deposit out-of-plane Jy and Jz for this segment
         for (int i=0; i<=depos_order; i++) {
             const amrex::Real weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
+            if constexpr (JComponents::has(components, JComponents::y)) {
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, 0, 0), wqy*weight);
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, 0, 0), wqz*weight);
+            }
         }
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         for (int i=0; i<=depos_order-1; i++) {
             const amrex::Real this_Jx = wqx*sx_cell[i]*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, 0, 0), this_Jx);
+        }
         }
 
         // update old segment values
@@ -2395,6 +2423,91 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     }
 
 #endif
+}
+
+/**
+ * \brief Villasenor and Buneman current deposition of a single particle, for the explicit scheme.
+ *
+ * Kernel of doVillasenorDepositionShapeNExplicit and doVillasenorDepositionSharedShapeN.
+ * Computes the old and new positions and gamma of the particle, then calls
+ * VillasenorDepositionShapeNKernel.
+ *
+ * \tparam depos_order  deposition order
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
+ * \param ip           Index of the particle.
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level, or null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density.
+ * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ * \param invvol                One over cell volume
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order, int components = JComponents::all>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doVillasenorDepositionShapeNExplicitKernel (const long ip,
+                                                 const GetParticlePosition<PIdx>& GetPosition,
+                                                 const amrex::ParticleReal * const wp,
+                                                 const amrex::ParticleReal * const uxp,
+                                                 const amrex::ParticleReal * const uyp,
+                                                 const amrex::ParticleReal * const uzp,
+                                                 const int * const ion_lev,
+                                                 const amrex::Array4<amrex::Real>& Jx_arr,
+                                                 const amrex::Array4<amrex::Real>& Jy_arr,
+                                                 const amrex::Array4<amrex::Real>& Jz_arr,
+                                                 const amrex::Real dt,
+                                                 const amrex::Real relative_time,
+                                                 const amrex::XDim3 & dinv,
+                                                 const amrex::XDim3 & xyzmin,
+                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                                 const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
+                                                 const amrex::Dim3 lo,
+                                                 const amrex::Real q,
+                                                 const amrex::Real invvol,
+                                                 [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+    const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                       + uyp[ip]*uyp[ip]*inv_c2
+                                                       + uzp[ip]*uzp[ip]*inv_c2);
+
+    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
+    // (do_ionization=1)
+    bool const do_ionization = ion_lev;
+
+    amrex::Real wq = q*wp[ip];
+    if (do_ionization){
+        wq *= ion_lev[ip];
+    }
+
+    amrex::ParticleReal xp, yp, zp;
+    GetPosition(ip, xp, yp, zp);
+
+    // computes current and old position
+    amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+    amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
+    amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+    amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+    amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+    amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+
+    VillasenorDepositionShapeNKernel<depos_order, components>(
+        xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+        uxp[ip], uyp[ip], uzp[ip], gaminv,
+        Jx_arr, Jy_arr, Jz_arr,
+        dt, dinv, xyzmin, domain_double, do_cropping,
+        lo, invvol, n_rz_azimuthal_modes);
 }
 
 /**
@@ -2445,12 +2558,6 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
-    using namespace amrex::literals;
-
-    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
-    // (do_ionization=1)
-    bool const do_ionization = ion_lev;
-
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr.
@@ -2458,36 +2565,147 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
     amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
-
-            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
-                                                               + uyp[ip]*uyp[ip]*inv_c2
-                                                               + uzp[ip]*uzp[ip]*inv_c2);
-
-            amrex::Real wq = q*wp[ip];
-            if (do_ionization){
-                wq *= ion_lev[ip];
-            }
-
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(ip, xp, yp, zp);
-
-            // computes current and old position
-            amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
-            amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
-            amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
-            amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
-            amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
-
-            VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                          uxp[ip], uyp[ip], uzp[ip], gaminv,
-                                                          Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain_double, do_cropping,
-                                                          lo, invvol, n_rz_azimuthal_modes);
-
+            doVillasenorDepositionShapeNExplicitKernel<depos_order>(
+                ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, Jx_arr, Jy_arr, Jz_arr,
+                dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, invvol,
+                n_rz_azimuthal_modes);
     });
 
+}
+
+/**
+ * \brief Functor that deposits the current of one particle with the Villasenor and Buneman
+ *        deposition, for doSharedDeposition. See doVillasenorDepositionShapeNExplicitKernel
+ *        for the members.
+ *
+ * \tparam depos_order  deposition order
+ */
+template <int depos_order>
+struct VillasenorParticleDeposit
+{
+    GetParticlePosition<PIdx> GetPosition;
+    const amrex::ParticleReal* wp;
+    const amrex::ParticleReal* uxp;
+    const amrex::ParticleReal* uyp;
+    const amrex::ParticleReal* uzp;
+    const int* ion_lev;
+    amrex::Real dt;
+    amrex::Real relative_time;
+    amrex::XDim3 dinv;
+    amrex::XDim3 xyzmin;
+    amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
+    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> do_cropping;
+    amrex::Dim3 lo;
+    amrex::Real q;
+    amrex::Real invvol;
+    int n_rz_azimuthal_modes;
+
+    /** \brief Deposit the components of J in the bitmask \c components (see JComponents)
+     *         of particle \c ip into \c J */
+    template <int components>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void deposit (const long ip, amrex::GpuArray<amrex::Array4<amrex::Real>, 3> const& J) const
+    {
+        doVillasenorDepositionShapeNExplicitKernel<depos_order, components>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, J[0], J[1], J[2],
+            dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, invvol,
+            n_rz_azimuthal_modes);
+    }
+};
+
+/**
+ * \brief Villasenor and Buneman current deposition, for the explicit scheme, using shared
+ *        memory arrays. Particles are binned into tiles of bin_size cells, and each tile
+ *        is processed by one GPU thread block, which accumulates the current in shared
+ *        memory before adding it to the global arrays. Only available for CUDA and HIP.
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param jx_fab,jy_fab,jz_fab FArrayBox of current density.
+ * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit J, relative to the time of the
+ *                              current positions of the particles.
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry; must be 1.
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
+ */
+template <int depos_order>
+void doVillasenorDepositionSharedShapeN (
+    const GetParticlePosition<PIdx>& GetPosition,
+    const amrex::ParticleReal * const wp,
+    const amrex::ParticleReal * const uxp,
+    const amrex::ParticleReal * const uyp,
+    const amrex::ParticleReal * const uzp,
+    const int* ion_lev,
+    amrex::FArrayBox& jx_fab,
+    amrex::FArrayBox& jy_fab,
+    amrex::FArrayBox& jz_fab,
+    const amrex::Real dt,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+    const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
+    const amrex::Dim3 lo,
+    const amrex::Real q,
+    const int n_rz_azimuthal_modes,
+    const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
+    const amrex::Box& box,
+    const amrex::Geometry& geom,
+    const amrex::IntVect& a_tbox_max_size,
+    const int threads_per_block,
+    const amrex::IntVect bin_size)
+{
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+    using namespace amrex::literals;
+
+    // With the CFL condition, a particle in a given cell touches points from depos_order
+    // cells below to depos_order+1 cells above that cell, so the shared memory arrays cover
+    // the tile grown by depos_order.
+    // The new position is the current position (used for binning) pushed by
+    // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
+    // grow the shared memory arrays by the number of cells that the particle can move in
+    // that time.
+    const auto dxiarr = geom.InvCellSizeArray();
+    const amrex::Real shift_time = std::abs(relative_time + 0.5_rt*dt);
+    int ngrow = depos_order;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        ngrow = amrex::max(ngrow, depos_order + static_cast<int>(
+            std::ceil(PhysConst::c*shift_time*dxiarr[idim])));
+    }
+
+    const VillasenorParticleDeposit<depos_order> deposit_particle{
+        GetPosition, wp, uxp, uyp, uzp, ion_lev, dt, relative_time, dinv, xyzmin,
+        domain_double, do_cropping, lo, q, dinv.x*dinv.y*dinv.z, n_rz_azimuthal_modes};
+    const amrex::GpuArray<amrex::Array4<amrex::Real>, 3> J{
+        jx_fab.array(), jy_fab.array(), jz_fab.array()};
+    const amrex::GpuArray<amrex::IntVect, 3> types{
+        jx_fab.box().type(), jy_fab.box().type(), jz_fab.box().type()};
+    doSharedDeposition<3>(deposit_particle, J, types, ngrow, a_bins, box, a_tbox_max_size,
+                          threads_per_block, bin_size);
+#else
+    amrex::ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, n_rz_azimuthal_modes,
+        a_bins, box, geom, a_tbox_max_size, threads_per_block, bin_size);
+    WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
+#endif
 }
 
 /**

@@ -4660,9 +4660,9 @@ Additional parameters
     (e.g. for high particles per cell). We have observed this option to be faster
     on AMD GPUs such as the MI250X and MI300A for greater than ~4 particles per cell,
     but not neccesarily on NVIDIA hardware such as the A100. This feature is only available
-    for CUDA and HIP, and is only recommended for 3D or 2D. It supports the ``direct`` and
-    ``esirkepov`` values of :pp:param:`algo.current_deposition` with the explicit
-    particle push, and cannot be used with more than one azimuthal mode in RZ.
+    for CUDA and HIP, and is only recommended for 3D or 2D. It supports the ``direct``,
+    ``esirkepov`` and ``villasenor`` values of :pp:param:`algo.current_deposition` with the
+    explicit particle push, and cannot be used with more than one azimuthal mode in RZ.
 
 .. pp:param:: warpx.shared_tilesize
     :type: list of ``int``
