@@ -17,7 +17,7 @@
 # narrower ones it should not override.
 
 # Field solvers
-/Source/FieldSolver/ElectrostaticSolvers/                        @roelof-groenewald @RemiLehe @dpgrote
+/Source/FieldSolver/ElectrostaticSolvers/                        @roelof-groenewald @RemiLehe @dpgrote @WeiqunZhang @ax3l @cemitch99 @aeriforme
 /Source/FieldSolver/WarpXSolveFieldsES.cpp                       @roelof-groenewald @RemiLehe @dpgrote
 /Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/       @roelof-groenewald @prkkumar-he @clarkse-he
 /Source/FieldSolver/FiniteDifferenceSolver/HybridPICSolveE.cpp   @roelof-groenewald @prkkumar-he @clarkse-he
@@ -89,8 +89,8 @@
 /Tools/machines/dane-llnl/                                       @dpgrote @ax3l @JustinRayAngus @debog
 /Docs/source/install/hpc/dane.rst                                @dpgrote @ax3l @JustinRayAngus @debog
 /Tools/machines/desktop/                                         @ax3l @EZoni
-/Tools/machines/frontier-olcf/                                   @ax3l @WeiqunZhang @titoiride @Noerr @aarontran @Pierre-Bartoli
-/Docs/source/install/hpc/frontier.rst                            @ax3l @WeiqunZhang @titoiride @Noerr @aarontran @Pierre-Bartoli
+/Tools/machines/frontier-olcf/                                   @ax3l @WeiqunZhang @Noerr @aarontran @Pierre-Bartoli
+/Docs/source/install/hpc/frontier.rst                            @ax3l @WeiqunZhang @Noerr @aarontran @Pierre-Bartoli
 /Tools/machines/fugaku-riken/                                    @lucafedeli88
 /Docs/source/install/hpc/fugaku.rst                              @lucafedeli88
 /Tools/machines/greatlakes-umich/                                @ax3l @archermarx @bstassel
@@ -121,8 +121,8 @@
 /Docs/source/install/hpc/polaris.rst                             @roelof-groenewald @ax3l @WeiqunZhang @zippylab @ppiot
 /Tools/machines/taurus-zih/                                      @ax3l @tmiethlinger @BrianMarre
 /Docs/source/install/hpc/taurus.rst                              @ax3l @tmiethlinger @BrianMarre
-/Tools/machines/tuolumne-llnl/                                   @ax3l @eebasso @titoiride @JustinRayAngus @debog
-/Docs/source/install/hpc/tuolumne.rst                            @ax3l @eebasso @titoiride @JustinRayAngus @debog
+/Tools/machines/tuolumne-llnl/                                   @ax3l @eebasso @JustinRayAngus @debog
+/Docs/source/install/hpc/tuolumne.rst                            @ax3l @eebasso @JustinRayAngus @debog
 
 # CI, issue templates and repository configuration (including this file)
 /.github/                                                        @ax3l @EZoni
