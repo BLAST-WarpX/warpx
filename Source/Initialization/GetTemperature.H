@@ -55,7 +55,7 @@ struct GetTemperature
     /* q_e / (m c^2) factor, used for temperature_in_eV conversion */
     amrex::Real m_q_e_over_mc2{0.0};
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    !defined(WARPX_DIM_RCYLINDER)
     ExternalFieldView m_temperature_in_eV_from_file;
 #endif
 
@@ -85,7 +85,7 @@ struct GetTemperature
                 return m_temperature_parser(x,y,z);
             }
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    !defined(WARPX_DIM_RCYLINDER)
             case (TempFromFileValue):
             {
                 return m_temperature_in_eV_from_file.getValue(x,y,z);

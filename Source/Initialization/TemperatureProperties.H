@@ -72,6 +72,9 @@ struct TemperatureProperties
     std::unique_ptr<ExternalFieldReader> m_u_std_x_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_y_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_z_reader;
+#endif
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER)
     std::unique_ptr<ExternalFieldReader> m_temperature_in_eV_reader;
 #endif
 };

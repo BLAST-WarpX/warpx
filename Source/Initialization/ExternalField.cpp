@@ -463,8 +463,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 
 #else
     amrex::ignore_unused(pbox);
-    WARPX_ABORT_WITH_MESSAGE(
-        "ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER");
+    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER");
 #endif
 }
 
