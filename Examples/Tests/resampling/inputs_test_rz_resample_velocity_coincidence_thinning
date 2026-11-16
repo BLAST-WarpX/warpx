@@ -1,0 +1,55 @@
+# Cold rigid-rotor ring in RZ geometry, resampled with velocity coincidence thinning.
+# All particles have u_r = u_z = 0 and the same u_theta, so in the local cylindrical
+# frame each cell holds a single velocity cluster that should be merged into two particles.
+max_step = 1
+warpx.verbose = 1
+warpx.const_dt = 1e-12
+amr.n_cell = 8 8
+amr.max_level = 0
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -1.0e-3
+geometry.prob_hi = 1.0e-3 1.0e-3
+warpx.n_rz_azimuthal_modes = 1
+
+# Boundary condition and field solver
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+algo.particle_shape = 1
+algo.maxwell_solver = none
+
+particles.species_names = ring
+ring.charge = 0.0
+ring.mass = m_e
+ring.injection_style = NUniformPerCell
+# particles are spread uniformly in theta
+ring.num_particles_per_cell_each_dim = 4 64 4
+ring.profile = constant
+ring.density = 1.0e15
+# 2 x 2 cells are filled
+ring.xmin = 0.5e-3
+ring.xmax = 0.75e-3
+ring.zmin = -0.25e-3
+ring.zmax = 0.25e-3
+ring.do_not_push = 1
+ring.initialize_self_fields = 0
+ring.momentum_distribution_type = parse_momentum_function
+ring.momentum_function_ux(x,y,z) = -0.1*sin(atan2(y,x))
+ring.momentum_function_uy(x,y,z) = 0.1*cos(atan2(y,x))
+ring.momentum_function_uz(x,y,z) = 0.0
+
+ring.do_resampling = 1
+ring.resampling_trigger_intervals = 1
+ring.resampling_min_ppc = 10
+ring.resampling_algorithm = velocity_coincidence_thinning
+ring.resampling_algorithm_velocity_grid_type = spherical
+ring.resampling_algorithm_delta_ur = 1.0e6
+ring.resampling_algorithm_n_theta = 16
+ring.resampling_algorithm_n_phi = 16
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = none

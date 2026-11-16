@@ -1799,6 +1799,14 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
     {
         Redistribute();
         global_numparts = TotalNumberOfParticles();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Particles in the same cylindrical (or spherical) cell can sit at different
+        // azimuthal (and polar) angles, so their Cartesian momenta are not comparable.
+        // Temporarily rotate the momenta to the local curvilinear frame so that the
+        // resampling algorithms bin and merge (u_r, u_theta, u_z) / (u_r, u_theta, u_phi),
+        // and rotate back with each remaining particle's own angle(s) afterwards.
+        TransformMomentumToCurvilinear(/*forward*/true);
+#endif
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
@@ -1806,6 +1814,10 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                 m_resampler(geom[lev], pti, lev, this);
             }
         }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Undo the rotation above
+        TransformMomentumToCurvilinear(/*forward*/false);
+#endif
         deleteInvalidParticles();
         if (verbose) {
             const amrex::Long new_global_numparts = TotalNumberOfParticles();

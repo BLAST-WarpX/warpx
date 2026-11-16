@@ -18,7 +18,7 @@ import argparse
 
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
-from scipy.constants import e, m_p, mu_0
+from scipy.constants import Boltzmann, e, m_p, mu_0
 
 # Parameters must match inputs_test_2d_ohm_solver_resistive_drag_picmi.py
 n0 = 2.0e20
@@ -26,6 +26,7 @@ B0 = 0.1
 Lx = 0.5
 k = 2.0 * np.pi / Lx
 J0 = k * B0 / mu_0
+K_PER_EV = e / Boltzmann  # T[K] / this = T[eV]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--eta-scale", type=float, default=1.0)
@@ -104,12 +105,13 @@ assert rel_err < args.tol_decay, (
 # --- tertiary: ion-temperature preservation ---------------------------------
 # The drag applies a velocity-independent bulk shift to each particle, so it
 # must not heat or cool the ions: the domain-mean deposited ion temperature
-# (T_ions, in eV) has to stay at its initial value (500 eV in the deck).
+# (T_ions, read in K: openPMD-viewer applies unitSI to the eV data) has to
+# stay at its initial value (500 eV in the deck).
 Ti_mean = []
 for it in ts.iterations:
     Ti, _ = ts.get_field(field="T_ions", iteration=it)
     Ti_mean.append(np.mean(Ti))
-Ti_mean = np.asarray(Ti_mean)
+Ti_mean = np.asarray(Ti_mean) / K_PER_EV
 
 Ti_change = abs(Ti_mean[-1] - Ti_mean[0]) / Ti_mean[0]
 
