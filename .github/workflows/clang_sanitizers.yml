@@ -313,17 +313,20 @@ jobs:
         export OMP_NUM_THREADS=2
         ulimit -c unlimited
 
+        # data required by some tests
+        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
+
         echo "=================================================================================================== "
         echo "======================  Examples/Physics_applications/capacitive_discharge ======================== "
         echo "=================================================================================================== "
-        git clone https://github.com/BLAST-WarpX/warpx-data.git
-        mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc warpx.serialize_initial_conditions = 0
+        cd Examples/Physics_applications/capacitive_discharge
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_background_mcc warpx.serialize_initial_conditions = 0
         rm -rf ./diags
+        cd -
 
         echo "=================================================================================================== "
         echo "==================================  Examples/Tests/embedded_circle ================================ "
         echo "=================================================================================================== "
-        git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
         cd Examples/Tests/embedded_circle
         mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_embedded_circle warpx.serialize_initial_conditions = 0
         rm -rf ./diags
