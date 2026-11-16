@@ -10,4 +10,4 @@ dependencies:
   - doxygen
   - pip
   - pip:
-    - -r requirements.txt
+      - -r requirements.txt
