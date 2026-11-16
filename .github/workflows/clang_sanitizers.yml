@@ -445,4 +445,3 @@ jobs:
         echo "=================================================================================================== "
         mpirun -n 2 ./build/bin/warpx.3d Examples/Physics_applications/thomson_parabola_spectrometer/inputs_test_3d_thomson_parabola_spectrometer warpx.serialize_initial_conditions = 0
         rm -rf ./diags
-
