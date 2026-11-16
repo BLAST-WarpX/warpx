@@ -754,11 +754,12 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         xyzmin, lo, q, WarpX::n_rz_azimuthal_modes,
                         bins, box, max_tbox_size, threads_per_block, bin_size);
             }
-            // The kernel runs asynchronously and reads the bins, which are freed at the end of
-            // this scope: wait for it, so that their memory cannot be reused while it runs.
-            amrex::Gpu::streamSynchronize();
             ABLASTR_PROFILE_VAR_STOP(direct_current_dep_kernel);
         }
+
+        // The shared kernels run asynchronously and read the bins, which are freed at the end of
+        // this scope: wait for it, so that their memory cannot be reused while it runs.
+        amrex::Gpu::streamSynchronize();
     }
     // If not doing shared memory deposition (or depositing in the buffers), call normal kernels
     else {
