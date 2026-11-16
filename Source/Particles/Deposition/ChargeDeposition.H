@@ -275,7 +275,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
         if (bin_start == bin_stop) { return; }
 
         // The tile of this bin defines the index space of the shared memory buffer
-        const amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
+        const amrex::Box buffer_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
 
         Box tbx = convert( buffer_box, ix_type);
         tbx.grow(depos_order);
