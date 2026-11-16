@@ -249,8 +249,7 @@ computePhi (
 #endif
 
     ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE (
-        std::all_of(beta_solver.begin(), beta_solver.end(),
-            [](const auto b){return (b<1.0_rt);}),
+        std::ranges::all_of(beta_solver, [](const auto b){return (b<1.0_rt);}),
         "Components of beta_solver must be < 1.");
 
     amrex::LPInfo info;

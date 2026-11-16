@@ -242,6 +242,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     m_solver->setBottomSolver(BottomSolver::smoother);
     m_solver->setVerbose(static_cast<int>(m_verbose));
     m_solver->setBottomVerbose(static_cast<int>(m_bottom_verbose));
+    m_solver->setNoGpuSync(true);
 
     m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }

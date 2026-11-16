@@ -166,7 +166,9 @@ struct ExternalFieldView
     amrex::Real
     getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
-#if (AMREX_SPACEDIM == 1)
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::RealVect const pos{std::sqrt(x*x + y*y + z*z)};
+#elif (AMREX_SPACEDIM == 1)
         amrex::ignore_unused(x,y);
         amrex::RealVect const pos{z};
 #elif defined(WARPX_DIM_XZ)

@@ -42,7 +42,8 @@ void StrangImplicitSpectralEM::Define (WarpX* const a_WarpX, bool a_from_restart
     m_nlsolver->Define(m_E, this);
 
     // Initialize the mass matrices for plasma response
-    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+    if (m_use_mass_matrices) { InitializeMassMatrices(WarpX::nox); }
+    InitializeImplicitOptions();
 
     m_is_defined = true;
 
@@ -108,11 +109,11 @@ int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
     return exit_status;
 }
 
-void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
-                                            WarpXSolverVec const & a_E,
-                                            amrex::Real start_time,
-                                            int a_nl_iter,
-                                            bool a_from_jacobian )
+void StrangImplicitSpectralEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                                           WarpXSolverVec const & a_E,
+                                           amrex::Real start_time,
+                                           int a_nl_iter,
+                                           bool a_from_jacobian)
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
@@ -121,7 +122,7 @@ void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian, /*a_dt_scale*/1.0_rt);
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;

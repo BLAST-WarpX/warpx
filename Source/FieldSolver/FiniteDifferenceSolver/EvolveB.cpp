@@ -10,9 +10,7 @@
 #include "Fields.H"
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
-#elif defined(WARPX_DIM_RSPHERE)
-#   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
-#else
+#elif !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
@@ -59,6 +57,9 @@ void FiniteDifferenceSolver::EvolveB (
     [[maybe_unused]] amrex::Real const dt )
 {
 
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(fields, lev, patch_type, flag_info_cell, borrowing, dt);
+#else
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
@@ -73,12 +74,7 @@ void FiniteDifferenceSolver::EvolveB (
     if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee)||
         (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)){
         EvolveBCylindrical <CylindricalYeeAlgorithm> ( Bfield, Efield, lev, dt );
-#elif defined(WARPX_DIM_RSPHERE)
-    if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee)||
-        (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)){
-        EvolveBSpherical <SphericalYeeAlgorithm> ( Bfield, Efield, lev, dt );
 #else
-
     amrex::MultiFab const * Gfield = nullptr;
     if (fields.has(FieldType::G_fp, lev)) {
         Gfield = patch_type == PatchType::fine ?
@@ -120,8 +116,8 @@ void FiniteDifferenceSolver::EvolveB (
     } else {
         WARPX_ABORT_WITH_MESSAGE("EvolveB: Unknown algorithm");
     }
+#endif
 }
-
 
 #if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 
@@ -512,72 +508,5 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
 }
 
 #elif defined(WARPX_DIM_RSPHERE)
-
-template<typename T_Algo>
-void FiniteDifferenceSolver::EvolveBSpherical (
-    ablastr::fields::VectorField const& Bfield,
-    ablastr::fields::VectorField const& Efield,
-    int lev, amrex::Real const dt ) {
-
-    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // Loop through the grids, and over the tiles within each grid
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for ( MFIter mfi(*Bfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-        }
-        auto wt = static_cast<amrex::Real>(amrex::second());
-
-        // Extract field data for this grid/tile
-        Array4<Real> const& Br = Bfield[0]->array(mfi);
-        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
-        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
-        Array4<Real> const& Etheta = Efield[1]->array(mfi);
-        Array4<Real> const& Ephi = Efield[2]->array(mfi);
-
-        // Extract stencil coefficients
-        Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
-
-        // Extract spheriical specific parameters
-        Real const dr = m_dr;
-        Real const rmin = m_rmin;
-
-        // Extract tileboxes for which to loop
-        Box const& tbr  = mfi.tilebox(Bfield[0]->ixType().toIntVect());
-        Box const& tbt  = mfi.tilebox(Bfield[1]->ixType().toIntVect());
-        Box const& tbp  = mfi.tilebox(Bfield[2]->ixType().toIntVect());
-
-        // Loop over the cells and update the fields
-        amrex::ParallelFor(tbr, tbt, tbp,
-
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Br(i, 0, 0, 0) = 0.;
-            },
-
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bphi is cell-centered in r)
-                Btheta(i, 0, 0, 0) += dt*( + T_Algo::UpwardDrr_over_r(Ephi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
-            },
-
-            [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Btheta is cell-centered in r)
-                Bphi(i, 0, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0));
-            }
-
-        );
-
-        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
-        {
-            amrex::Gpu::synchronize();
-            wt = static_cast<amrex::Real>(amrex::second()) - wt;
-            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
-        }
-    }
-}
 
 #endif

@@ -33,6 +33,7 @@ WarpXLaserProfiles::FieldFunctionLaserProfile::init (
     utils::parser::Store_parserString(
             ppl, "field_function(X,Y,t)", m_params.field_function);
     m_parser = utils::parser::makeParser(m_params.field_function,{"X","Y","t"});
+    m_parser_exe = m_parser.compile<3>();
 }
 
 void
@@ -40,7 +41,7 @@ WarpXLaserProfiles::FieldFunctionLaserProfile::fill_amplitude (
     const int np, Real const * AMREX_RESTRICT const Xp, Real const * AMREX_RESTRICT const Yp,
     Real t, Real * AMREX_RESTRICT const amplitude) const
 {
-    auto parser = m_parser.compile<3>();
+    auto const parser = m_parser_exe;
     amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) noexcept
     {
         amplitude[i] = parser(Xp[i], Yp[i], t);

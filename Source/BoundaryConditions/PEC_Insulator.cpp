@@ -123,6 +123,9 @@ namespace
      * \param[in] field_value  the value of the field for the insulator boundary cell
      * \param[in] set_field    whether to set the field on the lower boundary
      * \param[in] only_zero_parallel_field only zero the parallel field on the boundary
+     * \param[in] icomp        vector component being updated
+     * \param[in] rmin         physical radius at the lower domain boundary
+     * \param[in] dr           radial cell size for this patch
      */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void SetFieldOnPEC_Insulator (int idim,
@@ -138,7 +141,10 @@ namespace
                                   const int is_normal_to_boundary,
                                   amrex::Real const field_value,
                                   bool const set_field,
-                                  bool const only_zero_parallel_field)
+                                  bool const only_zero_parallel_field,
+                                  [[maybe_unused]] int const icomp,
+                                  [[maybe_unused]] amrex::Real const rmin,
+                                  [[maybe_unused]] amrex::Real const dr)
     {
         using namespace amrex::literals;
 
@@ -245,7 +251,19 @@ namespace
                         ijk_nextp1[idim] = ijk_next[idim] - ig*iside;
                         field(ijk_vec, n) = 2._rt*field(ijk_next, n) + field(ijk_nextp1, n);
                     } else {
-                        field(ijk_vec, n) = field(ijk_mirror, n);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                        amrex::Real mirror_factor = 1._rt;
+                        if (icomp == 1 && idim == 0) {
+                            // Reflect r*Btheta evenly where the magnetic field is not prescribed.
+                            amrex::Real const shift = is_nodal[0] ? 0._rt : 0.5_rt;
+                            amrex::Real const r = rmin + (ijk_vec[0] - dom_lo[0] + shift)*dr;
+                            amrex::Real const r_mirror = rmin + (ijk_mirror[0] - dom_lo[0] + shift)*dr;
+                            mirror_factor = r_mirror/r;
+                        }
+#else
+                        const amrex::Real mirror_factor = 1._rt;
+#endif
+                        field(ijk_vec, n) = mirror_factor * field(ijk_mirror, n);
                     }
                 }
             }
@@ -590,8 +608,11 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 {
     using namespace amrex::literals;
     amrex::Box domain_box = geom.Domain();
+    amrex::Real const rmin = geom.ProbLo(0);
+    amrex::Real dr = geom.CellSize(0);
     if (patch_type == PatchType::coarse && (lev > 0)) {
         domain_box.coarsen(ref_ratios[lev-1]);
+        dr *= ref_ratios[lev-1][0];
     }
     amrex::IntVect const domain_lo = domain_box.smallEnd();
     amrex::IntVect const domain_hi = domain_box.bigEnd();
@@ -715,11 +736,13 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fx ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        // Conductor zeroing passes dummy field parsers; do not evaluate them.
+                        amrex::Real const field_value = (set_Fx && !only_zero_parallel_field)
+                            ? Fx_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fx, E_like, Fx_nodal, is_insulator, is_normal_to_boundary[0],
-                                                  field_value, set_Fx, only_zero_parallel_field);
+                                                  field_value, set_Fx, only_zero_parallel_field, 0, rmin, dr);
                     },
                     tey_guard, nComp_y,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -730,11 +753,12 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fy ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        amrex::Real const field_value = (set_Fy && !only_zero_parallel_field)
+                            ? Fy_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fy, E_like, Fy_nodal, is_insulator, is_normal_to_boundary[1],
-                                                  field_value, set_Fy, only_zero_parallel_field);
+                                                  field_value, set_Fy, only_zero_parallel_field, 1, rmin, dr);
                     },
                     tez_guard, nComp_z,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) {
@@ -745,11 +769,12 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
                         ::XDimTransverse const tcoords = ::GetTransverseCoordinates(idim, coords);
 
                         bool const is_insulator = (area_parser(tcoords.t1, tcoords.t2) > 0._rt);
-                        amrex::Real const field_value = (set_Fz ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt);
+                        amrex::Real const field_value = (set_Fz && !only_zero_parallel_field)
+                            ? Fz_parser(tcoords.t1, tcoords.t2, time) : 0._rt;
 
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   Fz, E_like, Fz_nodal, is_insulator, is_normal_to_boundary[2],
-                                                  field_value, set_Fz, only_zero_parallel_field);
+                                                  field_value, set_Fz, only_zero_parallel_field, 2, rmin, dr);
                     }
                 );
             }
@@ -852,9 +877,11 @@ PEC_Insulator::ZeroParallelScalarInConductor (
                         bool const is_normal_to_boundary = false;
                         amrex::Real const field_value = 0.;
                         bool const only_zero_parallel_field = true;
+                        // Component and radius arguments are unused when only zeroing the scalar.
                         ::SetFieldOnPEC_Insulator(idim, iside, domain_lo, domain_hi, iv, n,
                                                   S, E_like, S_nodal, is_insulator, is_normal_to_boundary,
-                                                  field_value, set_S, only_zero_parallel_field);
+                                                  field_value, set_S, only_zero_parallel_field,
+                                                  /*icomp=*/0, /*rmin=*/0._rt, /*dr=*/0._rt);
                     }
                 );
             }
