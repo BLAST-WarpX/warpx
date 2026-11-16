@@ -135,9 +135,8 @@ WarpXParIter::WarpXParIter (ContainerType& pc, int level)
 {
 }
 
-WarpXParIter::WarpXParIter (ContainerType& pc, int level, MFItInfo& info)
-    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
-                   info.SetDynamic(WarpX::do_dynamic_scheduling))
+WarpXParIter::WarpXParIter (ContainerType& pc, int level, const MFItInfo& info)
+    : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level, info)
 {
 }
 
@@ -477,19 +476,7 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     // are not trivial, this check might be too relaxed and we might include a particle that should
     // deposit part of its current in a neighboring box. However, this should catch particles
     // traveling many cells away, for example with algorithms that allow for large time steps.
-
-#if   defined(WARPX_DIM_1D_Z)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2));
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#elif defined(WARPX_DIM_3D)
-    const amrex::IntVect shape_extent = amrex::IntVect(static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2),
-                                                       static_cast<int>(particle_shape/2));
-#endif
+    const amrex::IntVect shape_extent(particle_shape/2);
 
     // On CPU: particles deposit on tile arrays, which have a small number of guard cells ng_J
     // On GPU: particles deposit directly on the J arrays, which usually have a larger number of guard cells
@@ -707,14 +694,33 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         if (push_type == PushType::Implicit) {
             amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
         }
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Esirkepov algorithm");
-        }
-        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Villasenor algorithm");
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
             WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Vay algorithm");
+        }
+        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
+            ABLASTR_PROFILE_VAR_START(esirkepov_current_dep_kernel);
+
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            amrex::Array4<const int> eb_reduce_particle_shape;
+            if (EB::enabled()) {
+                eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+            }
+
+            amrex::AnyCTO(
+                amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                [&](auto depos_order) {
+                    doEsirkepovDepositionSharedShapeN<depos_order.value>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                        jx_fab, jy_fab, jz_fab, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes, eb_reduce_particle_shape, EB::enabled(),
+                        bins, box, geom, max_tbox_size, threads_per_block, bin_size);
+                });
+            ABLASTR_PROFILE_VAR_STOP(esirkepov_current_dep_kernel);
         }
         else {
             ABLASTR_PROFILE_VAR_START(direct_current_dep_kernel);
