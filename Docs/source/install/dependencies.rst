@@ -34,7 +34,8 @@ Optional dependencies include:
 - `openPMD-api 0.17.0+ <https://github.com/openPMD/openPMD-api>`__: we automatically download and compile a copy of openPMD-api for openPMD I/O support
 
   - see `optional I/O backends <https://github.com/openPMD/openPMD-api#dependencies>`__, i.e., ADIOS2 and/or HDF5
-- `Ascent 0.8.0+ <https://ascent.readthedocs.io>`__: for in situ 3D visualization
+- `Ascent 0.9.3+ <https://ascent.readthedocs.io>`__: for in situ 3D visualization
+- `ParaView 6.0+ <https://www.paraview.org>`__ with `Catalyst 2 <https://catalyst-in-situ.readthedocs.io>`__: for in situ visualization with ParaView
 - `CCache <https://ccache.dev>`__: to speed up rebuilds (For CUDA support, needs version 3.7.9+ and 4.2+ is recommended)
 - `Ninja <https://ninja-build.org>`__: for faster parallel compiles
 - `Python 3.11+ <https://www.python.org>`__
