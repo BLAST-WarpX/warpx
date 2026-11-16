@@ -23,9 +23,6 @@
 #include "Particles/LaserParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleBoundaries_K.H"
-#ifdef WARPX_QED
-#   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
-#endif
 #include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartCreate.H"
