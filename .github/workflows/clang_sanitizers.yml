@@ -339,6 +339,7 @@ jobs:
         echo "=================================================================================================== "
         echo "======================  Examples/Physics_applications/capacitive_discharge ======================== "
         echo "=================================================================================================== "
+        git clone https://github.com/BLAST-WarpX/warpx-data.git
         mpirun -n 2 ./build/bin/warpx.2d Examples/Physics_applications/capacitive_discharge/inputs_test_2d_background_mcc warpx.serialize_initial_conditions = 0
         rm -rf ./diags
 
