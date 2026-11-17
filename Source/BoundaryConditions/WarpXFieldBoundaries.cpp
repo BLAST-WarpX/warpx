@@ -30,8 +30,8 @@ namespace
     {
         const auto isFT = [](const auto& b){
             return b == FT;};
-        return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(), isFT) ||
-               std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(), isFT);
+        return std::ranges::any_of(field_boundary_lo, isFT) ||
+               std::ranges::any_of(field_boundary_hi, isFT);
     }
 
     /** Returns true if any particle boundary is set to ParticleBoundaryType PT, else returns false.*/
@@ -42,8 +42,8 @@ namespace
     {
         const auto isPT = [](const auto& b){
             return b == PT;};
-        return std::any_of(particle_boundary_lo.begin(), particle_boundary_lo.end(), isPT) ||
-               std::any_of(particle_boundary_hi.begin(), particle_boundary_hi.end(), isPT);
+        return std::ranges::any_of(particle_boundary_lo, isPT) ||
+               std::ranges::any_of(particle_boundary_hi, isPT);
     }
 
 }

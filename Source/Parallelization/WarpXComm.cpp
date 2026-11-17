@@ -617,6 +617,16 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
         amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         amrex::IntVect const& ng_src = guard_cells.ng_FieldGather;
 
+        // Before reading aux[lev-1] guard cells in the coarse/fine interpolation below,
+        // make them consistent with valid data. For example, at level 0 they were filled by
+        // the staggered-to-nodal centering stencil, which uses zero for source values
+        // beyond the allocated guard cells, so the outermost guard layer is wrong.
+        // Copying those guard cells (e.g., with safe_guard_cells active, so that
+        // ng_FieldGather = ng_alloc_EB) can otherwise overwrite valid data at box boundaries.
+        if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
+            FillBoundaryAux(lev-1, ng_src);
+        }
+
         UpdateAuxiliaryDataStagToNodalField(
             m_fields, Bfield_fp, Bfield_aux, FieldType::Bfield_fp, FieldType::Bfield_cp,
             FieldType::Bfield_cax, lev, cnba, dm, cperiod, refinement_ratio, ng_src,

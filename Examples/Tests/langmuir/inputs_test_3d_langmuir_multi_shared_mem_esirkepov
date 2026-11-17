@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+algo.particle_shape = 2
+warpx.do_shared_mem_current_deposition = 1

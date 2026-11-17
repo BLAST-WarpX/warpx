@@ -30,3 +30,13 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1000008"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_rz_resample_velocity_coincidence_thinning  # name
+    RZ  # dims
+    1  # nprocs
+    inputs_test_rz_resample_velocity_coincidence_thinning  # inputs
+    "analysis_rz_velocity_coincidence_thinning.py diags/diag1000001"  # analysis
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
