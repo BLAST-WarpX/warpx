@@ -37,9 +37,7 @@ from scipy.constants import e as q_e
 from scipy.constants import epsilon_0, m_e
 
 MIN_FIT_POINTS = 6  # minimum number of diagnostics needed to fit a growth rate
-TRANSIENT_LN_BZ_2_RISE = (
-    1.0  # ln(B_z^2) rise above the initial level marking the end of transient
-)
+FIT_START_OMEGA_P_T = 75.0  # fit starts at omega_p * t >= this value (end of transient)
 MIN_FIT_LN_BZ_2_RISE = 1.0  # minimum ln(B_z^2) growth covered by the fit window
 GAMMA_RTOL_UPPER = 0.10  # fitted gamma must not exceed gamma_theory by more than 10%
 GAMMA_RTOL_LOWER = (
@@ -130,8 +128,11 @@ def load_input_deck():
 input_dict = load_input_deck()
 
 species_names = input_dict["particles.species_names"]
-assert len(species_names) == 2, f"Expected two electron species, got {species_names}"
-assert species_names == ["electrons_1", "electrons_2"]
+electron_species = ["electrons_1", "electrons_2"]
+ion_species = "ions"
+assert species_names == electron_species + [ion_species], (
+    f"Expected two electron species and a neutralizing ion background, got {species_names}"
+)
 
 if "geometry.dims" in input_dict:
     assert input_dict["geometry.dims"][0] == "2"
@@ -145,13 +146,13 @@ u_means = np.array(
             float(input_dict[f"{species}.{component}_mean"][0])
             for component in momentum_components
         ]
-        for species in species_names
+        for species in electron_species
     ]
 )
 beta_means = u_means / np.sqrt(1.0 + u_means**2)
 betas = np.abs(beta_means[:, 1])
 densities = np.array(
-    [float(input_dict[f"{species}.density"][0]) for species in species_names]
+    [float(input_dict[f"{species}.density"][0]) for species in electron_species]
 )
 u_stds = np.array(
     [
@@ -159,15 +160,15 @@ u_stds = np.array(
             float(input_dict[f"{species}.{component}_std"][0])
             for component in momentum_components
         ]
-        for species in species_names
+        for species in electron_species
     ]
 )
 np.testing.assert_allclose(u_stds[:, 1], u_stds[:, 0])
 np.testing.assert_allclose(u_stds[:, 2], u_stds[:, 0])
 thetas = u_stds[:, 0] ** 2
 drift_dirs = ["y" if beta_mean[1] > 0.0 else "-y" for beta_mean in beta_means]
-charges = [input_dict[f"{species}.charge"][0] for species in species_names]
-masses = [input_dict[f"{species}.mass"][0] for species in species_names]
+charges = [input_dict[f"{species}.charge"][0] for species in electron_species]
+masses = [input_dict[f"{species}.mass"][0] for species in electron_species]
 
 # Enforce the symmetric counter-streaming electron configuration required by this test.
 assert set(drift_dirs) == {"y", "-y"}, (
@@ -185,6 +186,13 @@ np.testing.assert_allclose(thetas, thetas[0])
 
 beta = float(np.mean(betas))  # common drift speed v_d/c
 n_0 = float(np.sum(densities))  # total electron number density
+
+# The periodic Poisson solve (required by the Darwin solver) needs a charge-neutral plasma:
+# the ions must form an immobile, uniform background that exactly cancels the electron charge.
+assert input_dict[f"{ion_species}.charge"][0] == "q_e"
+assert input_dict[f"{ion_species}.do_not_push"][0] == "1"
+assert input_dict[f"{ion_species}.momentum_distribution_type"][0] == "at_rest"
+np.testing.assert_allclose(float(input_dict[f"{ion_species}.density"][0]), n_0)
 omega_p = math.sqrt(
     n_0 * q_e**2 / (m_e * epsilon_0)
 )  # non-relativistic electron plasma frequency
@@ -273,18 +281,22 @@ assert magnetic_energy.max() > 2.0 * early_reference, (
     f"max/early = {magnetic_energy.max() / max(early_reference, np.finfo(float).tiny):.3g}"
 )
 
-# Verify charge-density consistency: total rho is the sum of the two electron depositions.
+# Verify charge-density consistency: total rho is the sum of the electron and ion depositions.
 rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iterations[-1], plot=False)
 rho_2, _ = ts.get_field(field="rho_electrons_2", iteration=iterations[-1], plot=False)
+rho_i, _ = ts.get_field(field="rho_ions", iteration=iterations[-1], plot=False)
 rho, _ = ts.get_field(field="rho", iteration=iterations[-1], plot=False)
 
 assert np.all(np.isfinite(rho_1))
 assert np.all(np.isfinite(rho_2))
+assert np.all(np.isfinite(rho_i))
 assert np.all(np.isfinite(rho))
 charge_scale = (
     abs(q_e) * n_0
 )  # characteristic charge density used for absolute tolerance
-np.testing.assert_allclose(rho, rho_1 + rho_2, rtol=1.0e-7, atol=1.0e-10 * charge_scale)
+np.testing.assert_allclose(
+    rho, rho_1 + rho_2 + rho_i, rtol=1.0e-7, atol=1.0e-10 * charge_scale
+)
 
 # At late time, B_z must dominate the other components. B_z > B_y is physics: B_y is not driven
 # by the out-of-plane drift. B_z > B_x is a property of this grid, not of the physics: both are
@@ -319,11 +331,10 @@ dynamic_range = (
     np.max(ln_Bz_2[finite_positive]) - noise_floor
 )  # total rise in ln(B_z^2)
 
-# The transient is over once ln(B_z^2) has risen TRANSIENT_LN_BZ_2_RISE above the initial level;
-# from there on, fit up to the last diagnostic (the longest contiguous run above threshold).
-candidate = np.flatnonzero(
-    np.isfinite(ln_Bz_2) & (ln_Bz_2 >= noise_floor + TRANSIENT_LN_BZ_2_RISE)
-)
+# The local growth rate decreases steadily during the transient, so the fit start is fixed in
+# physical time (omega_p * t >= FIT_START_OMEGA_P_T) rather than detected from the data, which
+# would make it depend on the diagnostic interval. Fit from there up to the last diagnostic.
+candidate = np.flatnonzero(np.isfinite(ln_Bz_2) & (omega_p * t >= FIT_START_OMEGA_P_T))
 assert candidate.size >= MIN_FIT_POINTS, (
     "B_z^2 did not grow past the initial transient. "
     f"t_final={t[-1]:.6e} s, ln-noise floor={noise_floor:.6g}, "
@@ -360,18 +371,6 @@ print(f"ln(B_z^2) rise over fit window: {fit_ln_Bz_2_rise:.6g}")
 print(f"Fit R^2: {r_sq:.6f}")
 print(f"Fitted gamma: {gamma_fit:.6e} 1/s")
 print(f"gamma_fit / gamma_theory: {gamma_fit / gamma_theory:.6f}")
-
-assert np.isfinite(gamma_fit)
-assert gamma_fit > 0.0
-assert r_sq > 0.80
-assert gamma_fit <= gamma_theory * (1.0 + GAMMA_RTOL_UPPER), (
-    "Fitted growth rate exceeds the cold asymptotic upper-bound estimate: "
-    f"gamma_fit={gamma_fit:.6e}, gamma_theory={gamma_theory:.6e}"
-)
-assert gamma_fit >= gamma_theory * (1.0 - GAMMA_RTOL_LOWER), (
-    "Fitted growth rate is lower than expected for the resolved linear phase: "
-    f"gamma_fit={gamma_fit:.6e}, gamma_theory={gamma_theory:.6e}"
-)
 
 # Semilog plot of all three magnetic-field components together with the theory and fit slopes.
 fig, ax = plt.subplots()
@@ -436,4 +435,17 @@ save_field_animation(
     colorbar_label=r"$\rho_{\mathrm{e1}}$ (C/m$^3$)",
     title_prefix="rho_electrons_1",
     filename="weibel_rho_electrons_1.gif",
+)
+
+# Check the fitted growth rate after plotting, so that the plots are available on failure.
+assert np.isfinite(gamma_fit)
+assert gamma_fit > 0.0
+assert r_sq > 0.80
+assert gamma_fit <= gamma_theory * (1.0 + GAMMA_RTOL_UPPER), (
+    "Fitted growth rate exceeds the cold asymptotic upper-bound estimate: "
+    f"gamma_fit={gamma_fit:.6e}, gamma_theory={gamma_theory:.6e}"
+)
+assert gamma_fit >= gamma_theory * (1.0 - GAMMA_RTOL_LOWER), (
+    "Fitted growth rate is lower than expected for the resolved linear phase: "
+    f"gamma_fit={gamma_fit:.6e}, gamma_theory={gamma_theory:.6e}"
 )
