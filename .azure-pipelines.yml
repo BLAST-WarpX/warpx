@@ -34,6 +34,7 @@ jobs:
     BLASPP_HOME: '/usr/local'
     CEI_SUDO: 'sudo'
     CEI_TMP: '/tmp/cei'
+    CMAKE_BUILD_PARALLEL_LEVEL: '2'
     CMAKE_GENERATOR: 'Ninja'
     FFTW_HOME: '/usr'
     PETSC_ARCH: 'arch-opt'
@@ -54,7 +55,7 @@ jobs:
       # Cartesian 3D
       cartesian_3d:
         CDASH_BUILD_NAME: CPU-3D
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cylindrical RZ
       cylindrical_rz:
         CDASH_BUILD_NAME: CPU-RZ
@@ -200,7 +201,8 @@ jobs:
         ${WARPX_CMAKE_FLAGS}                 \
         ${WARPX_TEST_FLAGS}
       # build
-      cmake --build build -j 2
+      ctest --test-dir build -D ExperimentalBuild -V
+      cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     displayName: 'Build'
 
   - bash: |

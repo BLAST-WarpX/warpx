@@ -21,7 +21,7 @@ jobs:
   style:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Non-ASCII characters
       run: .github/workflows/source/hasNonASCII
     - name: TABs
@@ -41,8 +41,8 @@ jobs:
   zenodo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate Zenodo Metadata
-        uses: vsoch/zenodo-validator@main
+        uses: vsoch/zenodo-validator@00643f085e550b329ab56bc79da510ba18b2d547 # main
         with:
           path: '.zenodo.json'

@@ -8,11 +8,11 @@
 #define JacobianFunctionMF_H_
 
 #include "LinearFunction.H"
-#include "CurlCurlMLMGPC.H"
-#include "MatrixPC.H"
-#include "JacobiPC.H"
+#include "PreconditionerLibrary.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
+#include <AMReX_ParmParse.H>
+#include <cmath>
 #include <string>
 
 /**
@@ -98,12 +98,6 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     }
 
     inline
-    void setIsLinear ( bool a_isLinear )
-    {
-        m_is_linear = a_isLinear;
-    }
-
-    inline
     void curTime ( RT a_time )
     {
         m_cur_time = a_time;
@@ -133,7 +127,6 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     private:
 
     bool m_is_defined = false;
-    bool m_is_linear = false;
     bool m_usePreCond = false;
     RT m_epsJFNK = RT(1.0e-6);
     RT m_normY0;
@@ -159,15 +152,27 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
 
     m_ops = a_ops;
 
+    const amrex::ParmParse pp_jac("jacobian");
+    pp_jac.query("epsJFNK", m_epsJFNK);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::isfinite(m_epsJFNK) && m_epsJFNK != RT(0.0),
+        "jacobian.epsJFNK must be finite and nonzero.");
+
     m_usePreCond = (a_pc_type != PreconditionerType::none);
     if (m_usePreCond) {
         m_pc_type = a_pc_type;
         if (m_pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+#if defined(WARPX_DIM_RSPHERE)
+            WARPX_ABORT_WITH_MESSAGE(
+                "curl_curl_mlmg is not a valid pc_type for RSPHERE geometry, which is electrostatic.");
+#endif
             m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_jacobi) {
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
+        } else if (m_pc_type == PreconditionerType::pc_algmg) {
+            m_preCond = std::make_unique<AlgMGPC<T,Ops>>();
         } else {
-            m_preCond = std::make_unique<MatrixPC<T,Ops>>();
+            m_preCond = std::make_unique<ExternLibPC<T,Ops>>();
             m_preCond->setName(amrex::getEnumNameString(m_pc_type));
         }
         m_preCond->Define(a_U, a_ops);
@@ -199,7 +204,7 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
 {
     BL_PROFILE("JacobianFunctionMF::apply()");
     using namespace amrex::literals;
-    RT const normY = this->norm2(a_dU); // always 1 when called from GMRES
+    RT const normY = this->norm2(a_dU); // Right preconditioning can change the direction norm.
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         isDefined(),
@@ -209,24 +214,21 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
     else {
 
         RT eps;
-        if (m_is_linear) {
-            eps = 1.0_rt;
-        } else {
-            /* eps = error_rel * sqrt(1 + ||Y0||) / ||dU||
-             * M. Pernice and H. F. Walker, "NITSOL: A Newton Iterative Solver for
-             * Nonlinear Systems", SIAM J. Sci. Stat. Comput., 1998, vol 19,
-             * pp. 302--318. */
-            if (m_normY0==0.0) { eps = m_epsJFNK * this->norm2(m_R0) / normY; }
-            else {
-                // m_epsJFNK * sqrt(1.0 + m_normY0) / normY
-                // above commonly used form not recommend for poorly scaled Y0
-                eps = m_epsJFNK * m_normY0 / normY;
-            }
+        /* eps = error_rel * sqrt(1 + ||Y0||) / ||dU||
+         * M. Pernice and H. F. Walker, "NITSOL: A Newton Iterative Solver for
+         * Nonlinear Systems", SIAM J. Sci. Stat. Comput., 1998, vol 19,
+         * pp. 302--318. */
+        if (m_normY0==0.0) { eps = m_epsJFNK * this->norm2(m_R0) / normY; }
+        else {
+            // For poorly scaled vectors (||Y0|| not of order unity), use ||Y0||
+            // instead of sqrt(1 + ||Y0||) so ||eps*dU|| scales with the solution.
+            eps = m_epsJFNK * m_normY0 / normY;
         }
         const RT eps_inv = 1.0_rt/eps;
 
         m_Z.linComb( 1.0, m_Y0, eps, a_dU ); // Z = Y0 + eps*dU
-        m_ops->ComputeRHS(m_R, m_Z, m_cur_time, -1, true );
+        m_ops->ComputeRHS(m_R, m_Z, m_cur_time, /*a_nl_iter=*/-1,
+                          /*a_from_jacobian=*/true);
 
         // F(Y) = Y - b - R(Y) ==> dF = dF/dY*dU = [1 - dR/dY]*dU
         //                            = dU - (R(Z)-R(Y0))/eps

@@ -48,21 +48,9 @@ public:
           int          a_step,
           bool verbose_step) const override;
 
-    void GetSolverParams (amrex::Real&  a_rtol,
-                          amrex::Real&  a_atol,
-                          int&          a_maxits) override
-    {
-        a_rtol = m_rtol;
-        a_atol = m_atol;
-        a_maxits = m_maxits;
-    }
-
     void PrintParams () const override
     {
-        amrex::Print() << "Picard max iterations:      " << m_maxits << "\n";
-        amrex::Print() << "Picard relative tolerance:  " << m_rtol << "\n";
-        amrex::Print() << "Picard absolute tolerance:  " << m_atol << "\n";
-        amrex::Print() << "Picard require convergence: " << (m_require_convergence?"true":"false") << "\n";
+        this->m_params.Print("Picard");
     }
 
 private:
@@ -76,26 +64,6 @@ private:
      * \brief Pointer to Ops class.
      */
     Ops* m_ops = nullptr;
-
-    /**
-     * \brief Flag to determine whether convergence is required.
-     */
-    bool m_require_convergence = true;
-
-    /**
-     * \brief Relative tolerance for the Picard nonlinear solver
-     */
-    amrex::Real m_rtol = 1.0e-6;
-
-    /**
-     * \brief Absolute tolerance for the Picard nonlinear solver
-     */
-    amrex::Real m_atol = 0.;
-
-    /**
-     * \brief Maximum iterations for the Picard nonlinear solver
-     */
-    int m_maxits = 100;
 
     /**
      * \brief Total iterations for the diagnostic file
@@ -123,48 +91,14 @@ void PicardSolver<Vec,Ops>::Define (const Vec&  a_U,
 
     this->m_is_defined = true;
 
-    // Create diagnostic file and write header
-    if (amrex::ParallelDescriptor::IOProcessor()
-        && !this->m_diagnostic_file.empty()
-        && !amrex::FileExists(this->m_diagnostic_file)) {
-
-        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
-        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
-        if (!diagnostic_dir.empty()) {
-            std::filesystem::create_directories(diagnostic_dir);
-        }
-
-        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
-        int c = 0;
-        diagnostic_file << "#";
-        diagnostic_file << "[" << c++ << "]step()";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]time(s)";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]total_iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]norm_abs";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]norm_rel";
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
+    this->InitDiagnosticFile();
 
 }
 
 template <class Vec, class Ops>
 void PicardSolver<Vec,Ops>::ParseParameters ()
 {
-    const amrex::ParmParse pp_picard("picard");
-    pp_picard.query("verbose",             this->m_verbose);
-    pp_picard.query("absolute_tolerance",  m_atol);
-    pp_picard.query("relative_tolerance",  m_rtol);
-    pp_picard.query("max_iterations",      m_maxits);
-    pp_picard.query("require_convergence", m_require_convergence);
-    pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
-    pp_picard.query("diagnostic_interval", this->m_diagnostic_interval);
+    this->m_params.Parse("picard");
 }
 
 template <class Vec, class Ops>
@@ -191,7 +125,7 @@ void PicardSolver<Vec,Ops>::Solve (Vec&         a_U,
     amrex::Real norm_rel = 0.;
 
     int iter;
-    for (iter = 0; iter < m_maxits;) {
+    for (iter = 0; iter < this->m_params.maxits;) {
 
         // Save previous state for norm calculation
         m_Usave.Copy(a_U);
@@ -212,34 +146,34 @@ void PicardSolver<Vec,Ops>::Solve (Vec&         a_U,
         iter++;
 
         // Check for convergence criteria
-        if ((this->m_verbose and verbose_step) || iter == m_maxits) {
+        if ((this->m_params.verbose and verbose_step) || iter == this->m_params.maxits) {
             amrex::Print() << "Picard: iter = " << std::setw(3) << iter <<  ", norm = "
                            << std::scientific << std::setprecision(5) << norm_abs << " (abs.), "
                            << std::scientific << std::setprecision(5) << norm_rel << " (rel.)" << "\n";
         }
 
-        if (norm_abs < m_atol) {
+        if (norm_abs < this->m_params.atol) {
             this->m_exit_status = 2;
-            if (this->m_verbose and verbose_step) {
+            if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+                               << ". Satisfied absolute tolerance " << this->m_params.atol << "\n";
             }
             break;
         }
 
-        if (norm_rel < m_rtol) {
+        if (norm_rel < this->m_params.rtol) {
             this->m_exit_status = 3;
-            if (this->m_verbose and verbose_step) {
+            if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+                               << ". Satisfied relative tolerance " << this->m_params.rtol << "\n";
             }
             break;
         }
 
-        if (iter >= m_maxits) {
-            if (this->m_verbose and verbose_step) {
+        if (iter >= this->m_params.maxits) {
+            if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Picard: exiting at iter = " << std::setw(3) << iter
-                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+                               << ". Maximum iteration reached: iter = " << this->m_params.maxits << "\n";
             }
             break;
         }
@@ -249,38 +183,21 @@ void PicardSolver<Vec,Ops>::Solve (Vec&         a_U,
     // Update total iteration count
     m_total_iters += iter;
 
-    if (m_rtol > 0. && iter == m_maxits) {
+    if (this->m_params.rtol > 0. && iter == this->m_params.maxits) {
         std::stringstream convergenceMsg;
         convergenceMsg << "Picard solver failed to converge after " << iter <<
                           " iterations. Relative norm is " << norm_rel <<
-                          " and the relative tolerance is " << m_rtol <<
+                          " and the relative tolerance is " << this->m_params.rtol <<
                           ". Absolute norm is " << norm_abs <<
-                          " and the absolute tolerance is " << m_atol;
-        if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+                          " and the absolute tolerance is " << this->m_params.atol;
+        if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
         ablastr::warn_manager::WMRecordWarning("PicardSolver", convergenceMsg.str());
 
-        if (m_require_convergence) { this->m_exit_status = -5; }
+        if (this->m_params.require_convergence) { this->m_exit_status = -5; }
         else { this->m_exit_status = 0; }
     }
 
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
-        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
-        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
-        diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step+1;
-        diagnostic_file << " ";
-        diagnostic_file << a_time + a_dt;
-        diagnostic_file << " ";
-        diagnostic_file << iter;
-        diagnostic_file << " ";
-        diagnostic_file << m_total_iters;
-        diagnostic_file << " ";
-        diagnostic_file << norm_abs;
-        diagnostic_file << " ";
-        diagnostic_file << norm_rel;
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
+    this->WriteDiagnostics(a_step, a_time + a_dt, iter, m_total_iters, norm_abs, norm_rel);
 
 }
 

@@ -1,5 +1,7 @@
 #include "FlushFormatSensei.H"
 
+#include "Python/GIL.H"
+
 #include <ablastr/profiler/ProfilerWrapper.H>
 #ifdef AMREX_USE_SENSEI_INSITU
 # include <AMReX_AmrMeshParticleInSituBridge.H>
@@ -21,6 +23,10 @@ FlushFormatSensei::FlushFormatSensei (amrex::AmrMesh *amr_mesh,
     m_insitu_bridge->setEnabled(true);
     m_insitu_bridge->setConfig(m_insitu_config);
     m_insitu_bridge->setPinMesh(m_insitu_pin_mesh);
+
+    // If WarpX is driven from Python, then SENSEI runs its Python analyses in the same
+    // interpreter and relies on its caller to hold the GIL.
+    const warpx::python::ScopedGIL gil;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_amr_mesh && !m_insitu_bridge->initialize(),
@@ -77,6 +83,8 @@ FlushFormatSensei::WriteToFile (
         const_cast<amrex::Vector<amrex::MultiFab>*>(&mf);
 
     auto particles = particle_diags[0].getParticleContainer();
+    // see the constructor: SENSEI relies on its caller to hold the GIL
+    const warpx::python::ScopedGIL gil;
     bool didUpdate = m_insitu_bridge->update(
         iteration[0], time, m_amr_mesh,{mf_ptr}, {varnames},
         particles, {}, {}, {{"u",{0,1,2}}}, {});
