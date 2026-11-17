@@ -606,6 +606,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
         // These boxes define the index space for the shared memory arrays.
         // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
         amrex::Box shared_memory_box = amrex::getTileBoxFromIndex(bin_id, box, bin_size);
+
         shared_memory_box.grow(depos_order);
         Box tbox_x = convert(shared_memory_box, jx_type);
         Box tbox_y = convert(shared_memory_box, jy_type);
@@ -2862,7 +2863,8 @@ void vayAddNoRet (amrex::Array4<amrex::Real> const& arr, int i, int j, int k, am
 }
 
 /**
- * \brief Vay current deposition of a single particle.
+ * \brief Vay current deposition (<a href="https://doi.org/10.1016/j.jcp.2013.03.010"> Vay et al, 2013</a>
+ *  of a single particle.
  *
  * Kernel of doVayDepositionShapeN and doVayDepositionSharedShapeN. Deposits into the
  * temporary arrays that are then combined into D (and, in 2D, directly into Dy).
