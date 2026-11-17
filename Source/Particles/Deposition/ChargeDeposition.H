@@ -192,6 +192,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param a_bins
  * \param box
  * \param a_tbox_max_size
+ * \param threads_per_block number of threads to use per block in shared charge deposition
  * \param bin_size tile size to use for shared current deposition operations
  */
 template <int depos_order>
@@ -209,6 +210,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                                      const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
                                      const amrex::Box& box,
                                      const amrex::IntVect& a_tbox_max_size,
+                                     const int threads_per_block,
                                      const amrex::IntVect bin_size
                                      )
 {
@@ -217,7 +219,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
     const auto *permutation = a_bins.permutationPtr();
 
 #if !defined(AMREX_USE_GPU)
-    amrex::ignore_unused(ix_type, a_bins, box, a_tbox_max_size, bin_size);
+    amrex::ignore_unused(ix_type, a_bins, box, a_tbox_max_size, threads_per_block, bin_size);
 #endif
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
@@ -244,7 +246,6 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
 
     const int nblocks = a_bins.numBins();
     const auto offsets_ptr = a_bins.offsetsPtr();
-    const int threads_per_block = 256;
 
     std::size_t shared_mem_bytes = npts*sizeof(amrex::Real);
 
