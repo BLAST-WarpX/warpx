@@ -7,16 +7,24 @@
 # License: BSD-3-Clause-LBNL
 
 """
-Analyse the linear phase of the 2D Weibel instability test.
+Check the early, exponential-growth phase of the 2D Weibel instability test.
 
-The two electron populations counter-stream along y, which is out of the x-z simulation plane.
-The Weibel modes therefore have wave vectors k in the x-z plane and magnetic fields
-B = y_hat x k, also in the plane: modes with k || x drive B_z and modes with k || z drive B_x,
-and in the cold limit both grow at the same rate. B_y is not driven and stays at noise level.
-On this grid dx < dz, so more of the resolved unstable modes have |k_x| > |k_z|, and B_z carries
-most of the magnetic energy. The growth-rate fit is performed on ln(sum(B_z^2)). The fitted
-growth rate is compared to the cold k -> infinity asymptote gamma = beta * omega_p, used here
-as an upper-bound estimate for the warm, finite-box simulation.
+Physical setup: two electron beams move in opposite directions along y, which is perpendicular
+to the x-z simulation plane. The Weibel instability then produces magnetic-field structures in
+the x-z plane:
+- structures that vary along x produce B_z,
+- structures that vary along z produce B_x,
+- B_y is not produced and stays at the level of the particle noise.
+In the cold-beam limit, B_x and B_z grow equally fast. However, the grid spacing is finer in x
+than in z (dx < dz), so the grid resolves more structures that vary along x. As a result, B_z
+holds most of the magnetic energy, and we use B_z to measure the growth rate.
+
+How the growth rate is measured: while the instability grows exponentially, B_z^2 summed over
+the grid is proportional to exp(2 * gamma * t). Its logarithm is therefore a straight line in
+time with slope 2 * gamma. We fit that line and compare gamma to beta * omega_p, which is the
+growth rate predicted for cold beams at very short wavelengths. Since the simulated beams are
+warm and the box is finite, the simulation should grow somewhat slower than this, so beta *
+omega_p serves as an upper bound.
 """
 
 import math
@@ -36,50 +44,73 @@ from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import e as q_e
 from scipy.constants import epsilon_0, m_e
 
-MIN_FIT_POINTS = 6  # minimum number of diagnostics needed to fit a growth rate
-FIT_START_OMEGA_P_T = 75.0  # fit starts at omega_p * t >= this value (end of transient)
-MIN_FIT_LN_BZ_2_RISE = 1.0  # minimum ln(B_z^2) growth covered by the fit window
-GAMMA_RTOL_UPPER = 0.10  # fitted gamma must not exceed gamma_theory by more than 10%
-GAMMA_RTOL_LOWER = (
-    0.30  # fitted gamma must not fall below gamma_theory by more than 30%
-)
+# Need at least this many field snapshots to fit a growth rate.
+MIN_FIT_POINTS = 6
+# The fit starts once omega_p * t reaches this value. Earlier times are the start-up phase, when
+# the growing structures are still emerging from the particle noise.
+FIT_START_OMEGA_P_T = 75.0
+# Over the fit window, ln(B_z^2) must increase by at least this much (i.e., B_z^2 must grow by at
+# least a factor e), so that the fit measures actual growth and not noise.
+MIN_FIT_LN_BZ_2_RISE = 1.0
+# The fitted growth rate may be at most 10% above the theoretical upper bound and at most 30% below it.
+GAMMA_RTOL_UPPER = 0.10
+GAMMA_RTOL_LOWER = 0.30
 
 
 def largest_contiguous_block(indices):
-    """Return the longest run of consecutive integers from *indices*."""
+    """Keep only the longest stretch of snapshots that follow each other without gaps.
+
+    *indices* is a sorted array of snapshot numbers. For example, [2, 3, 7, 8, 9] has two
+    stretches, [2, 3] and [7, 8, 9], and this function returns [7, 8, 9]. This makes sure the
+    growth-rate fit uses one uninterrupted time window.
+    """
     assert indices.size > 0
-    # Find positions where the gap between successive indices is > 1, then split there.
+    # A gap is where two neighbouring numbers differ by more than 1: cut the array there.
     split_points = np.flatnonzero(np.diff(indices) > 1) + 1
     blocks = np.split(indices, split_points)
     return max(blocks, key=len)
 
 
 def linear_fit(x, y):
-    """Fit y = slope*x + intercept and return (slope, intercept, R^2)."""
+    """Fit a straight line y = slope * x + intercept through the data points.
+
+    Returns slope, intercept, and R^2. R^2 measures how well the line matches the data:
+    1 means the points lie exactly on the line, values near 0 mean the line explains almost
+    nothing.
+    """
     slope, intercept = np.polyfit(x, y, 1)
     y_fit = slope * x + intercept
-    ss_res = np.sum((y - y_fit) ** 2)  # residual sum of squares
-    ss_tot = np.sum((y - np.mean(y)) ** 2)  # total sum of squares
-    r_sq = (
-        1.0 - ss_res / ss_tot if ss_tot > 0.0 else 1.0
-    )  # coefficient of determination
+    # Squared distance of the points from the fitted line...
+    ss_res = np.sum((y - y_fit) ** 2)
+    # ...compared to their squared distance from their own average.
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r_sq = 1.0 - ss_res / ss_tot if ss_tot > 0.0 else 1.0
     return slope, intercept, r_sq
 
 
 def save_field_animation(
     iterations, t, get_field_frame, vmin, vmax, colorbar_label, title_prefix, filename
 ):
-    """Create and save an animated GIF for a 2-D field quantity.
+    """Save a GIF that shows how a 2D field evolves, one frame per snapshot.
 
     Parameters
     ----------
     iterations : array of int
+        Simulation step number of each snapshot.
     t : array of float
-    get_field_frame : callable(iteration) -> (data, info)
-    vmin, vmax : float — color-scale limits
+        Physical time of each snapshot, in seconds.
+    get_field_frame : function
+        Takes a step number and returns (data, info) for that snapshot, as returned by
+        openPMD-viewer's ``get_field``.
+    vmin, vmax : float
+        Values mapped to the two ends of the color scale. They are the same for all frames, so
+        that colors can be compared between frames.
     colorbar_label : str
-    title_prefix : str — prepended to "iteration N - time T s"
-    filename : str — output GIF path
+        Label of the color bar.
+    title_prefix : str
+        Start of each frame's title; the step number and time are appended to it.
+    filename : str
+        Name of the GIF file to write.
     """
     fig, ax = plt.subplots()
     data, info = get_field_frame(iterations[0])
@@ -115,6 +146,11 @@ def save_field_animation(
 
 
 def load_input_deck():
+    """Read the simulation input parameters into a dictionary.
+
+    Prefer ``warpx_used_inputs``, which WarpX writes next to the output and which contains the
+    parameters that were actually used. If it is missing, fall back to the original input file.
+    """
     input_file = Path("warpx_used_inputs")
     if not input_file.exists():
         input_file = Path("inputs_test_2d_weibel_instability")
@@ -124,7 +160,7 @@ def load_input_deck():
     return parse_input_file(input_file)
 
 
-# Parse simulation parameters at module level so they are available to all subsequent code.
+# Read the simulation parameters once; the rest of the script uses them.
 input_dict = load_input_deck()
 
 species_names = input_dict["particles.species_names"]
@@ -137,8 +173,10 @@ assert species_names == electron_species + [ion_species], (
 if "geometry.dims" in input_dict:
     assert input_dict["geometry.dims"][0] == "2"
 
-# Read species parameters. The input deck stores the drift as u = gamma * beta, where
-# gamma = 1 / sqrt(1 - beta**2), and the thermal spread as sqrt(theta).
+# Read the electron beam parameters. The input file gives momenta as u = gamma * beta (momentum
+# divided by m_e * c), with gamma = 1 / sqrt(1 - beta**2) the Lorentz factor. The mean of u is
+# the beam drift; its spread (standard deviation) is the thermal spread, equal to sqrt(theta),
+# where theta = k_B T / (m_e c^2) is the temperature in units of the electron rest energy.
 momentum_components = ("ux", "uy", "uz")
 u_means = np.array(
     [
@@ -149,7 +187,9 @@ u_means = np.array(
         for species in electron_species
     ]
 )
+# Convert u = gamma * beta back to the velocity beta = v / c.
 beta_means = u_means / np.sqrt(1.0 + u_means**2)
+# Drift speed of each beam along y.
 betas = np.abs(beta_means[:, 1])
 densities = np.array(
     [float(input_dict[f"{species}.density"][0]) for species in electron_species]
@@ -163,6 +203,7 @@ u_stds = np.array(
         for species in electron_species
     ]
 )
+# The thermal spread must be the same in x, y, and z (same temperature in all directions).
 np.testing.assert_allclose(u_stds[:, 1], u_stds[:, 0])
 np.testing.assert_allclose(u_stds[:, 2], u_stds[:, 0])
 thetas = u_stds[:, 0] ** 2
@@ -170,7 +211,7 @@ drift_dirs = ["y" if beta_mean[1] > 0.0 else "-y" for beta_mean in beta_means]
 charges = [input_dict[f"{species}.charge"][0] for species in electron_species]
 masses = [input_dict[f"{species}.mass"][0] for species in electron_species]
 
-# Enforce the symmetric counter-streaming electron configuration required by this test.
+# This test expects two electron beams moving in opposite directions along y.
 assert set(drift_dirs) == {"y", "-y"}, (
     f"Expected counter-streaming y beams, got {drift_dirs}"
 )
@@ -179,24 +220,28 @@ assert masses == ["m_e", "m_e"]
 assert np.all(betas > 0.0)
 assert np.all(densities > 0.0)
 assert np.all(thetas > 0.0)
-# Both populations must be identical so the combined plasma is symmetric.
+# The two beams must have the same speed, density, and temperature, so that they mirror each
+# other and the plasma as a whole carries no net current.
 np.testing.assert_allclose(betas, betas[0])
 np.testing.assert_allclose(densities, densities[0])
 np.testing.assert_allclose(thetas, thetas[0])
 
-beta = float(np.mean(betas))  # common drift speed v_d/c
-n_0 = float(np.sum(densities))  # total electron number density
+# Drift speed of the beams, as a fraction of the speed of light.
+beta = float(np.mean(betas))
+# Total electron density of both beams together.
+n_0 = float(np.sum(densities))
 
-# The periodic Poisson solve (required by the Darwin solver) needs a charge-neutral plasma:
-# the ions must form an immobile, uniform background that exactly cancels the electron charge.
+# The Darwin field solver computes the electric potential on a periodic domain, which only works
+# if the total charge is zero. The ions therefore form a uniform background that does not move
+# and exactly cancels the electron charge.
 assert input_dict[f"{ion_species}.charge"][0] == "q_e"
 assert input_dict[f"{ion_species}.do_not_push"][0] == "1"
 assert input_dict[f"{ion_species}.momentum_distribution_type"][0] == "at_rest"
 np.testing.assert_allclose(float(input_dict[f"{ion_species}.density"][0]), n_0)
-omega_p = math.sqrt(
-    n_0 * q_e**2 / (m_e * epsilon_0)
-)  # non-relativistic electron plasma frequency
-# Cold-beam k -> infinity asymptote: gamma = beta * omega_p (used as an upper bound).
+# Electron plasma frequency (without relativistic corrections).
+omega_p = math.sqrt(n_0 * q_e**2 / (m_e * epsilon_0))
+# Theoretical growth rate for cold beams at very short wavelengths. Warm beams in a finite box
+# grow somewhat slower, so this is used as an upper bound.
 gamma_theory = beta * omega_p
 
 max_step = int(input_dict["max_step"][0]) if "max_step" in input_dict else None
@@ -205,30 +250,38 @@ print(f"Plasma frequency omega_p: {omega_p:.6e} 1/s")
 print(f"Cold asymptotic gamma upper bound: {gamma_theory:.6e} 1/s")
 print(f"v_drift / v_thermal: {beta / math.sqrt(float(np.mean(thetas))):.6g}")
 
-# Load the openPMD time series written by the WarpX field diagnostics.
+# Open the field snapshots written by the simulation.
 ts = OpenPMDTimeSeries("diags/diag1")
-iterations = np.asarray(ts.iterations)  # integer step numbers for each snapshot
-t = np.asarray(ts.t)  # physical times in seconds
+# Simulation step number of each snapshot.
+iterations = np.asarray(ts.iterations)
+# Physical time of each snapshot, in seconds.
+t = np.asarray(ts.t)
 assert iterations.size == t.size
 assert t.size >= MIN_FIT_POINTS, "Need at least 6 field diagnostics to fit growth"
-assert np.all(np.diff(t) > 0.0)  # times must be strictly increasing
+# Each snapshot must come later in time than the previous one.
+assert np.all(np.diff(t) > 0.0)
 
 print(f"Final diagnostic time: {t[-1]:.6e} s")
+# Guard against analysing output left over from a different (longer) run.
 if max_step is not None:
     assert iterations[-1] <= max_step, (
         "The diagnostics do not appear to come from the parsed input file: "
         f"final iteration {iterations[-1]} exceeds max_step {max_step}"
     )
 
-# Accumulate sum(B_i^2) over all cells at every diagnostic iteration.
+# For each snapshot, add up B_x^2, B_y^2, and B_z^2 over all grid cells. These sums are
+# proportional to the magnetic energy in each component.
 Bx_2 = np.empty_like(t)
 By_2 = np.empty_like(t)
 Bz_2 = np.empty_like(t)
-Bz_abs_max = 0.0  # track the peak |B_z| for the animation color scale
-rho_spatial_mean = (
-    None  # mean of rho_electrons_1 in first frame (proxy for bulk density)
-)
-rho_dev_max = 0.0  # max spatial deviation from that mean, across all frames
+# Largest |B_z| over all snapshots; sets the color scale of the B_z animation.
+Bz_abs_max = 0.0
+# Average charge density of the electrons_1 beam in the first snapshot, i.e., before any
+# filaments have formed. The rho animation is colored relative to this value.
+rho_spatial_mean = None
+# Largest local difference from that average, over all snapshots; sets the color scale of the
+# rho animation.
+rho_dev_max = 0.0
 
 for i, iteration in enumerate(iterations):
     Bx, _ = ts.get_field(field="B", coord="x", iteration=iteration, plot=False)
@@ -249,7 +302,8 @@ assert np.all(np.isfinite(By_2))
 assert np.all(np.isfinite(Bz_2))
 assert Bz_abs_max > 0.0, "B_z is identically zero across all field diagnostics"
 
-# Load the FieldEnergy reduced diagnostic. Columns: 0=step, 1=time, 2=total, 3=electric, 4=magnetic energy.
+# Load the field energy over time, written by the FieldEnergy reduced diagnostic. Its columns
+# are: step, time, total field energy, electric energy, magnetic energy.
 field_energy = np.atleast_2d(np.loadtxt("diags/reducedfiles/EF.txt", skiprows=1))
 assert field_energy.shape[0] >= 2
 assert field_energy.shape[1] == 5
@@ -268,12 +322,14 @@ assert np.all(np.isfinite(total_energy))
 assert np.all(np.isfinite(electric_energy))
 assert np.all(np.isfinite(magnetic_energy))
 
-# Coarse check: magnetic energy must be higher in the second half of the run than the first.
+# Rough check: on average, the magnetic energy must be higher in the second half of the run
+# than in the first half.
 early_magnetic_energy = np.mean(magnetic_energy[: field_energy.shape[0] // 2])
 late_magnetic_energy = np.mean(magnetic_energy[field_energy.shape[0] // 2 :])
 assert late_magnetic_energy > early_magnetic_energy
 
-# Use the first ~5% of steps as the noise reference to confirm growth by at least 2x.
+# The average over the first ~5% of the run gives the initial (noise) level of the magnetic
+# energy. Its peak value must be at least twice that level.
 n_early = min(len(magnetic_energy), max(2, len(magnetic_energy) // 20))
 early_reference = np.mean(magnetic_energy[:n_early])
 assert magnetic_energy.max() > 2.0 * early_reference, (
@@ -281,7 +337,8 @@ assert magnetic_energy.max() > 2.0 * early_reference, (
     f"max/early = {magnetic_energy.max() / max(early_reference, np.finfo(float).tiny):.3g}"
 )
 
-# Verify charge-density consistency: total rho is the sum of the electron and ion depositions.
+# Check that, at the last snapshot, the total charge density rho equals the sum of the charge
+# densities of the two electron beams and the ions.
 rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iterations[-1], plot=False)
 rho_2, _ = ts.get_field(field="rho_electrons_2", iteration=iterations[-1], plot=False)
 rho_i, _ = ts.get_field(field="rho_ions", iteration=iterations[-1], plot=False)
@@ -291,17 +348,18 @@ assert np.all(np.isfinite(rho_1))
 assert np.all(np.isfinite(rho_2))
 assert np.all(np.isfinite(rho_i))
 assert np.all(np.isfinite(rho))
-charge_scale = (
-    abs(q_e) * n_0
-)  # characteristic charge density used for absolute tolerance
+# Typical size of the charge density; sets the absolute tolerance of the comparison below.
+charge_scale = abs(q_e) * n_0
 np.testing.assert_allclose(
     rho, rho_1 + rho_2 + rho_i, rtol=1.0e-7, atol=1.0e-10 * charge_scale
 )
 
-# At late time, B_z must dominate the other components. B_z > B_y is physics: B_y is not driven
-# by the out-of-plane drift. B_z > B_x is a property of this grid, not of the physics: both are
-# Weibel-unstable, but dx < dz resolves more modes with k mostly along x, which drive B_z.
-late = slice(max(1, len(t) - 5), len(t))  # average over the last 5 snapshots
+# At the end of the run, B_z must be the largest magnetic-field component.
+# - B_z > B_y is expected from the physics: the beams move along y, which does not produce B_y.
+# - B_z > B_x comes from the grid, not from the physics: both B_x and B_z grow, but the finer
+#   spacing in x (dx < dz) resolves more of the structures that vary along x, which produce B_z.
+# Average over the last 5 snapshots.
+late = slice(max(1, len(t) - 5), len(t))
 Bx_late = np.mean(Bx_2[late])
 By_late = np.mean(By_2[late])
 Bz_late = np.mean(Bz_2[late])
@@ -311,29 +369,35 @@ assert Bz_late > dominance_factor * max(Bx_late, By_late), (
     f"B_z^2={Bz_late:.6e}, B_x^2={Bx_late:.6e}, B_y^2={By_late:.6e}"
 )
 
-# Select the linear growth phase. The run is deliberately short and ends during linear growth,
-# well before saturation, so the series is: a short initial transient (while the fastest
-# growing modes emerge from the particle noise), then exponential growth up to the final
-# diagnostic. Skip the transient and fit everything after it.
+# Choose the time window for the growth-rate fit. The run is deliberately short: it stops while
+# B_z is still growing exponentially, before the instability saturates (stops growing).
+# B_z^2 therefore first goes through a short start-up phase, while the fastest-growing structures
+# emerge from the particle noise, and then grows exponentially until the last snapshot. We skip
+# the start-up phase and fit everything after it.
+#
+# Exponential growth is a straight line on a log scale, so work with ln(B_z^2). Snapshots with
+# B_z^2 == 0 give ln = -inf; they are left out below (the warning is silenced).
 with np.errstate(divide="ignore", invalid="ignore"):
-    ln_Bz_2 = np.log(Bz_2)  # work in log-space; Bz_2 == 0 gives -inf (silently ignored)
+    ln_Bz_2 = np.log(Bz_2)
 
+# Snapshots where B_z^2 > 0, i.e., where the logarithm is a regular number.
 finite_positive = np.flatnonzero(np.isfinite(ln_Bz_2))
 assert finite_positive.size >= MIN_FIT_POINTS, (
     f"Need at least {MIN_FIT_POINTS} positive B_z^2 diagnostics to fit growth"
 )
 
-# Reference level: mean of the first few finite snapshots (initial particle noise).
+# Initial noise level: average of ln(B_z^2) over the first few snapshots. Only used in the
+# printed output and in error messages.
 noise_sample_count = min(5, max(2, finite_positive.size // 10))
 noise_indices = finite_positive[:noise_sample_count]
 noise_floor = np.mean(ln_Bz_2[noise_indices])
-dynamic_range = (
-    np.max(ln_Bz_2[finite_positive]) - noise_floor
-)  # total rise in ln(B_z^2)
+# How much ln(B_z^2) rises in total, from the noise level to its maximum.
+dynamic_range = np.max(ln_Bz_2[finite_positive]) - noise_floor
 
-# The local growth rate decreases steadily during the transient, so the fit start is fixed in
-# physical time (omega_p * t >= FIT_START_OMEGA_P_T) rather than detected from the data, which
-# would make it depend on the diagnostic interval. Fit from there up to the last diagnostic.
+# During the start-up phase the growth rate is still changing, so there is no sharp feature in
+# the data that marks its end. Instead, the fit starts at a fixed physical time
+# (omega_p * t >= FIT_START_OMEGA_P_T). This also keeps the window the same if the snapshots are
+# written more or less often. The fit then runs until the last snapshot.
 candidate = np.flatnonzero(np.isfinite(ln_Bz_2) & (omega_p * t >= FIT_START_OMEGA_P_T))
 assert candidate.size >= MIN_FIT_POINTS, (
     "B_z^2 did not grow past the initial transient. "
@@ -341,7 +405,9 @@ assert candidate.size >= MIN_FIT_POINTS, (
     f"ln(B_z^2) dynamic range={dynamic_range:.3g}"
 )
 
+# Use one uninterrupted window (snapshots with B_z^2 == 0 would leave gaps).
 fit_indices = largest_contiguous_block(candidate)
+# The window must contain enough snapshots and show a clear rise of B_z^2.
 fit_ln_Bz_2_rise = ln_Bz_2[fit_indices[-1]] - ln_Bz_2[fit_indices[0]]
 assert (
     fit_indices.size >= MIN_FIT_POINTS and fit_ln_Bz_2_rise >= MIN_FIT_LN_BZ_2_RISE
@@ -354,14 +420,15 @@ assert (
 fit_t = t[fit_indices]
 fit_ln_Bz_2 = ln_Bz_2[fit_indices]
 slope, intercept, r_sq = linear_fit(fit_t, fit_ln_Bz_2)
-# ln(B_z^2) grows as 2*gamma*t, so the growth rate is half the log-slope.
+# B_z grows as exp(gamma * t), so B_z^2 grows as exp(2 * gamma * t) and ln(B_z^2) has slope
+# 2 * gamma. The growth rate is therefore half the fitted slope.
 gamma_fit = 0.5 * slope
 
-# Amplitude-match the theoretical slope to the fit window for plotting.
+# For the plot: draw a line with the theoretical slope, shifted up or down so that it passes
+# through the data in the fit window. This makes it easy to compare the two slopes by eye.
 theory_intercept = np.mean(fit_ln_Bz_2 - 2.0 * gamma_theory * fit_t)
-theory_ln = (
-    theory_intercept + 2.0 * gamma_theory * t
-)  # extended over all t for the plot
+# Theory and fit lines, drawn over the whole run (not just the fit window).
+theory_ln = theory_intercept + 2.0 * gamma_theory * t
 fit_ln = intercept + slope * t
 
 print(f"Fit window: {fit_t[0]:.6e} s to {fit_t[-1]:.6e} s")
@@ -372,7 +439,8 @@ print(f"Fit R^2: {r_sq:.6f}")
 print(f"Fitted gamma: {gamma_fit:.6e} 1/s")
 print(f"gamma_fit / gamma_theory: {gamma_fit / gamma_theory:.6f}")
 
-# Semilog plot of all three magnetic-field components together with the theory and fit slopes.
+# Plot, on a log scale, the sums of B_x^2, B_y^2, and B_z^2 over time, together with the
+# theoretical and fitted growth.
 fig, ax = plt.subplots()
 ax.semilogy(t, Bx_2, label=r"$\sum B_x^2$")
 ax.semilogy(t, By_2, label=r"$\sum B_y^2$")
@@ -384,10 +452,11 @@ ax.semilogy(
     label=r"$\propto e^{2 \beta \omega_p t}$",
 )
 ax.semilogy(t, np.exp(fit_ln), ":", label=r"fit to $\sum B_z^2$")
-ax.axvspan(
-    fit_t[0], fit_t[-1], color="0.85", label="fit window"
-)  # shade the fitted interval
+# Shade the fit window in gray.
+ax.axvspan(fit_t[0], fit_t[-1], color="0.85", label="fit window")
 
+# Set the vertical range from the smallest and largest plotted values. Zeros are left out, since
+# they cannot be shown on a log scale.
 positive_plot_values = np.concatenate(
     (
         Bx_2[Bx_2 > 0.0],
@@ -410,8 +479,9 @@ fig.tight_layout()
 fig.savefig("weibel_magnetic_energy_growth.png", dpi=150)
 plt.close(fig)
 
-# Animate the fitted B_z component and the electrons_1 charge density. The rho color scale is
-# centered on the initial mean of rho_electrons_1, so filamentation shows as red/blue deviations.
+# Make animations of B_z and of the charge density of the electrons_1 beam. For the charge
+# density, white is the initial average value, so the filaments formed by the instability show
+# up as red and blue regions (above and below that average).
 save_field_animation(
     iterations,
     t,
@@ -437,7 +507,9 @@ save_field_animation(
     filename="weibel_rho_electrons_1.gif",
 )
 
-# Check the fitted growth rate after plotting, so that the plots are available on failure.
+# Check the fitted growth rate only now, after plotting, so that the plots exist even if the
+# check fails. The rate must be a positive number, the data must lie close to a straight line
+# (R^2 > 0.8), and the rate must be close to the theoretical value.
 assert np.isfinite(gamma_fit)
 assert gamma_fit > 0.0
 assert r_sq > 0.80
