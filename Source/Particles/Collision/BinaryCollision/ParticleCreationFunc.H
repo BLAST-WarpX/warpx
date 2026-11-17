@@ -60,12 +60,16 @@ public:
     /**
      * \brief operator() of the ParticleCreationFunc class. It creates new particles from binary
      * collisions.
-     * For linear Compton only, one macroparticle per product species is created (first product
-     * at the first reactant position, second at the second). For all other binary processes
-     * (Linear Breit-Wheeler, fusion, etc.), one product is created at the position of each
-     * parent particle that collided (e.g. 2 photons and 2 electrons for Breit-Wheeler), allowing
-     * for exact charge conservation. For example, in the nuclear reaction "proton + boron -> 3 alpha",
-     * we create 6 new alpha particles, 3 at the position of the proton and 3 at the position of the boron.
+     * For two-product processes in which the charge of each product matches the charge of one
+     * of the reactants (linear Compton, D+D -> T+p, D+He3 -> He4+p), one macroparticle per
+     * product species is created, at the position of the reactant with the same charge. This
+     * conserves charge locally while creating half as many macroparticles.
+     * For all other binary processes (linear Breit-Wheeler, D+T -> n+He4, D+D -> n+He3,
+     * proton-boron fusion), one product is created at the position of each
+     * parent particle that collided (e.g. 2 photons and 2 electrons for Breit-Wheeler), with half
+     * of the reaction weight each, allowing for exact charge conservation. For example, in the
+     * nuclear reaction "proton + boron -> 3 alpha", we create 6 new alpha particles, 3 at the
+     * position of the proton and 3 at the position of the boron.
      * This function also sets the initial weight of the produced particles and subtracts it from
      * the parent particles. If the weight of a parent particle becomes 0, then that particle is
      * deleted.
@@ -124,15 +128,15 @@ public:
         const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
         // How many particles of each product species are created.
-        // Linear Compton: one macroparticle per product species
-        // (one product photon at reactant photon position, same for electron)
-        // All other binary processes: create one product particle at
-        // the position of each reacting particles (factor 2).
+        // If each product has the same charge as one of the reactants (e.g. linear Compton,
+        // D+D -> T+p, D+He3 -> He4+p): one macroparticle per product species, created at the
+        // position of the reactant with the same charge (factor 1).
+        // Otherwise: create one product particle at the position of each reacting
+        // particle (factor 2), with half of the reaction weight each.
         // E.g., if a binary collision produces one electron, we create two electrons,
         // one at the position of each particle that collided.
-        // This allows for exact charge conservation.
-        const int products_per_reactant_factor =
-            (m_collision_type == CollisionType::LinearCompton) ? 1 : 2;
+        // Both choices ensure exact local charge conservation.
+        const int products_per_reactant_factor = m_products_per_reactant_factor;
         amrex::Vector<int> num_added_vec(m_num_product_species);
         for (int i = 0; i < m_num_product_species; i++)
         {
@@ -176,6 +180,7 @@ public:
         const int t_num_product_species = m_num_product_species;
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
+        const bool t_swap_product_positions = m_swap_product_positions;
         const ScatteringAngleModel t_scattering_angle_model = m_scattering_angle_model;
         const ScatteringUtils::AnisotropicCoefficientTable t_anisotropic_coefficients{
             m_legendre_angular_distribution_energies.empty() ? nullptr : m_legendre_angular_distribution_energies.data(),
@@ -197,19 +202,23 @@ public:
                 {
                     for (int k = 0; k < p_num_products_device[j]; k++)
                     {
-                        if (t_collision_type == CollisionType::LinearCompton)
+                        if (products_per_reactant_factor == 1)
                         {
-                            // Linear Compton only: one macroparticle per product species,
-                            // first at first reactant position, second at second.
+                            // One macroparticle per product species (only used for
+                            // two-product processes), each created at the position of
+                            // the reactant that has the same charge: by default, the first
+                            // product at the first reactant and the second product at the
+                            // second reactant (swapped if t_swap_product_positions).
                             const auto product_index = products_np_data[j] +
                                 (p_offsets[i]*p_num_products_device[j] + k);
-                            if (j == 0) // first product: photon
+                            const bool from_first_reactant = ((j == 0) != t_swap_product_positions);
+                            if (from_first_reactant)
                             {
                                 copy_species1[j](soa_products_data[j], soa_1,
                                     static_cast<int>(p_pair_indices_1[i]),
                                     static_cast<int>(product_index), engine);
                             }
-                            else if (j == 1) // second product: electron
+                            else
                             {
                                 copy_species2[j](soa_products_data[j], soa_2,
                                     static_cast<int>(p_pair_indices_2[i]),
@@ -258,8 +267,9 @@ public:
                     TwoProductFusionInitializeMomentum(soa_1, soa_2,
                         soa_products_data[0], soa_products_data[1],
                         p_pair_indices_1[i], p_pair_indices_2[i],
-                        products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
-                        products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
+                        products_np_data[0] + products_per_reactant_factor*p_offsets[i]*p_num_products_device[0],
+                        products_np_data[1] + products_per_reactant_factor*p_offsets[i]*p_num_products_device[1],
+                        products_per_reactant_factor,
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy,
                         t_scattering_angle_model, t_anisotropic_coefficients,
                         &event_energy_range_status, engine);
@@ -316,6 +326,13 @@ private:
     amrex::Gpu::DeviceVector<int> m_num_products_device;
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
+    // Number of macroparticles created per product, per reaction and per reactant:
+    // 1 when each product of a two-product process can be placed at the position of a
+    // reactant with the same charge, 2 otherwise (one product at each reactant position).
+    int m_products_per_reactant_factor = 2;
+    // Only used when m_products_per_reactant_factor == 1: if true, the first product is
+    // created at the position of the second reactant and vice versa.
+    bool m_swap_product_positions = false;
     ScatteringAngleModel m_scattering_angle_model{ScatteringAngleModel::Default};
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_legendre_angular_distribution_energies;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_legendre_angular_distribution_coefficients;
