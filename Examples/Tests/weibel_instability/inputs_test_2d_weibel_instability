@@ -1,89 +1,87 @@
 # ===== Numerics / grid =====
 algo.evolve_scheme = semi_implicit_darwin                # semi-implicit Darwin field solver (no light waves)
-algo.particle_shape = 2                                  # quadratic (2nd-order) particle shape factor
-amr.blocking_factor_x = 32                               # min grid dimension along x
-amr.blocking_factor_y = 32                               # min grid dimension along z (2nd dim in 2D)
-amr.max_grid_size_x = 32                                 # max cells per grid block along x
-amr.max_grid_size_y = 32                                 # max cells per grid block along z (2nd dim in 2D)
+algo.particle_shape = 2                                  # quadratic (2nd-order) particle shape
+amr.blocking_factor_x = 32                               # box sizes along x are multiples of this
+amr.blocking_factor_y = 32                               # same along z (named y: 2nd dimension in 2D)
+amr.max_grid_size_x = 32                                 # max cells per box along x
+amr.max_grid_size_y = 32                                 # max cells per box along z: 2 x 2 boxes of 32 x 32 cells
 amr.max_level = 0                                        # no mesh refinement
-amr.n_cell = 64 64                                       # cells in x, z (dx = 0.54 um < dz = 1.44 um; c/omega_p = 1.19 um)
+amr.n_cell = 64 64                                       # cells in x, z (dx = 0.54 um < dz = 1.44 um; skin depth c/omega_p = 1.19 um)
 amrex_gmres.pc_type = pc_darwin_mlmg                     # multigrid preconditioner for the Darwin GMRES solve
-amrex_gmres.relative_tolerance = 1.0e-2                  # looser than the 1e-4 default, to reduce GMRES iterations
+amrex_gmres.relative_tolerance = 1.0e-2                  # looser than the 1e-4 default, for fewer GMRES iterations
 implicit_evolve.magnetostatic_particle_shape = 1         # linear shape for the magnetostatic part (smaller mass-matrix stencil)
 
 # ===== Boundary conditions =====
-boundary.field_hi = periodic periodic                    # periodic upper field boundaries
-boundary.field_lo = periodic periodic                    # periodic lower field boundaries
-boundary.particle_hi = periodic periodic                 # periodic upper particle boundaries
-boundary.particle_lo = periodic periodic                 # periodic lower particle boundaries
+boundary.field_hi = periodic periodic                    # periodic in x, z (fields, upper boundaries)
+boundary.field_lo = periodic periodic                    # periodic in x, z (fields, lower boundaries)
+boundary.particle_hi = periodic periodic                 # periodic in x, z (particles, upper boundaries)
+boundary.particle_lo = periodic periodic                 # periodic in x, z (particles, lower boundaries)
 
 # ===== Diagnostics =====
-diag1.diag_type = Full                                   # full diagnostic
+diag1.diag_type = Full                                   # regular snapshots of fields and particles
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_electrons_1 rho_electrons_2 rho_ions jx jy jz divE rho
-diag1.file_min_digits = 8                                # zero-padding of output step numbers
 diag1.format = openpmd                                   # openPMD output format
-diag1.intervals = 4                                      # avoid the even/odd-step oscillation of B
+diag1.intervals = 4                                      # even interval: B oscillates between even and odd steps
 diag1.openpmd_backend = h5                               # HDF5 backend
-diagnostics.diags_names = diag1                          # active diagnostics
+diagnostics.diags_names = diag1                          # list of active diagnostics
 
 # ===== Reduced diagnostics =====
 EF.intervals = 1                                         # compute every step
-EF.type = FieldEnergy                                    # total E and B field energy
+EF.type = FieldEnergy                                    # total, electric, and magnetic field energy
 
 # ===== Electron beam 1 (drifting along +y) =====
 electrons_1.charge = -q_e                                # electron charge
 electrons_1.density = 1e25                               # number density [m^-3]
-electrons_1.injection_style = NUniformPerCell            # uniform placement per cell
+electrons_1.injection_style = NUniformPerCell            # particles evenly spaced within each cell
 electrons_1.mass = m_e                                   # electron mass
 electrons_1.maxwellian_u_mean_distribution_type = constant
 electrons_1.maxwellian_u_std_distribution_type = constant
-electrons_1.momentum_distribution_type = maxwellian      # drifting Maxwellian
+electrons_1.momentum_distribution_type = maxwellian      # drifting Maxwellian (mean and spread set below)
 electrons_1.num_particles_per_cell_each_dim = 4 4        # macroparticles per cell in x, z
 electrons_1.profile = constant                           # uniform density
-electrons_1.ux_mean = 0                                  # no x drift
-electrons_1.ux_std = 0.0001414213562373095               # thermal spread in u_x (isotropic)
-electrons_1.uy_mean = 0.010000500037503125               # +y drift, u = gamma*beta with beta = 0.01 (out of plane)
-electrons_1.uy_std = 0.0001414213562373095               # thermal spread in u_y (isotropic)
-electrons_1.uz_mean = 0                                  # no z drift
-electrons_1.uz_std = 0.0001414213562373095               # thermal spread in u_z (isotropic)
+electrons_1.ux_mean = 0                                  # no drift along x
+electrons_1.ux_std = 0.0001414213562373095               # thermal spread in u_x (same in x, y, z)
+electrons_1.uy_mean = 0.010000500037503125               # drift along +y (out of plane): u = gamma*beta with beta = 0.01
+electrons_1.uy_std = 0.0001414213562373095               # thermal spread in u_y (same in x, y, z)
+electrons_1.uz_mean = 0                                  # no drift along z
+electrons_1.uz_std = 0.0001414213562373095               # thermal spread in u_z (same in x, y, z)
 
 # ===== Electron beam 2 (drifting along -y) =====
 electrons_2.charge = -q_e                                # electron charge
 electrons_2.density = 1e25                               # number density [m^-3]
-electrons_2.injection_style = NUniformPerCell            # uniform placement per cell
+electrons_2.injection_style = NUniformPerCell            # particles evenly spaced within each cell
 electrons_2.mass = m_e                                   # electron mass
 electrons_2.maxwellian_u_mean_distribution_type = constant
 electrons_2.maxwellian_u_std_distribution_type = constant
-electrons_2.momentum_distribution_type = maxwellian      # drifting Maxwellian
+electrons_2.momentum_distribution_type = maxwellian      # drifting Maxwellian (mean and spread set below)
 electrons_2.num_particles_per_cell_each_dim = 4 4        # macroparticles per cell in x, z
 electrons_2.profile = constant                           # uniform density
-electrons_2.ux_mean = 0                                  # no x drift
-electrons_2.ux_std = 0.0001414213562373095               # thermal spread in u_x (isotropic)
-electrons_2.uy_mean = -0.010000500037503125              # -y drift, counter-streaming with beam 1
-electrons_2.uy_std = 0.0001414213562373095               # thermal spread in u_y (isotropic)
-electrons_2.uz_mean = 0                                  # no z drift
-electrons_2.uz_std = 0.0001414213562373095               # thermal spread in u_z (isotropic)
+electrons_2.ux_mean = 0                                  # no drift along x
+electrons_2.ux_std = 0.0001414213562373095               # thermal spread in u_x (same in x, y, z)
+electrons_2.uy_mean = -0.010000500037503125              # drift along -y, opposite to beam 1
+electrons_2.uy_std = 0.0001414213562373095               # thermal spread in u_y (same in x, y, z)
+electrons_2.uz_mean = 0                                  # no drift along z
+electrons_2.uz_std = 0.0001414213562373095               # thermal spread in u_z (same in x, y, z)
 
 # ===== Ion background (neutralizes both electron beams) =====
 ions.charge = q_e                                        # proton charge
 ions.density = 2e25                                      # sum of both beam densities [m^-3]
 ions.do_not_push = 1                                     # immobile background
-ions.injection_style = NUniformPerCell                   # uniform placement per cell
+ions.injection_style = NUniformPerCell                   # particles evenly spaced within each cell
 ions.mass = m_p                                          # proton mass
-ions.momentum_distribution_type = at_rest                # cold, at rest
+ions.momentum_distribution_type = at_rest                # no drift, no thermal spread
 ions.num_particles_per_cell_each_dim = 4 4               # macroparticles per cell in x, z
 ions.profile = constant                                  # uniform density
 
 # ===== Geometry =====
-geometry.dims = 2                                        # 2D (x-z) simulation
+geometry.dims = 2                                        # 2D simulation in the x-z plane
 geometry.prob_hi =  17.25e-6 92.0e-6                     # domain upper bounds in x, z [m]
 geometry.prob_lo = -17.25e-6  0.0e-6                     # domain lower bounds in x, z [m]
 
 # ===== Run control =====
-max_step = 175                                           # number of timesteps (same end time, ~7e-13 s, as the explicit run)
+max_step = 175                                           # number of timesteps (t_end = 7e-13 s)
 particles.species_names = electrons_1 electrons_2 ions   # all species
-warpx.const_dt = 4.0e-15                                 # omega_pe * dt ~ 1 (no light-wave CFL limit with Darwin)
-warpx.do_electrostatic = labframe                        # electrostatic solve required by the Darwin scheme
-warpx.random_seed = 1                                    # fixed seed for reproducible checksums
-warpx.reduced_diags_names = EF                           # active reduced diagnostics
+warpx.const_dt = 4.0e-15                                 # omega_p * dt ~ 1 (no light-wave CFL limit with Darwin)
+warpx.do_electrostatic = labframe                        # electrostatic solve, required by the Darwin scheme
+warpx.reduced_diags_names = EF                           # list of active reduced diagnostics
 warpx.verbose = 1                                        # verbose console output
