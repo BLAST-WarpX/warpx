@@ -280,8 +280,10 @@ WarpX::Evolve (int numsteps)
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
-        // Resample after the particle boundary conditions: the Redistribute() in resample()
-        // would otherwise delete particles that crossed a domain boundary during the push.
+        // Resampling requires the particles to be redistributed, which the
+        // boundary handler above does.  Running resampling and Redistribute()
+        // before the boundary handler can remove particles that ought to have
+        // been handled by the boundary conditions.
         // +1 because the user-facing step number starts at 1, while step starts at 0.
         mypc->doResampling(Geom(), step+1, verbose_step);
 
