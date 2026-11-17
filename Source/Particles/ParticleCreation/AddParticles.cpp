@@ -896,33 +896,20 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                         for (const auto& y : ylim) {
                             for (const auto& z : zlim) {
 
-                                amrex::Real xb = x;
-                                amrex::Real yb = y;
-                                XDim3 pos{x, y, z};
-
-                                // Apply the same mapping that is done for the particle
-                                // except that theta and phi are set to zero.
+                                // Apply the same mapping for radial coordinates that is done for
+                                // the particle, except that theta and phi are set to zero.
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                const amrex::Real xu = (x - rmin)/(rmax - rmin);
-                                const amrex::Real rc = std::pow(rmax, 1._rt + radial_numpercell_power)
+                                amrex::Real const xu = (x - rmin)/(rmax - rmin);
+                                amrex::Real const rc = std::pow(rmax, 1._rt + radial_numpercell_power)
                                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
-                                const amrex::Real rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
-                                xb = std::pow(xu*rc + rminp,
-                                              1._rt/(1._rt + radial_numpercell_power));
-                                yb = 0._rt;
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                                pos.x = xb;
-                                pos.y = 0._rt;
-#elif defined(WARPX_DIM_RSPHERE)
-                                amrex::ignore_unused(z);
-                                pos.x = xb;
-                                pos.y = 0._rt;
-                                pos.z = 0._rt;
-#endif
+                                amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
+                                amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
+#else
+                                amrex::Real const xb = x;
 #endif
 
-                                if (inj_pos->insideBounds(xb,yb,pos.z) and
-                                    (inj_rho->getDensity(pos.x,pos.y,pos.z) > 0))
+                                if (inj_pos->insideBounds(xb, y, z) and
+                                    (inj_rho->getDensity(xb, y, z) > 0))
                                 {
                                     return 1;
                                 }
