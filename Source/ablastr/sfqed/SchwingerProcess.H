@@ -55,7 +55,7 @@ namespace ablastr::qed::schwinger
             const auto em_b = convert_from_to<UnitSystem, unit_system::heaviside_lorentz, quantity::B>(t_em_b);
 
             constexpr auto one_over_schwinger = static_cast<amrex::Real>(
-                1.0/heaviside_lorentz_schwinger_field<double>);
+                1.0/heaviside_lorentz_schwinger_field_v<double>);
 
             const auto em_e_2 = em_e.dotProduct(em_e);
             const auto em_b_2 = em_b.dotProduct(em_b);
@@ -70,7 +70,7 @@ namespace ablastr::qed::schwinger
 
             constexpr const auto coeff = static_cast<amrex::Real>(
                 amrex::Math::powi<2>(
-                    (heaviside_lorentz_elementary_charge<double>*heaviside_lorentz_schwinger_field<double>)/
+                    (heaviside_lorentz_elementary_charge_v<double>*heaviside_lorentz_schwinger_field_v<double>)/
                     (2.0*ablastr::constant::math::pi_v<double>)));
 
             constexpr auto rate_conv =
