@@ -121,6 +121,14 @@ data = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
 )
 
+# The refined 3D run puts all electrons on the fine grid. Their full charge
+# must also be present in the coarse plotfile density.
+if ndims == 3 and ds.max_level > 0:
+    weights = ds.all_data()["electron", "particle_weight"]
+    particle_charge = q_e * weights.sum().item()
+    coarse_charge = data["boxlib", "rho"].to_ndarray().sum() * dx * dy * dz
+    np.testing.assert_allclose(coarse_charge, particle_charge, rtol=1e-6, atol=0)
+
 # Extract the E field along the axes
 # if ndims == 2:
 if ds.parameters["geometry.dims"] == "RZ":

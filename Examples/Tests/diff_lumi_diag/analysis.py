@@ -8,7 +8,9 @@ import os
 import re
 
 import numpy as np
+import yt
 from openpmd_viewer import OpenPMDTimeSeries
+from scipy.constants import e
 
 # Extract the 1D differential luminosity from the file
 filename = "./diags/reducedfiles/DifferentialLuminosity_beam1_beam2.txt"
@@ -92,3 +94,19 @@ print("Tolerance: ", tol3)
 assert error1 < tol1
 assert error2 < tol2
 assert error3 < tol3
+
+# Compare the two beam charges separately so their opposite signs cannot cancel.
+if test_name.endswith("_mr"):
+    ds = yt.load("diags/diag1000080")
+    cells = ds.all_data()  # Uncovered coarse cells and all fine cells.
+    volumes = cells["index", "cell_volume"].to_value("m**3")
+    coarse = ds.covering_grid(0, ds.domain_left_edge, ds.domain_dimensions)
+    coarse_volume = (ds.domain_width.to_value("m") / ds.domain_dimensions).prod()
+    for beam, charge in (("beam1", -e), ("beam2", e)):
+        field = ("boxlib", f"rho_{beam}")
+        composite_charge = (cells[field].to_ndarray() * volumes).sum()
+        coarse_charge = coarse[field].to_ndarray().sum() * coarse_volume
+        particle_charge = charge * cells[beam, "particle_weight"].sum().item()
+        np.testing.assert_allclose(composite_charge, coarse_charge, rtol=1e-6, atol=0)
+        # Cubic particle shapes near an open boundary extend outside the plotfile.
+        np.testing.assert_allclose(composite_charge, particle_charge, rtol=2e-4, atol=0)
