@@ -1646,6 +1646,10 @@ Particle initialization
     resolution domain to a higher resolution domain.
 
     Automatic tagging at refinement boundaries is currently implemented on CPU only.
+    GPU builds abort at startup if this option is enabled with :pp:param:`amr.max_level` greater than zero.
+    Splitting explicitly tagged particles on a single level is supported on GPUs.
+    With :pp:param:`amr.max_level` equal to zero, this option does not select particles for splitting;
+    the particles must be tagged explicitly.
 
 .. pp:param:: <species_name>.do_continuous_injection
     :type: ``0`` or ``1``

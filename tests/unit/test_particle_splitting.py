@@ -65,8 +65,8 @@ def make_particles(split_type, case):
     )
     sim.initialize_inputs()
     species.species.split_type = split_type
-    # Automatic refinement-boundary tagging is deliberately not enabled.
-    species.species.do_splitting = False
+    # A single-level run may enable splitting; parents still need explicit tags.
+    species.species.do_splitting = case == "enabled"
     if case == "nongridded":
         species.species.injection_style = "none"
     pywarpx.warpx.do_electrostatic = "none"
@@ -129,6 +129,7 @@ def tag_parents(pc, attributes, pending_boundary):
 CASES = [("interior", False), ("interior", True)] + [
     (case, True)
     for case in (
+        "enabled",
         "spacing",
         "boundary",
         "contained_boundary",
@@ -147,6 +148,7 @@ def test_particle_splitting(split_type, case, attributes):
     if case == "angles" and DIMS != "rz":
         pytest.skip("angular coordinates are specific to RZ")
     sim, pc, counts = make_particles(split_type, case)
+    assert sim.extension.warpx.max_level == 0
     if attributes:
         pc.add_real_comp("split_real", True)
         pc.add_int_comp("split_int", True)

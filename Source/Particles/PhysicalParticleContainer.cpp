@@ -229,6 +229,13 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     // Initialize splitting
     pp_species_name.query("do_splitting", do_splitting);
+#ifdef AMREX_USE_GPU
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !do_splitting || amr_core->maxLevel() == 0,
+        "Automatic particle tagging at refinement boundaries is not implemented on GPUs. "
+        "Species '" + species_name + "' sets do_splitting=1 with amr.max_level>0. "
+        "Splitting explicitly tagged particles on a single level is supported.");
+#endif
     pp_species_name.query("split_type", split_type);
     pp_species_name.query("do_not_deposit", do_not_deposit);
     pp_species_name.query("do_not_gather", do_not_gather);
