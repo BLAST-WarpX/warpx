@@ -469,6 +469,10 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
+        - External particle fields read from file (:pp:param:`particles.E/B_ext_particle_init_style` ``= read_from_file``)
+          and momentum-conserving field gathering (:pp:param:`algo.field_gathering` ``= momentum-conserving``)
+          are not yet supported, and the code aborts if either is used
+          (see `issue #7543 <https://github.com/BLAST-WarpX/warpx/issues/7543>`__).
 
       - **Particle shapes:**
         The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
@@ -4451,7 +4455,7 @@ Grid types (collocated, staggered, hybrid)
 
     Default: :pp:param:`interpolation.galerkin_scheme = 0` with collocated grids, or momentum-conserving field gathering, or when :pp:param:`algo.current_deposition = direct` ; :pp:param:`interpolation.galerkin_scheme = 1` otherwise.
 
-    With ``algo.evolve_scheme = semi_implicit_darwin``, the particle pushes of the Darwin solver do not use this parameter: the electrostatic field is always gathered with the Galerkin scheme (unless momentum-conserving field gathering is used), while the magnetic field and the inductive electric field are always gathered without it, consistent with the mass matrices.
+    With ``algo.evolve_scheme = semi_implicit_darwin``, the particle pushes of the Darwin solver do not use this parameter: the electrostatic field is always gathered with the Galerkin scheme, while the magnetic field and the inductive electric field are always gathered without it, consistent with the mass matrices.
 
     .. warning::
 

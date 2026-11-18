@@ -12,8 +12,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
-#include <ablastr/warn_manager/WarnManager.H>
-
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -39,6 +37,31 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
             "The semi-implicit Darwin solver requires periodic field boundary "
             "conditions in all directions.");
     }
+
+    // The Darwin step gathers fields from Efield_fp/Bfield_fp in the particle pushes
+    // and from Bfield_aux in the mass matrices, and never calls UpdateAuxiliaryData.
+    // This is only correct when the aux fields alias the fp fields, which is not
+    // the case for external particle fields read from file (the file map is only
+    // added to aux) or for momentum-conserving gathering (aux is a separate nodal
+    // copy). Reject both until this is fixed, rather than silently giving wrong
+    // results. See https://github.com/BLAST-WarpX/warpx/issues/7543
+    {
+        auto const& mypc = m_WarpX->GetPartContainer();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            mypc.m_E_ext_particle_s != "read_from_file" &&
+            mypc.m_B_ext_particle_s != "read_from_file",
+            "The semi-implicit Darwin solver does not yet support external particle "
+            "fields read from file (particles.E_ext_particle_init_style or "
+            "particles.B_ext_particle_init_style = read_from_file): the particle push "
+            "would ignore them. See WarpX issue #7543 "
+            "(https://github.com/BLAST-WarpX/warpx/issues/7543).");
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving,
+        "The semi-implicit Darwin solver does not yet support "
+        "algo.field_gathering = momentum-conserving: the mass matrices would "
+        "gather a magnetic field that is not updated during the Darwin step. "
+        "See WarpX issue #7543 (https://github.com/BLAST-WarpX/warpx/issues/7543).");
 
     // Define dA MultiFabs
     using ablastr::fields::Direction;
@@ -114,16 +137,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
     // The predictor velocity push gathers the electrostatic E-field with the
-    // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
-    // momentum-conserving gathering.
+    // Galerkin scheme, except with momentum-conserving gathering (currently
+    // rejected above, see issue #7543).
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
-    if (!m_predictor_use_galerkin) {
-        ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
-            "algo.field_gathering = momentum_conserving is set; the predictor "
-            "velocity push will keep using momentum-conserving gathering "
-            "rather than switching to the Galerkin scheme.",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
 
     m_is_defined = true;
 }
