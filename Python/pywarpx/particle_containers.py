@@ -636,40 +636,6 @@ class ParticleContainerWrapper(object):
 
     bz = property(getbz)
 
-    def deposit_charge_density(self, level, clear_rho=True, sync_rho=True):
-        """
-        Deposit this species' charge density in rho_fp in order to
-        access that data via pywarpx.fields.RhoFPWrapper().
-
-        Parameters
-        ----------
-        species_name   : str
-            The species name that will be deposited.
-        level          : int
-            Which AMR level to retrieve scraped particle data from.
-        clear_rho      : bool
-            If True, zero out rho_fp before deposition.
-        sync_rho       : bool
-            If True, perform MPI exchange and properly set boundary cells for rho_fp.
-        """
-        fields = libwarpx.warpx.multifab_register()
-        rho_fp = fields.get("rho_fp", level=level)
-
-        if rho_fp is None:
-            raise RuntimeError("Multifab `rho_fp` is not allocated.")
-
-        if clear_rho:
-            rho_fp.set_val(0.0)
-
-        # deposit the charge density from the desired species
-        self.particle_container.deposit_charge(rho_fp, level)
-
-        if libwarpx.geometry_dim == "rz":
-            libwarpx.warpx.apply_inverse_volume_scaling_to_charge_density(rho_fp, level)
-
-        if sync_rho:
-            libwarpx.warpx.sync_rho()
-
 
 class ParticleBoundaryBufferWrapper(object):
     """Wrapper around particle boundary buffer containers.

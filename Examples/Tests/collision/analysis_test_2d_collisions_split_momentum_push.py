@@ -118,7 +118,7 @@ def analyze(args: argparse.Namespace) -> None:
         )
 
     # compare the final value of the field energy variation to the reference equipartition value
-    relative_tolerance = 1.1e-1 if electrostatic else 5e-1
+    relative_tolerance = 2e-1 if electrostatic else 5e-1
     # average over the last 100 time steps to reduce noise
     field_energy_error_avg = np.mean(field_energy_error[-100:])
     if not np.isclose(

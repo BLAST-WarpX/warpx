@@ -27,6 +27,18 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
+        test_3d_embedded_boundary_cube_mr  # name
+        3  # dims
+        1  # nprocs
+        inputs_test_3d_embedded_boundary_cube_mr  # inputs
+        "analysis_fields.py diags/diag1000104"  # analysis
+        "analysis_default_regression.py --path diags/diag1000104"  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
         test_3d_embedded_boundary_cube_macroscopic  # name
         3  # dims
         1  # nprocs
