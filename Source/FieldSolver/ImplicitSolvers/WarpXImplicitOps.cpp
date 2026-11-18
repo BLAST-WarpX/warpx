@@ -307,7 +307,8 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
-WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options)
+WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options,
+                            amrex::Real field_time)
 {
     ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
 
@@ -323,6 +324,12 @@ WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_op
             "DepositMassMatrices requires initialized mass-matrix component counts. "
             "Call InitData before depositing mass matrices.");
     }
+
+    // Mass-matrix deposition gathers Bfield_aux; prepare it independently of
+    // particle pushes, including external particle fields read from file.
+    // The auxiliary-field API currently refreshes both E and B.
+    UpdateAuxiliaryData(field_time);
+    FillBoundaryAux(guard_cells.ng_UpdateAux);
 
     amrex::Real const dt_scale = a_dt/dt[0];
 

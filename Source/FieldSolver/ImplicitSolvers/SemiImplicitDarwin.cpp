@@ -147,7 +147,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
+int SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
                                                    amrex::Real  a_dt,
                                                    int          a_step,
                                                    bool verbose_step)
@@ -158,6 +158,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Set the member time step
     m_dt = a_dt;
+    // The velocity advance is centered at t^n; evaluate external maps at that time.
+    m_field_time = start_time;
 
     const int finest_level = 0;
 
@@ -372,7 +374,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
     // here with the magnetostatic particle shape (set in m_implicit_options).
-    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options, m_field_time);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete
