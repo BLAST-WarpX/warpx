@@ -22,7 +22,7 @@ import sys
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, libwarpx, picmi
+from pywarpx import callbacks, picmi
 
 constants = picmi.constants
 comm = mpi.COMM_WORLD
