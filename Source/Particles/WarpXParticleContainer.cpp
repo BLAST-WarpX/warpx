@@ -1196,7 +1196,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     const amrex::IndexType By_type = By->box().ixType();
     const amrex::IndexType Bz_type = Bz->box().ixType();
 
-    const auto getExternalEB = GetExternalEBField(pti, offset);
+    const auto getExternalEB = GetExternalEBField(pti, offset, implicit_options.field_time);
 
     // Get uniform external B-field
     const amrex::ParticleReal Bx_ext = m_B_external_particle[0];
