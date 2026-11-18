@@ -185,7 +185,6 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     rel_errors = []
     peak_snr = []
     print("Parallel R-mode dispersion check:")
-    print("     w/w_ci    k l_i (measured)    k l_i (analytic)    rel. err    SNR")
     for i, w in enumerate(freq):
         if w < W_MIN:
             continue
@@ -211,8 +210,9 @@ def check_parallel_dispersion(field_kw, k_vals, w):
         rel_errors.append(abs(k_measured - k_analytic) / k_analytic)
         peak_snr.append(peak / np.median(band_power))
         print(
-            f"    {w:7.2f}    {k_measured:16.3f}    {k_analytic:16.3f}"
-            f"    {rel_errors[-1]:8.3f}    {peak_snr[-1]:7.1f}"
+            f"w/w_ci = {w:.2f}: k l_i = {k_measured:.3f} (measured), "
+            f"{k_analytic:.3f} (analytic), rel. err. = {rel_errors[-1]:.3f}, "
+            f"SNR = {peak_snr[-1]:.1f}"
         )
 
     rel_errors = np.array(rel_errors)
@@ -227,16 +227,13 @@ def check_parallel_dispersion(field_kw, k_vals, w):
     frac_on_curve = float(np.mean(rel_errors < BAND_ERROR))
     median_snr = float(np.median(peak_snr))
 
-    print(f"    resolved frequency bands     : {n_bands}")
+    print(f"Resolved frequency bands: {n_bands}")
+    print(f"Median relative error in k: {median_error:.3f} (tol. {MAX_MEDIAN_ERROR})")
     print(
-        f"    median relative error in k   : {median_error:.3f} "
-        f"(tol {MAX_MEDIAN_ERROR:.2f})"
+        f"Fraction of bands within {BAND_ERROR:.0%}: {frac_on_curve:.2f} "
+        f"(tol. {MIN_FRAC_ON_CURVE})"
     )
-    print(
-        f"    fraction of bands within {BAND_ERROR:.0%} : {frac_on_curve:.2f} "
-        f"(tol {MIN_FRAC_ON_CURVE:.2f})"
-    )
-    print(f"    median peak signal-to-noise  : {median_snr:.1f} (tol {MIN_SNR:g})")
+    print(f"Median peak signal-to-noise: {median_snr:.1f} (tol. {MIN_SNR})")
 
     assert median_error < MAX_MEDIAN_ERROR, (
         f"measured spectrum departs from the analytic R-mode dispersion "
