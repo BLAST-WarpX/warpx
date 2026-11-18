@@ -69,7 +69,7 @@ class ObliqueModes(object):
     N = 16  # cells per side (dx = 0.5 l_i, matching the full-resolution deck)
     L_over_li = 8.0  # box side, in ion skin depths
     NPPC = 4  # seed macroparticles/cell/species before symmetrization (x3 after)
-    SHAPE = 3  # particle shape for the electrostatic part of the solve
+    ES_SHAPE = 3  # particle shape for the electrostatic part of the solve
     MS_SHAPE = 1  # particle shape for the magnetostatic part of the solve
     GMRES_TOL = 1e-5
     DT_WCI = 0.04  # dt * Omega_ci
@@ -101,7 +101,7 @@ class ObliqueModes(object):
                 f"\tN={self.N}^3, L={self.L_over_li} l_i, dx={self.dx / self.l_i:.3f} l_i, "
                 f"k0 l_i = {2 * np.pi / self.L_over_li:.3f}\n"
                 f"\tdt W_ci = {self.dt * self.w_ci:.4f}, steps={self.total_steps}, "
-                f"NPPC={self.NPPC}, ES/MS shape={self.SHAPE}/{self.MS_SHAPE}"
+                f"NPPC={self.NPPC}, ES/MS shape={self.ES_SHAPE}/{self.MS_SHAPE}"
             )
 
         self.setup_run()
@@ -143,7 +143,7 @@ class ObliqueModes(object):
         )
         simulation.time_step_size = self.dt
         simulation.max_steps = self.total_steps
-        simulation.particle_shape = self.SHAPE
+        simulation.particle_shape = self.ES_SHAPE
         simulation.use_filter = False
         simulation.verbose = self.test
         simulation.current_deposition_algo = "direct"
@@ -229,7 +229,7 @@ class ObliqueModes(object):
         axis permutation that relates our two K_LIST groups. Runs once,
         locally on each rank, right after the normal random loading; added
         particles that land outside the calling rank's box are moved to
-        their owner by the normal per-step Redistribute()."""
+        their owner by the Redistribute() that add_particles() calls."""
         comps = ("x", "y", "z", "ux", "uy", "uz", "w")
         for name in ("ions", "electrons"):
             pc = simulation.particles.get(name)
@@ -256,7 +256,7 @@ class ObliqueModes(object):
         for d in "xyz":
             a = simulation.fields.get("Bfield_aux", dir=d, level=0)[...]
             comps.append(a)
-        if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
+        if comm.rank != 0:
             return
         row = [step, step * self.dt]
         for c, a in enumerate(comps):
