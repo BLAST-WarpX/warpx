@@ -249,8 +249,8 @@ class SNES_impl : public PETScSolver_impl
         //! Evaluate the RHS
         void computeRHS(VecType&, const VecType&);
 
-        //! Prepare for the linear solve at the current iterate
-        void preLinearSolve();
+        //! Prepare for the linear solve at PETSc's zero-based Newton iteration a_iter.
+        void preLinearSolve(int a_iter);
 
         //! With -snes_fd: called when the KSP solve of a Newton iteration has returned, so its
         //! finite-difference Jacobian is complete and later residual evaluations are true residuals
@@ -258,6 +258,12 @@ class SNES_impl : public PETScSolver_impl
 
         //! Record that the PC has been set up
         void setPCInitialized() const { m_pc_initialized = true; }
+
+        //! Whether newly created PETSc objects still need their PC assembled and set up.
+        [[nodiscard]] bool needsPETScPCSetup() const { return m_petsc_pc_needs_setup; }
+
+        //! Record that the PETSc PC is ready for the next linear solve.
+        void setPETScPCReady() { m_petsc_pc_needs_setup = false; }
 
         //! Require a PC update before the next linear solve.
         void invalidatePreconditioner() { m_pc_initialized = false; }
@@ -329,8 +335,10 @@ class SNES_impl : public PETScSolver_impl
         //! Input parameters of the Newton-type solvers
         const NewtonSolverParams& m_newton_params;
 
-        //! Ensure the first linear solve initializes the PC, including after restart.
+        //! Whether the retained WarpX PC has been initialized; survives PETSc reinitialization.
         mutable bool m_pc_initialized = false;
+        //! Rebuild PETSc storage and factors without changing the WarpX PC update schedule.
+        bool m_petsc_pc_needs_setup = true;
         //! PC update decision for the current nonlinear iteration.
         mutable bool m_update_pc = true;
         //! Override the normal PC update decision until disabled by the owner.
@@ -356,7 +364,7 @@ class SNES_impl : public PETScSolver_impl
         mutable amrex::Real m_time = 0.0;
         //! Time step index
         mutable int m_step = 0;
-        //! Newton iteration index of the next residual evaluation
+        //! Residual evaluation counter, excluding finite-difference Jacobian evaluations.
         mutable int m_iter = 0;
 
         //! Total nonlinear iterations for the diagnostic file
