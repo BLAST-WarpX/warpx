@@ -13,7 +13,8 @@
 
 using namespace amrex::literals;
 
-GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset) noexcept
+GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset,
+                                      std::optional<amrex::Real> a_field_time) noexcept
 {
     auto& warpx = WarpX::GetInstance();
     auto& mypc = warpx.GetPartContainer();
@@ -45,7 +46,15 @@ GetExternalEBField::GetExternalEBField (const WarpXParIter& a_pti, long a_offset
         mypc.m_E_ext_particle_s == "repeated_plasma_lens" ||
         mypc.m_B_ext_particle_s == "repeated_plasma_lens")
     {
+        // Parsed fields use the implicit stage time when supplied. Keep a separate
+        // m_time to preserve the existing interval timing of repeated plasma lenses;
+        // this does not establish that plasma lenses support implicit stepping.
+        // m_time and m_parser_time are the same when called from the explicit path.
+        // TODO: Determine whether repeated plasma lenses support implicit stepping.
+        // Either implement consistent stage/substep timing or reject that combination,
+        // then reconsider whether separate times are needed.
         m_time = warpx.gett_new(a_pti.GetLevel());
+        m_parser_time = a_field_time.value_or(m_time);
         m_get_position = GetParticlePosition<PIdx>(a_pti, a_offset);
     }
 

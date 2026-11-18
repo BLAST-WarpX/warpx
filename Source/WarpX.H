@@ -156,8 +156,7 @@ public:
     void FinishImplicitField (const ablastr::fields::MultiLevelVectorField& Field_fp,
                               const ablastr::fields::MultiLevelVectorField& Field_n,
                               amrex::Real theta);
-    void DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options,
-                              amrex::Real field_time);
+    void DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_options);
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
