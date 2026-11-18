@@ -8,6 +8,8 @@
  */
 #include "callbacks.H"
 
+#include "GIL.H"
+
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -29,9 +31,18 @@ bool IsPythonCallbackInstalled ( const std::string& name )
 void ExecutePythonCallback ( const std::string& name )
 {
     if ( IsPythonCallbackInstalled(name) ) {
+        // Our Python bindings release the GIL while the simulation runs. Acquire it before the
+        // callback timer starts: waiting for other Python threads is not part of the callback.
+        const warpx::python::ScopedGIL gil;
+
+        // removing callbacks from another Python thread is not supported, but if it happened
+        // while we waited for the GIL, then return instead of calling an empty function
+        const auto it = warpx_callback_py_map.find(name);
+        if (it == warpx_callback_py_map.end()) { return; }
+
         ABLASTR_PROFILE("warpx_py_" + name);
         try {
-            warpx_callback_py_map[name]();
+            it->second();
         } catch (std::exception &e) {
             std::cerr << "Python callback '" << name << "' failed!" << "\n";
             std::cerr << e.what() << "\n";

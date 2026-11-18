@@ -128,9 +128,11 @@ void init_WarpX (py::module& m)
         )
 
         .def("initialize_data", &WarpX::InitData,
+            py::call_guard<py::gil_scoped_release>(),
             "Initializes the WarpX simulation"
         )
         .def("evolve", &WarpX::Evolve,
+            py::call_guard<py::gil_scoped_release>(),
             "Evolve the simulation the specified number of steps"
         )
 

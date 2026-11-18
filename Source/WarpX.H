@@ -125,8 +125,10 @@ public:
         return field_boundary_hi;
     }
 
-    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
-                                               int  bdry_side ) const;
+    [[nodiscard]] int GetPECInsulator_IsESet (int bdry_dir,
+                                              int bdry_side) const;
+
+    void ApplyPECInsulatorToPCMasks (int lev);
 
     void InitData ();
 
@@ -143,7 +145,7 @@ public:
     void SyncMassMatricesPC ();
     void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
-    void FinishImplicitParticleUpdate (amrex::Real a_time);
+    void FinishImplicitParticleUpdate (amrex::Real a_time, amrex::Real a_dt);
     void ResetImplicitParticleData ();
     void SetElectricFieldAndApplyBCs (const WarpXSolverVec& a_E, amrex::Real a_time);
     void UpdateMagneticFieldAndApplyBCs (ablastr::fields::MultiLevelVectorField const& a_Bn,

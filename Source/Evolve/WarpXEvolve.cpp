@@ -229,22 +229,18 @@ WarpX::Evolve (int numsteps)
         // multi-physics: field ionization
         doFieldIonization();
 
-#ifdef WARPX_QED
         // multi-physics: QED effects
+#ifdef WARPX_QED
         doQEDEvents();
-        mypc->doQEDSchwinger();
 #endif
+        mypc->doQEDSchwinger();
+
 
         // perform particle injection
         ExecutePythonCallback("particleinjection");
 
         // perform collisions and advance fields and particles by one time step
         OneStep(cur_time, dt[0], step, verbose_step);
-
-        // Resample particles
-        // +1 is necessary here because value of step seen by user (first step is 1) is different than
-        // value of step in code (first step is 0)
-        mypc->doResampling(Geom(), istep[0]+1, verbose_step);
 
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
@@ -283,6 +279,13 @@ WarpX::Evolve (int numsteps)
         mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
+
+        // Resampling requires the particles to be redistributed, which the
+        // boundary handler above does.  Running resampling and Redistribute()
+        // before the boundary handler can remove particles that ought to have
+        // been handled by the boundary conditions.
+        // +1 because the user-facing step number starts at 1, while step starts at 0.
+        mypc->doResampling(Geom(), step+1, verbose_step);
 
         // Apply particle thermalizer (no-op until implemented)
         if (m_particle_thermalizer.defined()) {
