@@ -1272,8 +1272,34 @@ WarpX::OneStep_sub1 (Real cur_time)
     // ii) Push particles on the coarse patch and mother grid.
     // Push the fields on the coarse patch and mother grid
     // by only half a coarse step (first half)
-    PushParticlesandDeposit(coarse_lev, cur_time, SubcyclingHalf::None);
-    ::StoreCurrent(coarse_lev, m_fields);
+    // Skip the full-step current deposition on the coarse patch during the first half of the coarse step, unless rho must be deposited on level 0
+    const bool split_coarse_current_deposition = (current_deposition_algo != CurrentDepositionAlgo::Vay);
+    const bool skip_coarse_current_deposition =
+    split_coarse_current_deposition && !m_fields.has(FieldType::rho_fp, coarse_lev);
+    PushParticlesandDeposit(coarse_lev, cur_time, SubcyclingHalf::None, skip_coarse_current_deposition);
+    // The coarse-level particles are pushed only once, over the full coarse step
+    // while the fine-level particles are pushed twice.
+    // If the full-step coarse current were used in both halves, the composite
+    // level-0 current (the current of the coarse-level particles plus the
+    // fine-level current averaged onto the coarse patch) would be inconsistent
+    // at the edges of the fine patch in each half, because particles change
+    // level only at the end of the coarse step.
+    // Instead, deposit the coarse-particle current separately for the two halves,
+    // so that each half matches the fine current deposited over that same half.
+    // Note: current_store is used by RestoreCurrent for the second half.
+    if (split_coarse_current_deposition) {
+        const amrex::Real dt_half = dt[fine_lev];
+        const ablastr::fields::MultiLevelVectorField J_store_lev0 {
+            m_fields.get_alldirs(FieldType::current_store, coarse_lev) };
+        const ablastr::fields::MultiLevelVectorField J_fp_lev0 {
+            m_fields.get_alldirs(FieldType::current_fp, coarse_lev) };
+        // second half: from x^{n+1/2} to x^{n+1} (particles are now at x^{n+1})
+        mypc->DepositCurrent(J_store_lev0, dt_half, -0.5_rt*dt_half);
+        // first half: from x^{n} to x^{n+1/2}
+        mypc->DepositCurrent(J_fp_lev0, dt_half, -1.5_rt*dt_half);
+    } else {
+        ::StoreCurrent(coarse_lev, m_fields);
+    }
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
