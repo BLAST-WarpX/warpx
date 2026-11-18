@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2020-2023 The WarpX Community
+# Copyright 2020-2026 The WarpX Community
 #
 # License: BSD-3-Clause-LBNL
 # Authors: Axel Huebl
@@ -9,19 +9,64 @@ set -eu -o pipefail
 
 cd Docs
 
-curl -L -o amrex-doxygen-web.tag.xml \
-  https://amrex-codes.github.io/amrex/docs_xml/doxygen/amrex-doxygen-web.tag.xml
+# Tag files we have, in Doxygen's TAGFILES syntax
+tagfiles=()
 
-curl -L -o openpmd-api-doxygen-web.tag.xml \
-  https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/openpmd-api-doxygen-web.tag.xml
+# A complete tag file, not merely XML: error pages come in XML flavors, too
+# (e.g., XHTML or S3-style <Error>), and a transfer truncated mid-stream starts
+# out perfectly valid.
+is_tagfile () {
+    local filename=$1
 
-# Treat all warnings as errors
-if ! grep -q "WARN_AS_ERROR = YES" Doxyfile; then
-    # Add line with the comment
-    echo "" >> Doxyfile
-    echo "# Overwrite value of WARN_AS_ERROR" >> Doxyfile
-    echo "WARN_AS_ERROR = YES" >> Doxyfile
-fi
+    head -c 200 "${filename}" | grep -q "^<?xml" \
+    && head -c 200 "${filename}" | grep -q "<tagfile" \
+    && tail -c 20 "${filename}" | grep -q "</tagfile>"
+}
 
-# Run doxygen
-doxygen
+# Download a Doxygen tag file to cross-link into an external documentation.
+#
+# Web servers (e.g., Read the Docs behind Cloudflare) occasionally answer
+# requests from CI runners with an error page instead of the file. curl writes
+# such a page to disk just as happily as the real thing and Doxygen then aborts
+# with a rather cryptic XML parser error, e.g.,
+#   openpmd-api-doxygen-web.tag.xml:1: error: Unexpected character `h` found
+# (the `h` of `<!DOCTYPE html>`).
+#
+# Tag files that stay unavailable are skipped: they only add cross-links into
+# external docs, which is not worth a CI failure.
+download_tagfile () {
+    local filename=$1
+    local download_url=$2
+    local docs_url=$3
+
+    if curl --location --fail --silent --show-error \
+            --connect-timeout 10 --max-time 120 \
+            --retry 5 --retry-delay 5 --retry-max-time 300 --retry-all-errors \
+            --user-agent "WarpX-docs-builder" \
+            --output "${filename}" "${download_url}" \
+       && is_tagfile "${filename}"
+    then
+        tagfiles+=("${filename}=${docs_url}")
+    else
+        echo "WARNING: no valid tag file at ${download_url}" >&2
+        echo "         Continuing without cross-links into ${docs_url}" >&2
+        rm -f "${filename}"
+    fi
+}
+
+download_tagfile amrex-doxygen-web.tag.xml \
+  https://amrex-codes.github.io/amrex/docs_xml/doxygen/amrex-doxygen-web.tag.xml \
+  https://amrex-codes.github.io/amrex/doxygen/
+
+download_tagfile openpmd-api-doxygen-web.tag.xml \
+  https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/openpmd-api-doxygen-web.tag.xml \
+  https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/
+
+# Run doxygen, treating all warnings as errors and cross-linking only the tag
+# files that we have. Both options overwrite the Doxyfile values; we pipe the
+# config through stdin to keep the file itself unmodified.
+{
+    cat Doxyfile
+    echo "WARN_AS_ERROR = YES"
+    echo "TAGFILES = ${tagfiles[*]:-}"
+} | doxygen -

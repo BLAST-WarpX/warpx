@@ -171,6 +171,9 @@ void FiniteDifferenceSolver::ComputeVectorLaplacian (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
+#else
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
@@ -178,12 +181,6 @@ void FiniteDifferenceSolver::ComputeVectorLaplacian (
         ComputeVectorLaplacianCylindrical <CylindricalYeeAlgorithm> (
             out_field, in_field, eb_update, lev
         );
-
-#elif defined(WARPX_DIM_RSPHERE)
-        ComputeVectorLaplacianSpherical <SphericalYeeAlgorithm> (
-            out_field, in_field, eb_update, lev
-        );
-
 #else
     ComputeVectorLaplacianCartesian <CartesianYeeAlgorithm> (
         out_field, in_field, eb_update, lev
@@ -194,6 +191,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacian (
         amrex::Abort(Utils::TextMsg::Err(
             "ComputeVectorLaplacian: Unsupported FDTD algorithm choice."));
     }
+#endif
 }
 
 /**
@@ -216,19 +214,7 @@ void FiniteDifferenceSolver::ComputeVectorLaplacianCylindrical (
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianCylindrical not fully implemented");
 }
 
-#elif defined(WARPX_DIM_RSPHERE)
-template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeVectorLaplacianSpherical (
-    ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-    int lev )
-{
-    amrex::ignore_unused(out_field, in_field, eb_update, lev);
-    WARPX_ABORT_WITH_MESSAGE("ComputeVectorLaplacianSpherical not fully implemented");
-}
-
-#else
+#elif !defined(WARPX_DIM_RSPHERE)
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeVectorLaplacianCartesian (
     ablastr::fields::VectorField& out_field,
@@ -343,6 +329,9 @@ void FiniteDifferenceSolver::ComputeVectorBiLaplacian (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
     int lev )
 {
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(out_field, in_field, eb_update, lev);
+#else
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
@@ -350,12 +339,6 @@ void FiniteDifferenceSolver::ComputeVectorBiLaplacian (
         ComputeVectorBiLaplacianCylindrical <CylindricalYeeAlgorithm> (
             out_field, in_field, eb_update, lev
         );
-
-#elif defined(WARPX_DIM_RSPHERE)
-        ComputeVectorBiLaplacianSpherical <SphericalYeeAlgorithm> (
-            out_field, in_field, eb_update, lev
-        );
-
 #else
     ComputeVectorBiLaplacianCartesian <CartesianYeeAlgorithm> (
         out_field, in_field, eb_update, lev
@@ -366,6 +349,7 @@ void FiniteDifferenceSolver::ComputeVectorBiLaplacian (
         amrex::Abort(Utils::TextMsg::Err(
             "ComputeVectorBiLaplacian: Unsupported FDTD algorithm choice."));
     }
+#endif
 }
 
 /**
@@ -389,19 +373,7 @@ void FiniteDifferenceSolver::ComputeVectorBiLaplacianCylindrical (
     WARPX_ABORT_WITH_MESSAGE("ComputeVectorBiLaplacianCylindrical not fully implemented");
 }
 
-#elif defined(WARPX_DIM_RSPHERE)
-template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeVectorBiLaplacianSpherical (
-    ablastr::fields::VectorField& out_field,
-    ablastr::fields::VectorField const& in_field,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-    int lev )
-{
-    amrex::ignore_unused(out_field, in_field, eb_update, lev);
-    WARPX_ABORT_WITH_MESSAGE("ComputeVectorBiLaplacianSpherical not fully implemented");
-}
-
-#else
+#elif !defined(WARPX_DIM_RSPHERE)
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeVectorBiLaplacianCartesian (
     ablastr::fields::VectorField& out_field,

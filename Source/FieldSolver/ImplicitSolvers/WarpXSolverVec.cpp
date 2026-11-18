@@ -47,7 +47,7 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type = FieldType::Bfield_fp;
     }
     else if (m_vector_type_name=="vector_potential_fp_nodal") {
-        m_array_type = FieldType::vector_potential_fp;
+        m_array_type = FieldType::vector_potential_fp_nodal;
     }
     else if (m_vector_type_name!="none") {
         WARPX_ABORT_WITH_MESSAGE(a_vector_type_name+" "

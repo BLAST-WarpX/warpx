@@ -1,0 +1,20 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+max_step = 40
+algo.maxwell_solver = ckc
+amr.max_level = 1
+amr.ref_ratio = 4
+diag1.electrons.variables = x z w ux uy uz
+diag1.positrons.variables = x z w ux uy uz
+warpx.fine_tag_hi =  10.e-6  10.e-6
+warpx.fine_tag_lo = -10.e-6 -10.e-6
+warpx.use_filter = 1
+
+# Divergence cleaning requires rho, which is then also deposited in the
+# mesh-refinement buffers (i.e. from a nonzero particle offset in each tile)
+warpx.do_dive_cleaning = 1
+
+# Same as test_2d_langmuir_multi_mr_dive_cleaning, with the shared-memory charge deposition
+warpx.do_shared_mem_charge_deposition = 1

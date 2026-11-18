@@ -354,8 +354,8 @@ public:
                 amrex::Print() << "        n2 = " << n2 << "\n";
                 amrex::Print() << "        sigma_total = " << sigma_total << "\n";
 #endif
-                arg = 1.0_prt;
                 fmulti = std::max(fmulti/arg, 1.0_prt);
+                arg = 1.0_prt;
             }
             //q12 = 1.0 - exp(-arg)
             amrex::ParticleReal const q12 = arg;

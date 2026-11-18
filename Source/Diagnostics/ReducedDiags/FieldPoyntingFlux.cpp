@@ -103,18 +103,21 @@ void FieldPoyntingFlux::ComputeDiags (int /*step*/)
     // This will be called at the end of the time step. Only calculate the
     // flux if it had not already been calculated mid step.
     if (!use_mid_step_value) {
-        ComputePoyntingFlux();
+        auto & warpx = WarpX::GetInstance();
+        int const lev = 0;
+        amrex::Real const dt = warpx.getdt(lev);
+        ComputePoyntingFlux(dt);
     }
 }
 
-void FieldPoyntingFlux::ComputeDiagsMidStep (int /*step*/)
+void FieldPoyntingFlux::ComputeDiagsMidStep (int /*step*/, amrex::Real dt)
 {
     // If this is called, always use the value calculated here.
     use_mid_step_value = true;
-    ComputePoyntingFlux();
+    ComputePoyntingFlux(dt);
 }
 
-void FieldPoyntingFlux::ComputePoyntingFlux ()
+void FieldPoyntingFlux::ComputePoyntingFlux (amrex::Real dt)
 {
     using warpx::fields::FieldType;
     using ablastr::fields::Direction;
@@ -199,7 +202,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
         amrex::Real flux = 0._rt;
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(+:flux)
 #endif
         // Loop over boxes, interpolate E,B data to cell face centers
         // and compute sum over cells of (E x B) components
@@ -301,7 +304,6 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
     amrex::ParallelDescriptor::ReduceRealSum(m_data.data(), 2*AMREX_SPACEDIM);
 
-    amrex::Real const dt = warpx.getdt(lev);
     for (int ii=0 ; ii < 2*AMREX_SPACEDIM ; ii++) {
         m_data[ii + 2*AMREX_SPACEDIM] += m_data[ii]*dt;
     }

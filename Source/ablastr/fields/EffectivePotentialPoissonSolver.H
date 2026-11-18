@@ -19,6 +19,7 @@
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
+#include <ablastr/fields/MLMGOptions.H>
 #include "PoissonSolver.H"
 
 #if defined(WARPX_USE_FFT) && defined(WARPX_DIM_3D)
@@ -77,10 +78,7 @@ namespace ablastr::fields {
  * \param[in] rho The charge density a given species
  * \param[out] phi The potential to be computed by this function
  * \param[in] sigma The matrix representing the mass operator used to lower the local plasma frequency
- * \param[in] relative_tolerance The relative convergence threshold for the MLMG solver
- * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
- * \param[in] verbosity The verbosity setting for the MLMG solver
+ * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
  * \param[in] geom the geometry per level (e.g., from AmrMesh)
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
@@ -104,10 +102,7 @@ computeEffectivePotentialPhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     amrex::MultiFab const & sigma,
-    amrex::Real relative_tolerance,
-    amrex::Real absolute_tolerance,
-    int max_iters,
-    int verbosity,
+    MLMGOptions const & mlmg_options,
     amrex::Vector<amrex::Geometry> const& geom,
     amrex::Vector<amrex::DistributionMapping> const& dmap,
     amrex::Vector<amrex::BoxArray> const& grids,
@@ -150,7 +145,8 @@ computeEffectivePotentialPhi (
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 
-    const amrex::LPInfo info;
+    amrex::LPInfo info;
+    applyMLMGOptions(info, mlmg_options);
 
     for (int lev=0; lev<=finest_level; lev++) {
 
@@ -228,8 +224,7 @@ computeEffectivePotentialPhi (
 
         // Solve the Poisson equation
         amrex::MLMG mlmg(*linop); // actual solver defined here
-        mlmg.setVerbose(verbosity);
-        mlmg.setMaxIter(max_iters);
+        applyMLMGOptions(mlmg, mlmg_options);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
 
@@ -242,7 +237,8 @@ computeEffectivePotentialPhi (
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
-                    relative_tolerance, absolute_tolerance );
+                    mlmg_options.relative_tolerance,
+                    mlmg_options.absolute_tolerance );
 
         // needed for solving the levels by levels:
         // - coarser level is initial guess for finer level

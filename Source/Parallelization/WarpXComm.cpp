@@ -617,6 +617,16 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
         amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         amrex::IntVect const& ng_src = guard_cells.ng_FieldGather;
 
+        // Before reading aux[lev-1] guard cells in the coarse/fine interpolation below,
+        // make them consistent with valid data. For example, at level 0 they were filled by
+        // the staggered-to-nodal centering stencil, which uses zero for source values
+        // beyond the allocated guard cells, so the outermost guard layer is wrong.
+        // Copying those guard cells (e.g., with safe_guard_cells active, so that
+        // ng_FieldGather = ng_alloc_EB) can otherwise overwrite valid data at box boundaries.
+        if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
+            FillBoundaryAux(lev-1, ng_src);
+        }
+
         UpdateAuxiliaryDataStagToNodalField(
             m_fields, Bfield_fp, Bfield_aux, FieldType::Bfield_fp, FieldType::Bfield_cp,
             FieldType::Bfield_cax, lev, cnba, dm, cperiod, refinement_ratio, ng_src,
@@ -1481,8 +1491,7 @@ void WarpX::ApplyFilterMF (
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
-                                       const int lev,
-                                       const int scomp, const int dcomp, const int ncomp)
+                                       const int lev, const int scomp, const int dcomp, const int ncomp)
 {
     using namespace amrex::literals;
     constexpr int NODE = amrex::IndexType::NODE;
@@ -1606,9 +1615,12 @@ amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amr
                         ? 0._rt : 0.5_rt*(w0 + point_weight(i+1));
                     if (i >= dom_hi) { w_hi = 0._rt; }
                     if (i > dom_hi)  { w_lo = 0._rt; }
-                    v(i,j,k,n) = u(i,j,k,n) + 0.25_rt/w0 *
-                        ( w_hi*(u(i+1,j,k,n) - u(i,j,k,n))
-                        - w_lo*(u(i,j,k,n) - u(i-1,j,k,n)) );
+                    // u = volume factor * density. Compute the same
+                    // density flux, retaining unscaled values in v.
+                    const amrex::Real density = u(i,j,k,n)/w0;
+                    v(i,j,k,n) = u(i,j,k,n) + 0.25_rt *
+                        ( w_hi*(u(i+1,j,k,n)/point_weight(i+1) - density)
+                        - w_lo*(density - u(i-1,j,k,n)/point_weight(i-1)) );
                 });
             } else {
                 amrex::ParallelFor(tb, ncomp,
@@ -1856,11 +1868,9 @@ void WarpX::ApplyFilterandSumBoundaryRho (int /*lev*/, int glev, amrex::MultiFab
         ng_depos_rho.min(ng);
         MultiFab rf(rho.boxArray(), rho.DistributionMap(), ncomp, ng);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // In radial geometry, filter the extensive quantity (charge) rather
-        // than the density so total charge is conserved. The flux-form
-        // passes fill one guard layer less per pass than the stencil form;
-        // seed the unfilled layers with the raw deposit and clamp the
-        // guard sum to the well-defined region.
+        // Keep rho unscaled while applying the volume-weighted flux filter.
+        // Seed guard layers beyond the region filled by the flux-form passes
+        // and clamp the guard sum to the well-defined region.
         MultiFab::Copy(rf, rho, icomp, 0, ncomp, amrex::min(ng, rho.nGrowVect()));
         const IntVect ng_filled = ApplyVolumeWeightedFilter(rf, rho, glev, icomp, 0, ncomp);
         ng_depos_rho.min(ng_filled);
