@@ -1791,14 +1791,15 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                          blp_resample_actual);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_synchronization);
-    amrex::Real global_numparts = TotalNumberOfParticles();
+    const amrex::Real global_numparts = TotalNumberOfParticles();
     ABLASTR_PROFILE_VAR_STOP(blp_resample_synchronization);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_actual);
     if (m_resampler.triggered(timestep, global_numparts))
     {
-        Redistribute();
-        global_numparts = TotalNumberOfParticles();
+        // The particles must already be redistributed (as after HandleParticlesAtBoundaries),
+        // since the resampling algorithms bin them by cell within their tile.
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // Particles in the same cylindrical (or spherical) cell can sit at different
         // azimuthal (and polar) angles, so their Cartesian momenta are not comparable.
