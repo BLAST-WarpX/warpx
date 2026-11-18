@@ -1506,6 +1506,22 @@ WarpX::PushParticlesandDeposit (
     ImplicitOptions const * implicit_options
 )
 {
+    // TODO: Centralize gather-field preparation for explicit and implicit
+    // particle pushes, including paths that bypass this function (Darwin).
+    // Cache the time-scaled external particle fields in a separate container,
+    // updated at each distinct stage time, including substeps and retries. Before
+    // each gather, all solver paths should use the same centralized preparation
+    // routine to rebuild aux from the current fp fields (with any required mesh
+    // refinement corrections or centering) and add the cached external contribution.
+    // This keeps aux current during implicit iterations without recomputing the
+    // external contribution or modifying the fields used by the field solver.
+    if (implicit_options) {
+        // Implicit iterations change the simulation fields before each push.
+        // Refresh the gather fields and scale external particle maps at the stage time.
+        UpdateAuxiliaryData(cur_time);
+        FillBoundaryAux(guard_cells.ng_UpdateAux);
+    }
+
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {
