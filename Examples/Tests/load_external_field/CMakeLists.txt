@@ -75,6 +75,26 @@ add_warpx_test(
 # ---- Time dependency tests ----
 
 add_warpx_test(
+    test_1d_load_external_field_particle_time_implicit_picmi  # name
+    1  # dims
+    1  # nprocs
+    inputs_test_1d_load_external_field_particle_time_implicit_picmi.py  # inputs
+    "analysis_1d_time_implicit.py diags/diag1000200"  # analysis
+    "analysis_default_regression.py --path diags/diag1000200"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_1d_load_external_field_particle_time_implicit_parsed_picmi  # name
+    1  # dims
+    1  # nprocs
+    "inputs_test_1d_load_external_field_particle_time_implicit_picmi.py --parsed"  # inputs
+    "analysis_1d_time_implicit.py diags/diag1000200"  # analysis
+    "analysis_default_regression.py --path diags/diag1000200"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_load_external_field_particle_time_picmi   # name
     3                                                 # dims
     1                                                 # nprocs
