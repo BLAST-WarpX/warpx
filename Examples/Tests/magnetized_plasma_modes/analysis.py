@@ -99,8 +99,13 @@ def get_analytic_R_mode(w):
         (k l_i)^2 = x / (1 - x r) - x / (1 + x)
                   = (1 + r) x^2 / [(1 - x r) (1 + x)] .
 
+    This is Eq. (34) of P. A. Munoz et al., Comput. Phys. Commun. 224, 245
+    (2018), https://doi.org/10.1016/j.cpc.2017.10.012, multiplied by
+    (w / w_pi)^2 with l_i = c / w_pi, without the displacement current term
+    (the leading 1 in Eq. (34)), which the quasi-neutral model neglects.
     The second form is evaluated because it avoids cancellation at small x.
-    For massless electrons (r = 0), it reduces to x^2 / (1 + x).
+    For massless electrons (r = 0), it reduces to x^2 / (1 + x), which is
+    Eq. (35) of the same paper.
     Returns nan where the mode does not propagate.
     """
     x = np.abs(w)
@@ -116,7 +121,10 @@ def get_analytic_L_mode(w):
 
         (k l_i)^2 = (1 + r) x^2 / [(1 - x) (1 + x r)] .
 
-    For massless electrons (r = 0), it reduces to x^2 / (1 - x).
+    This is Eq. (34) of Munoz et al. (2018) with the L-mode signs, in the same
+    limit as in get_analytic_R_mode.
+    For massless electrons (r = 0), it reduces to x^2 / (1 - x), which is
+    Eq. (35) of the same paper.
     Returns nan where the mode does not propagate, i.e., above w_ci.
     """
     x = np.abs(w)
@@ -313,8 +321,10 @@ else:
 cbar_ax.set_ylabel(cbar_lab, rotation=270, labelpad=30)
 
 if sim.B_dir == "z":
-    if is_darwin:
+    # Match the labels to the curves, which depend on INV_MASS_RATIO
+    if INV_MASS_RATIO > 0.0:
         # finite electron mass: include the electron cyclotron resonance
+        # (Eq. (34) of Munoz et al. (2018), see get_analytic_R_mode)
         L_mode_label = (
             r"$(kl_i)^2=\frac{(1+\Omega_i/\Omega_e)(\omega/\Omega_i)^2}"
             r"{(1-\omega/\Omega_i)(1+\omega/\Omega_e)}$"
@@ -324,6 +334,7 @@ if sim.B_dir == "z":
             r"{(1-\omega/\Omega_e)(1+\omega/\Omega_i)}$"
         )
     else:
+        # massless electrons (Eq. (35) of Munoz et al. (2018))
         L_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1-\omega/\Omega_i}$"
         R_mode_label = r"$(kl_i)^2=\frac{(\omega/\Omega_i)^2}{1+\omega/\Omega_i}$"
     # Evaluate the analytic curves on a fine frequency grid, so that they are
