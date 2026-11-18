@@ -2043,7 +2043,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(N_field_name, lev)) {
-        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps + 1, ng, 0.,
+        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps, ng, 0.,
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(u_field_name, Direction{0}, lev)) {
@@ -2115,8 +2115,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal uy = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
 #endif
-                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 0), (amrex::Real)(w));
-                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 1), (amrex::Real)(w*w));
+                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&uy_array(ii, jj, kk), (amrex::Real)(w*uy));
                 amrex::Gpu::Atomic::AddNoRet(&uz_array(ii, jj, kk), (amrex::Real)(w*uz));
@@ -2137,9 +2136,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(mfi);
         amrex::ParallelFor(box,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (N_array(i,j,k,0) == 0._rt) { return; }
-                    const amrex::Real invsum = 1._rt/N_array(i,j,k,0);
-                    N_array(i,j,k,1) *= invsum;
+                    if (N_array(i,j,k) == 0._rt) { return; }
+                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
                     ux_array(i,j,k) *= invsum;
                     uy_array(i,j,k) *= invsum;
                     uz_array(i,j,k) *= invsum;
@@ -2220,13 +2218,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (N_array(i,j,k,0) == 0._rt) { return; }
-                // Use the unbiased weighted sample variance,
-                // dividing by sum(w) - ave(w)
-                const amrex::Real denom = N_array(i,j,k,0) - N_array(i,j,k,1);
-                const amrex::Real invsum = denom > 0._rt ? 1._rt/denom : 0._rt;
+                if (N_array(i,j,k) == 0._rt) { return; }
                 // This operation order reduces the risk of underflow in single precision.
-                temp_array(i,j,k) *= (mass/(3._rt*PhysConst::q_e))*invsum;
+                temp_array(i,j,k) *= (mass/(3._rt*PhysConst::q_e))/N_array(i,j,k);
             });
     }
 
