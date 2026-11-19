@@ -9,7 +9,6 @@
 
 #include "BreitWheelerEngineWrapper_fwd.H"
 
-#include "QedChiFunctions.H"
 #include "QedWrapperCommons.H"
 #include "Utils/WarpXConst.H"
 
@@ -27,6 +26,8 @@
 #include <picsar_qed/physics/gamma_functions.hpp>
 #include <picsar_qed/physics/phys_constants.h>
 #include <picsar_qed/physics/unit_conversion.hpp>
+
+#include <ablastr/sfqed/ChiFunctions.H>
 
 #include <cmath>
 #include <vector>
@@ -160,7 +161,7 @@ public:
         const auto py = m_e*uy;
         const auto pz = m_e*uz;
 
-        const auto chi_phot = QedUtils::chi_photon(
+        const auto chi_phot = ablastr::qed::chi_photon(
             px, py, pz, ex, ey, ez, bx, by, bz);
 
         //Optical depth is not evolved for photons having less energy than what is
@@ -255,7 +256,7 @@ public:
         auto py = uy*me;
         auto pz = uz*me;
 
-        const auto chi_photon = QedUtils::chi_photon(
+        const auto chi_photon = ablastr::qed::chi_photon(
             px, py, pz, ex, ey, ez, bx, by, bz);
 
         const auto momentum_photon = pxr_m::vec3<amrex::ParticleReal>{px, py, pz};

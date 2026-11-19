@@ -8,9 +8,6 @@
 #include "ParticleExtrema.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#if (defined WARPX_QED)
-#   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
-#endif
 #include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
@@ -22,6 +19,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/sfqed/ChiFunctions.H>
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_Array.H>
@@ -240,7 +238,6 @@ void ParticleExtrema::ComputeDiags (int step)
         amrex::ParallelDescriptor::ReduceRealMin({xmin,ymin,zmin,uxmin,uymin,uzmin,gmin,wmin});
         amrex::ParallelDescriptor::ReduceRealMax({xmax,ymax,zmax,uxmax,uymax,uzmax,gmax,wmax});
 
-#if (defined WARPX_QED)
         // get number of level (int)
         const auto level_number = WarpX::GetInstance().finestLevel();
 
@@ -345,10 +342,10 @@ void ParticleExtrema::ComputeDiags (int step)
                         // compute chi
                         amrex::Real chi = 0.0_rt;
                         if ( is_photon ) {
-                            chi = QedUtils::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
+                            chi = ablastr::qed::chi_photon(ux[i]*m, uy[i]*m, uz[i]*m,
                                              ex, ey, ez, bx, by, bz);
                         } else {
-                            chi = QedUtils::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
+                            chi = ablastr::qed::chi_ele_pos(ux[i]*m, uy[i]*m, uz[i]*m,
                                              ex, ey, ez, bx, by, bz);
                         }
                         return {chi,chi};
@@ -363,7 +360,6 @@ void ParticleExtrema::ComputeDiags (int step)
             amrex::ParallelDescriptor::ReduceRealMin(chimin_f, amrex::ParallelDescriptor::IOProcessorNumber());
             amrex::ParallelDescriptor::ReduceRealMax(chimax_f, amrex::ParallelDescriptor::IOProcessorNumber());
         }
-#endif
 
         const auto get_idx = [&](const std::string& name){
             return m_headers_indices.at(name).idx;
