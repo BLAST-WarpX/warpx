@@ -21,7 +21,7 @@ using the conduit library created in the previous step.
 The latter can be achieved by adding the installation path of conduit to the environmental
 variable ``CMAKE_PREFIX_PATH`` and setting ``CATALYST_WITH_EXTERNAL_CONDUIT=ON`` during the configuration step of Catalyst.
 
-Then we build ParaView master (on a commit after 2024.07.01, tested on ``4ef351a54ff747ef7169e2e52e77d9703a9dfa77``) following the developer instructions provided
+Then we build ParaView 6.0 or newer, which reads the particles of WarpX, following the developer instructions provided
 `here <https://github.com/Kitware/ParaView/blob/master/Documentation/dev/build.md>`__ .
 A representative set of options for a headless ParaView installation is provided
 `here <https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images/-/blob/ci-catalyst-amrex-warpx-20240701/docker/ubuntu22_04/install_paraview.sh>`__

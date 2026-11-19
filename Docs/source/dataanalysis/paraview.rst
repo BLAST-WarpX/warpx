@@ -59,4 +59,5 @@ Please see `the AMReX documentation <https://amrex-codes.github.io/amrex/docs_ht
 In Situ Analysis with Catalyst 2
 --------------------------------
 
+This needs ParaView 6.0 or newer.
 Continue reading :ref:`here <visualization-catalyst>`.
