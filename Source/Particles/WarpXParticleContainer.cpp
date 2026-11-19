@@ -504,6 +504,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             esirkepov_current_dep_kernel);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::VillasenorCurrentDepKernel",
             villasenor_current_dep_kernel);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::VayCurrentDepKernel",
+            vay_current_dep_kernel);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate);
 
@@ -695,7 +697,20 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
         }
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Vay algorithm");
+            ABLASTR_PROFILE_VAR_START(vay_current_dep_kernel);
+
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            amrex::AnyCTO(
+                amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                [&](auto depos_order) {
+                    doVayDepositionSharedShapeN<depos_order.value>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                        jx_fab, jy_fab, jz_fab, dt, relative_time, dinv, xyzmin, lo, q,
+                        bins, box, geom, max_tbox_size, threads_per_block, bin_size);
+                });
+            ABLASTR_PROFILE_VAR_STOP(vay_current_dep_kernel);
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
             ABLASTR_PROFILE_VAR_START(villasenor_current_dep_kernel);
