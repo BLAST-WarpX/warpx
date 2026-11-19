@@ -12,6 +12,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_electrostatic_sphere_effective_potential_mr_emass_10  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_electrostatic_sphere_effective_potential_mr_emass_10  # inputs
+    "analysis_electrostatic_sphere.py diags/diag1000002"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_electrostatic_sphere_lab_frame  # name
     3  # dims
     2  # nprocs

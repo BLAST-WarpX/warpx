@@ -21,10 +21,6 @@ public:
 
     explicit EffectivePotentialES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            (nlevs_max == 1),
-            "Effective potential electrostatic solver only supports one level at present"
-        );
     }
 
     void InitData () override;
@@ -36,8 +32,16 @@ public:
         int max_level,
         bool verbose_step) override;
 
+    /**
+     * Deposit the total charge density and compute the dressing `sigma` of
+     * the Poisson equation on all mesh refinement levels.
+     * \param[out] rho_fp The total charge density (fine patch) on each level
+     * \param[in] rho_cp The coarse patch of the charge density on each level
+     *                    (used as work space for the synchronization across levels)
+     */
     void ComputeSigma (
-        ablastr::fields::MultiLevelScalarField const& rho_fp
+        ablastr::fields::MultiLevelScalarField const& rho_fp,
+        ablastr::fields::MultiLevelScalarField const& rho_cp
     );
 
     void computePhi (
