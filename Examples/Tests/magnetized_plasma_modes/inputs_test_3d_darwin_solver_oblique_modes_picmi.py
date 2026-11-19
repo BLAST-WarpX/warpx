@@ -49,7 +49,6 @@ class DummyES_Solver(picmi.ElectrostaticSolver):
     separate known issue. With ES off, the test checks the Darwin physics
     without that artifact."""
 
-
     def __init__(self, grid):
         super(DummyES_Solver, self).__init__(
             grid=grid, method="Multigrid", required_precision=1
