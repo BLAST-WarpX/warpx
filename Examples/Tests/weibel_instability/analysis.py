@@ -35,6 +35,10 @@ to gamma(k) are below 1%. The finite grid and particle shape reduce the growth s
 the simulation should grow somewhat slower than gamma(k), which therefore serves as an upper
 bound.
 
+The seed mode varies only along x, so the domain is kept short along z (16 cells) to reduce the
+runtime: this leaves the seed mode unchanged and only reduces the number of noise modes that vary
+along z (which produce B_x), so B_z dominates even more clearly.
+
 The same analysis is used for the semi-implicit Darwin test and the explicit (full Maxwell)
 test. Both simulate the same plasma on the same grid, so their results should agree.
 """

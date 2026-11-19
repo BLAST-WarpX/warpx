@@ -13,6 +13,9 @@
 # but the net current j_y ~ cos(k x) seeds B_z ~ sin(k x), well above the particle noise.
 # seed_mode = 6: k c / omega_p = 1.30, wavelength 5.75 um = 10.7 cells, so that the grid barely
 # slows down its growth.
+# The seed mode varies only along x, so the z extent does not affect the fitted growth rate. It is
+# kept short (16 cells, Lz = 23 um = 19 skin depths, with the same dz = 1.44 um) to reduce the
+# runtime; it only limits the number of z-varying noise modes (which produce B_x) on the grid.
 my_constants.Lx = 34.5e-6                                # domain length along x [m]; must match geometry.prob_lo/hi
 my_constants.n_beam = 1e25                               # number density of each beam [m^-3]
 my_constants.seed_amplitude = 0.003                      # relative density modulation eps
@@ -21,11 +24,11 @@ my_constants.seed_mode = 6                               # number of seed wavele
 # ===== Numerics / grid (shared by all field solvers) =====
 algo.particle_shape = 2                                  # quadratic (2nd-order) particle shape
 amr.blocking_factor_x = 32                               # box sizes along x are multiples of this
-amr.blocking_factor_y = 32                               # same along z (named y: 2nd dimension in 2D)
+amr.blocking_factor_y = 16                               # same along z (named y: 2nd dimension in 2D)
 amr.max_grid_size_x = 32                                 # max cells per box along x
-amr.max_grid_size_y = 32                                 # max cells per box along z: 2 x 2 boxes of 32 x 32 cells
+amr.max_grid_size_y = 16                                 # max cells per box along z: 2 x 1 boxes of 32 x 16 cells
 amr.max_level = 0                                        # no mesh refinement
-amr.n_cell = 64 64                                       # cells in x, z (dx = 0.54 um < dz = 1.44 um; skin depth c/omega_p = 1.19 um)
+amr.n_cell = 64 16                                       # cells in x, z (dx = 0.54 um < dz = 1.44 um; skin depth c/omega_p = 1.19 um)
 
 # ===== Boundary conditions =====
 boundary.field_hi = periodic periodic                    # periodic in x, z (fields, upper boundaries)
@@ -91,7 +94,7 @@ ions.profile = constant                                  # uniform density
 
 # ===== Geometry =====
 geometry.dims = 2                                        # 2D simulation in the x-z plane
-geometry.prob_hi =  17.25e-6 92.0e-6                     # domain upper bounds in x, z [m]
+geometry.prob_hi =  17.25e-6 23.0e-6                     # domain upper bounds in x, z [m]; z kept short (see "Seed mode")
 geometry.prob_lo = -17.25e-6  0.0e-6                     # domain lower bounds in x, z [m]
 
 # ===== Run control =====
