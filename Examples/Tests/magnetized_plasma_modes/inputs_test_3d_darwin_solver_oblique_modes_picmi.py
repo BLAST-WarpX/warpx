@@ -43,10 +43,12 @@ K_LIST = [
 
 
 class DummyES_Solver(picmi.ElectrostaticSolver):
-    """No-op electrostatic solver: the Darwin solve is exercised with ES off,
-    matching the physics regime the full-resolution verification deck found
-    usable (the effective-potential ES solver overheats electrons at the
-    dx/lambda_De of this problem; that is a separate, known issue)."""
+    """No-op electrostatic solver. This test runs the Darwin solve with the
+    electrostatic (ES) part switched off. At this problem's grid spacing
+    (dx/lambda_De), the ES solver artificially heats the electrons, which is a
+    separate known issue. With ES off, the test checks the Darwin physics
+    without that artifact."""
+
 
     def __init__(self, grid):
         super(DummyES_Solver, self).__init__(
