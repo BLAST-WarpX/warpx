@@ -107,6 +107,30 @@ def make_sim(
     return sim
 
 
+def alloc_like(sim, name, template):
+    """Register a zeroed vector field with the layout of vector field ``template``.
+
+    Same box arrays, staggering and guard cells for each of the three
+    components, so that the new field can stand in for
+    ``template`` wherever the C++ side expects that staggering.
+    """
+    fields = sim.fields
+    for direction in ("x", "y", "z"):
+        mf = fields.get(template, direction, 0)
+        fields.alloc_init(
+            name,
+            direction,
+            0,
+            mf.box_array(),
+            mf.dm(),
+            mf.n_comp,
+            mf.n_grow_vect,
+            0.0,
+            redistribute=False,
+            redistribute_on_remake=False,
+        )
+
+
 def add_uniform_particles(
     sim, species_name, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0
 ):
