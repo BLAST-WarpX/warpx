@@ -103,7 +103,7 @@ public:
 
         m_binary_collision_functor = CollisionFunctor(collision_name, mypc, m_isSameSpecies);
 
-        m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
+        m_calculate_debye_length = m_binary_collision_functor.calculate_debye_length();
 
         const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
@@ -322,9 +322,9 @@ public:
         }
         auto *tile_products_data = tile_products.data();
 
-        bool const use_global_debye_length = m_use_global_debye_length;
+        bool const calculate_debye_length = m_calculate_debye_length;
         amrex::Array4<amrex::Real> global_debye_length_array;
-        if (use_global_debye_length) {
+        if (calculate_debye_length) {
             WarpX & warpx = WarpX::GetInstance();
             amrex::MultiFab * global_debye_length = warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
             global_debye_length_array = global_debye_length->array(mfi);
@@ -474,28 +474,11 @@ public:
 
             // create vectors to store density and temperature on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> T1_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vx1_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vy1_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vz1_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vs1_vec;
 
             if (binary_collision_functor.m_computeSpeciesDensities) {
                 n1_vec.resize(n_cells, 0.0_prt);
             }
-            if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                T1_vec.resize(n_cells, 0.0_prt);
-                vx1_vec.resize(n_cells, 0.0_prt);
-                vy1_vec.resize(n_cells, 0.0_prt);
-                vz1_vec.resize(n_cells, 0.0_prt);
-                vs1_vec.resize(n_cells, 0.0_prt);
-            }
             amrex::ParticleReal* AMREX_RESTRICT n1_in_each_cell = n1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vx1_in_each_cell = vx1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vy1_in_each_cell = vy1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vz1_in_each_cell = vz1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vs1_in_each_cell = vs1_vec.dataPtr();
 
             // Create vectors to store energy and momentum in each cell.
             // This is used to correct the energy and momentum in the
@@ -552,15 +535,14 @@ public:
 
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setupDepositedQuantities", prof_setupDepositedQuantities);
 
             if (m_correct_energy_momentum ||
-                binary_collision_functor.m_computeSpeciesDensities ||
-                binary_collision_functor.m_computeSpeciesTemperatures) {
+                binary_collision_functor.m_computeSpeciesDensities) {
 
                 bool const correct_energy_momentum = m_correct_energy_momentum;
 
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setupDepositedQuantities::atomics", prof_setupDepositedQuantities_atomics);
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
                 // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
                 amrex::For( np1,
@@ -589,49 +571,13 @@ public:
                                                          w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
                         }
 
-                        // compute local temperature [Joules]
-                        if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                            const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                            auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-                            const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                            amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
-                            amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
-                            amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
-                        }
                     }
                 );
-                ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR_STOP(prof_setupDepositedQuantities_atomics);
 
             }
 
-            // Finish temperature calculation
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
-            amrex::ParallelFor( n_cells, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
-                {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-                    // Do not need if there is only one particle in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
-
-                    // finish temperature calculation if needed
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        const amrex::ParticleReal invsum = 1._prt/T1_in_each_cell[i_cell];
-                        auto vx1 = vx1_in_each_cell[i_cell] * invsum;
-                        auto vy1 = vy1_in_each_cell[i_cell] * invsum;
-                        auto vz1 = vz1_in_each_cell[i_cell] * invsum;
-                        auto vs1 = vs1_in_each_cell[i_cell] * invsum;
-
-                        T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
-                    }
-                }
-            );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR_STOP(prof_setupDepositedQuantities);
 
             // shuffle
             ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
@@ -675,16 +621,12 @@ public:
 
                     // Get the local density and temperature for this cell
                     amrex::ParticleReal n1 = 0.0;
-                    amrex::ParticleReal T1 = 0.0;
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         n1 = n1_in_each_cell[i_cell];
                     }
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        T1 = T1_in_each_cell[i_cell];
-                    }
 
                     amrex::Real global_lamdb = 0.;
-                    if (use_global_debye_length) {
+                    if (calculate_debye_length) {
                         global_lamdb = global_debye_length_array(global_index);
                     }
 
@@ -696,7 +638,7 @@ public:
                         cell_half_1, cell_stop_1,
                         indices_1, indices_1,
                         soa_1, soa_1, get_position_1, get_position_1,
-                        n1, n1, T1, T1, global_lamdb,
+                        n1, n1, global_lamdb,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
@@ -964,40 +906,13 @@ public:
 
             // create vectors to store density and temperature on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec, n2_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> T1_vec, T2_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vx1_vec, vx2_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vy1_vec, vy2_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vz1_vec, vz2_vec;
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> vs1_vec, vs2_vec;
 
             if (binary_collision_functor.m_computeSpeciesDensities) {
                 n1_vec.resize(n_cells, 0.0_prt);
                 n2_vec.resize(n_cells, 0.0_prt);
             }
-            if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                T1_vec.resize(n_cells, 0.0_prt);
-                T2_vec.resize(n_cells, 0.0_prt);
-                vx1_vec.resize(n_cells, 0.0_prt);
-                vx2_vec.resize(n_cells, 0.0_prt);
-                vy1_vec.resize(n_cells, 0.0_prt);
-                vy2_vec.resize(n_cells, 0.0_prt);
-                vz1_vec.resize(n_cells, 0.0_prt);
-                vz2_vec.resize(n_cells, 0.0_prt);
-                vs1_vec.resize(n_cells, 0.0_prt);
-                vs2_vec.resize(n_cells, 0.0_prt);
-            }
             amrex::ParticleReal* AMREX_RESTRICT n1_in_each_cell = n1_vec.dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT n2_in_each_cell = n2_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT T1_in_each_cell = T1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT T2_in_each_cell = T2_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vx1_in_each_cell = vx1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vx2_in_each_cell = vx2_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vy1_in_each_cell = vy1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vy2_in_each_cell = vy2_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vz1_in_each_cell = vz1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vz2_in_each_cell = vz2_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vs1_in_each_cell = vs1_vec.dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT vs2_in_each_cell = vs2_vec.dataPtr();
 
             // Create vectors to store energy and momentum in each cell.
             // This is used to correct the energy and momentum in the
@@ -1080,16 +995,15 @@ public:
 
             amrex::ParticleReal const beta_weight_exponent = m_beta_weight_exponent;
 
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures", prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setupDepositedQuantities", prof_setupDepositedQuantities);
 
             if (m_correct_energy_momentum ||
-                binary_collision_functor.m_computeSpeciesDensities ||
-                binary_collision_functor.m_computeSpeciesTemperatures) {
+                binary_collision_functor.m_computeSpeciesDensities) {
 
                 bool const correct_energy_momentum = m_correct_energy_momentum;
 
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
-                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setupDepositedQuantities::atomics", prof_setupDepositedQuantities_atomics);
                 // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
                 amrex::For( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
@@ -1146,78 +1060,13 @@ public:
                             }
                         }
 
-                        // compute local temperatures [Joules]
-                        if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                            if (ip < np1) {
-                                const amrex::ParticleReal us = u1x[ip]*u1x[ip] + u1y[ip]*u1y[ip] + u1z[ip]*u1z[ip];
-                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-                                const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                                amrex::Gpu::Atomic::AddNoRet(&T1_in_each_cell[bins_1_ptr[ip]],  w1[ip]);
-                                amrex::Gpu::Atomic::AddNoRet(&vx1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1x[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vy1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1y[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vz1_in_each_cell[bins_1_ptr[ip]], w1[ip]*u1z[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vs1_in_each_cell[bins_1_ptr[ip]], w1[ip]*us/gm/gm);
-                            }
-                            if (ip < np2) {
-                                const amrex::ParticleReal us = u2x[ip]*u2x[ip] + u2y[ip]*u2y[ip] + u2z[ip]*u2z[ip];
-                                auto constexpr inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-                                const amrex::ParticleReal gm = std::sqrt( 1.0_prt + us*inv_c2);
-                                amrex::Gpu::Atomic::AddNoRet(&T2_in_each_cell [bins_2_ptr[ip]], w2[ip]);
-                                amrex::Gpu::Atomic::AddNoRet(&vx2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2x[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vy2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2y[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vz2_in_each_cell[bins_2_ptr[ip]], w2[ip]*u2z[ip]/gm);
-                                amrex::Gpu::Atomic::AddNoRet(&vs2_in_each_cell[bins_2_ptr[ip]], w2[ip]*us/gm/gm);
-                            }
-                        }
                     }
                 );
-                ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_atomics);
+                ABLASTR_PROFILE_VAR_STOP(prof_setupDepositedQuantities_atomics);
 
             }
 
-            // Finish temperature calculation - we launch 2*n_cells threads to compute both species simultaneously
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::finishTemperature", prof_findDensityTemperatures_finish);
-            amrex::ParallelFor( 2*n_cells, [=] AMREX_GPU_DEVICE (int i) noexcept
-            {
-                const int i_cell = i < n_cells ? i : i - n_cells;
-
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-                    // Same for species 2
-                    index_type const cell_start_2 = cell_offsets_2[i_cell];
-                    index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-                    // Do not need if one species is missing in the cell
-                    if ( cell_stop_1 - cell_start_1 < 1 ||
-                         cell_stop_2 - cell_start_2 < 1 ) { return; }
-
-                    // finish temperature calculation if needed
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-              if (i < n_cells) {
-                        const amrex::ParticleReal invsum1 = 1._prt/T1_in_each_cell[i_cell];
-                        auto vx1 = vx1_in_each_cell[i_cell] * invsum1;
-                        auto vy1 = vy1_in_each_cell[i_cell] * invsum1;
-                        auto vz1 = vz1_in_each_cell[i_cell] * invsum1;
-                        auto vs1 = vs1_in_each_cell[i_cell] * invsum1;
-
-                        T1_in_each_cell[i_cell] = m1/(3._prt)*(vs1 -(vx1*vx1+vy1*vy1+vz1*vz1));
-              } else {
-                        const amrex::ParticleReal invsum2 = 1._prt/T2_in_each_cell[i_cell];
-                        auto vx2 = vx2_in_each_cell[i_cell] * invsum2;
-                        auto vy2 = vy2_in_each_cell[i_cell] * invsum2;
-                        auto vz2 = vz2_in_each_cell[i_cell] * invsum2;
-                        auto vs2 = vs2_in_each_cell[i_cell] * invsum2;
-
-                        T2_in_each_cell[i_cell] = m2/(3._prt)*(vs2 -(vx2*vx2+vy2*vy2+vz2*vz2));
-              }
-                    }
-                }
-            );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR_STOP(prof_setupDepositedQuantities);
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
             ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
@@ -1268,18 +1117,13 @@ public:
 
                     // Get the local densities and temperatures for this cell
                     amrex::ParticleReal n1 = 0.0, n2 = 0.0;
-                    amrex::ParticleReal T1 = 0.0, T2 = 0.0;
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         n1 = n1_in_each_cell[i_cell];
                         n2 = n2_in_each_cell[i_cell];
                     }
-                    if (binary_collision_functor.m_computeSpeciesTemperatures) {
-                        T1 = T1_in_each_cell[i_cell];
-                        T2 = T2_in_each_cell[i_cell];
-                    }
 
                     amrex::Real global_lamdb = 0.;
-                    if (use_global_debye_length) {
+                    if (calculate_debye_length) {
                         global_lamdb = global_debye_length_array(global_index);
                     }
 
@@ -1290,7 +1134,7 @@ public:
                         cell_start_1, cell_stop_1, cell_start_2, cell_stop_2,
                         indices_1, indices_2,
                         soa_1, soa_2, get_position_1, get_position_2,
-                        n1, n2, T1, T2, global_lamdb,
+                        n1, n2, global_lamdb,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);

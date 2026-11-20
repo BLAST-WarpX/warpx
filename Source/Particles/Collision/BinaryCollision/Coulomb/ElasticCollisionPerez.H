@@ -24,8 +24,6 @@
  * @param[in] I1,I2 the index arrays. They determine all elements that will be used.
  * @param[in,out] soa_1,soa_2 the struct of array for species 1/2
  * @param[in] n1,n2 density of species 1/2
- * @param[in] T1,T2 temperature [Joules] of species 1/2
- *            only used if L <= 0
  * @param[in] q1,q2 charge of species 1/2
  * @param[in] m1,m2 mass of species 1/2
  * @param[in] dt is the time step length between two collision calls.
@@ -48,7 +46,6 @@ void ElasticCollisionPerez (
     T_index const* AMREX_RESTRICT I2,
     SoaData_type soa_1, SoaData_type soa_2,
     T_PR const  n1, T_PR const  n2,
-    T_PR const  T1, T_PR const  T2,
     T_PR const  q1, T_PR const  q2,
     T_PR const  m1, T_PR const  m2,
     T_R const  dt, T_R const global_lamdb,
@@ -73,15 +70,7 @@ void ElasticCollisionPerez (
     T_PR * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
     // compute Debye length lmdD (if not using a fixed L = Coulomb log)
-    T_PR lmdD = T_PR(-1.0);
-    if ( L <= T_PR(0.0) ) {
-        if (global_lamdb <= T_PR(0.0)) {
-            lmdD = T_PR(1.0)/std::sqrt( n1*q1*q1/(T1*PhysConst::epsilon_0) +
-                                        n2*q2*q2/(T2*PhysConst::epsilon_0) );
-        } else {
-            lmdD = global_lamdb;
-        }
-    }
+    T_PR const lmdD = L <= T_PR(0.0) ? global_lamdb : T_PR(-1.0);
 
     // compute atomic spacing
     const T_PR maxn = amrex::max(n1,n2);

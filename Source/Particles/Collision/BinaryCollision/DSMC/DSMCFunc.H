@@ -100,7 +100,6 @@ public:
             const SoaData_type& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
-            amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
             amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
@@ -180,7 +179,6 @@ public:
 
         int m_process_count;
         bool m_computeSpeciesDensities = false;
-        bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
         bool m_isSameSpecies = false;
         ScatteringProcess::Executor* m_scattering_processes_data;
@@ -188,7 +186,7 @@ public:
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    bool use_global_debye_length() { return false; }
+    bool calculate_debye_length() { return false; }
 
 private:
     amrex::Vector<ScatteringProcess> m_scattering_processes;

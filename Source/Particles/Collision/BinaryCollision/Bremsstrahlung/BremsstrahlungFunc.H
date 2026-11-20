@@ -89,7 +89,6 @@ public:
             SoaData_type const& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const n1, amrex::ParticleReal const n2,
-            amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
             amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const m1, amrex::ParticleReal const m2,
@@ -394,7 +393,6 @@ public:
         }
 
         bool m_computeSpeciesDensities = true;
-        bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = true;
         amrex::ParticleReal m_multiplier;
         amrex::ParticleReal m_koT1_cut_default;
@@ -411,13 +409,13 @@ public:
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
+    [[nodiscard]] bool calculate_debye_length() const { return m_calculate_debye_length; }
 
 private:
 
     Executor m_exe;
 
-    bool m_use_global_debye_length = false;
+    bool m_calculate_debye_length = false;
 
     // Cross section data
 

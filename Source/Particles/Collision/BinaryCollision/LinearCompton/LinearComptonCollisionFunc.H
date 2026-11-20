@@ -139,7 +139,6 @@ public:
             const SoaData_type& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const /*n1*/, amrex::ParticleReal const /*n2*/,
-            amrex::ParticleReal const /*T1*/, amrex::ParticleReal const /*T2*/,
             amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  /*m1*/, amrex::ParticleReal const  /*m2*/,
@@ -219,13 +218,12 @@ public:
         amrex::ParticleReal m_probability_target_value;
         bool m_isSameSpecies;
         bool m_computeSpeciesDensities = false;
-        bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
     };
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    bool use_global_debye_length() { return false; }
+    bool calculate_debye_length() { return false; }
 
 private:
     // Factor used to increase the number of collisions by decreasing the weight of the

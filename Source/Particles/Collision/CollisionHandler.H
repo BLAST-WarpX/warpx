@@ -37,7 +37,7 @@ private:
     amrex::Vector<std::string> collision_types;
     amrex::Vector< std::unique_ptr<CollisionBase> > allcollisions;
 
-    bool m_use_global_debye_length = false;
+    bool m_calculate_debye_length = false;
 
 };
 
