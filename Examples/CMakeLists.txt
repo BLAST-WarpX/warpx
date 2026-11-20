@@ -24,6 +24,7 @@ endif()
 # analysis: custom test analysis command, always run without MPI
 # checksum: default regression analysis command (checksum benchmark)
 # dependency: name of base test that must run first
+# PREPARE: optional Python script to run before the test, in the test directory
 #
 function(add_warpx_test
     name
@@ -34,6 +35,14 @@ function(add_warpx_test
     checksum
     dependency
 )
+    set(options)
+    set(oneValueArgs)
+    set(multiValueArgs PREPARE)
+    cmake_parse_arguments(WARPX_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    if(WARPX_TEST_UNPARSED_ARGUMENTS)
+        message(FATAL_ERROR "Unknown add_warpx_test arguments: ${WARPX_TEST_UNPARSED_ARGUMENTS}")
+    endif()
+
     # cannot run MPI tests w/o MPI build
     if(nprocs GREATER_EQUAL 2 AND NOT WarpX_MPI)
         return()
@@ -89,6 +98,21 @@ function(add_warpx_test
         list(JOIN CHECKSUM_ARGS " " CHECKSUM_ARGS)
     else()
         set(CHECKSUM_ARGS "")
+    endif()
+
+    # get prepare script and optional command-line arguments
+    if(WARPX_TEST_PREPARE)
+        list(JOIN WARPX_TEST_PREPARE " " WARPX_TEST_PREPARE)
+        separate_arguments(PREPARE_LIST UNIX_COMMAND "${WARPX_TEST_PREPARE}")
+        list(GET PREPARE_LIST 0 PREPARE_FILE)
+        cmake_path(SET PREPARE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${PREPARE_FILE}")
+        list(LENGTH PREPARE_LIST PREPARE_LIST_LENGTH)
+        if(PREPARE_LIST_LENGTH GREATER 1)
+            list(SUBLIST PREPARE_LIST 1 -1 PREPARE_ARGS)
+            list(JOIN PREPARE_ARGS " " PREPARE_ARGS)
+        else()
+            set(PREPARE_ARGS "")
+        endif()
     endif()
 
     # Python test?
@@ -188,13 +212,29 @@ function(add_warpx_test
     set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
 
     # Always use Python_EXECUTABLE for analysis/checksum scripts to ensure conda Python is used
-    if(python OR analysis OR checksum)
+    if(python OR analysis OR checksum OR WARPX_TEST_PREPARE)
         # Try to find Python if not already set
         # This is more robust in virtual envs (conda, venv) than
         # relying only on /usr/bin/env python3
         if(NOT Python_EXECUTABLE)
             find_package(Python COMPONENTS Interpreter REQUIRED)
         endif()
+    endif()
+
+    # test preparation
+    if(WARPX_TEST_PREPARE)
+        # for argparse, do not pass command-line arguments as one quoted string
+        separate_arguments(PREPARE_ARGS UNIX_COMMAND "${PREPARE_ARGS}")
+        add_test(
+            NAME ${name}.prepare
+            COMMAND
+                ${Python_EXECUTABLE}
+                ${PREPARE_FILE}
+                ${PREPARE_ARGS}
+            WORKING_DIRECTORY ${THIS_WORKING_DIR}
+        )
+        # test run depends on test preparation
+        set_property(TEST ${name}.run APPEND PROPERTY DEPENDS "${name}.prepare")
     endif()
 
     # test analysis
@@ -289,7 +329,7 @@ endfunction()
 # label: ctest LABELS property value to be added
 #
 function(label_warpx_test name label)
-    set(_test_names "${name}.run;${name}.analysis;${name}.cleanup")
+    set(_test_names "${name}.prepare;${name}.run;${name}.analysis;${name}.cleanup")
     foreach(_test_name IN LISTS _test_names)
         if(TEST ${_test_name})
             set_property(TEST ${_test_name} APPEND PROPERTY LABELS "${label}")

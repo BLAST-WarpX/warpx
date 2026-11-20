@@ -2,23 +2,14 @@
 #
 
 add_warpx_test(
-    test_3d_initial_distribution_prepare  # name
-    3  # dims
-    1  # nprocs
-    inputs_test_3d_initial_distribution_prepare.py  # inputs
-    OFF  # analysis
-    OFF  # checksum
-    OFF  # dependency
-)
-
-add_warpx_test(
     test_3d_initial_distribution  # name
     3  # dims
     1  # nprocs
     inputs_test_3d_initial_distribution  # inputs
     "analysis.py"  # analysis
     "analysis_default_regression.py --path diags/diag1/"  # checksum
-    test_3d_initial_distribution_prepare  # dependency
+    OFF  # dependency
+    PREPARE inputs_test_3d_initial_distribution_prepare.py
 )
 
 add_warpx_test(
