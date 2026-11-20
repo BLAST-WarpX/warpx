@@ -6,6 +6,7 @@
 
 #include "Python/pyWarpX.H"
 
+#include <Particles/PhysicalParticleContainer.H>
 #include <Particles/WarpXParticleContainer.H>
 #include <WarpX.H>
 
@@ -200,6 +201,10 @@ relative_time: float
             },
             py::arg("lev")
         )
+        .def("apply_boundary_conditions",
+            &WarpXParticleContainer::ApplyBoundaryConditions,
+            "Apply physical particle boundary conditions before redistribution."
+        )
         .def("set_do_not_push",
             [](WarpXParticleContainer& pc, bool flag) { pc.setDoNotPush(flag); },
             py::arg("flag")
@@ -213,4 +218,20 @@ relative_time: float
             py::arg("flag")
         )
     ;
+
+    auto physical = py::class_<PhysicalParticleContainer, WarpXParticleContainer>(
+        m, "PhysicalParticleContainer");
+    physical
+        .def("split_particles", &PhysicalParticleContainer::SplitParticles,
+            py::arg("lev"),
+            R"pbdoc(Split particles whose ID is do_split_particle_id at level lev.
+
+Children receive no_split_particle_id. Call redistribute afterwards to remove
+invalidated parents. This operates on already tagged particles; it does not
+perform automatic tagging at refinement boundaries.)pbdoc"
+        )
+    ;
+    physical.attr("do_split_particle_id") = py::int_(amrex::LongParticleIds::DoSplitParticleID);
+    physical.attr("no_split_particle_id") = py::int_(amrex::LongParticleIds::NoSplitParticleID);
+
 }
