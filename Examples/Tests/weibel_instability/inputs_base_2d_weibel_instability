@@ -26,6 +26,7 @@ amr.max_grid_size_x = 32                                 # max cells per box alo
 amr.max_grid_size_y = 16                                 # max cells per box along z
 amr.max_level = 0                                        # no mesh refinement
 amr.n_cell = 64 16                                       # cells in x, z (dx < dz)
+warpx.use_filter = 0                                     # a current filter would damp the fastest-growing short wavelengths
 
 # ===== Boundary conditions: periodic in x and z =====
 boundary.field_hi = periodic periodic

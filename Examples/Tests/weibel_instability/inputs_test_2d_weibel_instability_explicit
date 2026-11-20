@@ -6,4 +6,3 @@ diag1.average_period_steps = 15                          # about one period of t
 diag1.intervals = 16                                     # must be >= average_period_steps (non-overlapping windows)
 max_step = 1408                                          # same end time as the Darwin test
 warpx.const_dt = 1.0e-15                                 # below the CFL limit
-warpx.use_filter = 0                                     # a current filter would damp the fastest-growing short wavelengths
