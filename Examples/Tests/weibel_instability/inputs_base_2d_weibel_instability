@@ -34,10 +34,11 @@ boundary.particle_hi = periodic periodic
 boundary.particle_lo = periodic periodic
 
 # ===== Diagnostics =====
-diag1.diag_type = Full                                   # the test inputs switch this to TimeAveraged
+diag1.diag_type = TimeAveraged
 diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_electrons_1 rho_electrons_2 rho_ions jx jy jz divE rho
 diag1.format = openpmd
 diag1.openpmd_backend = h5
+diag1.time_average_mode = dynamic_start                  # averaging window ends at each output step
 diagnostics.diags_names = diag1
 
 # ===== Reduced diagnostics =====

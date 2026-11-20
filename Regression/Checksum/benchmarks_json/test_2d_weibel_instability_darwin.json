@@ -1,20 +1,20 @@
 {
   "electrons_1": {
-    "particle_momentum_x": 8.084401848064071e-22,
-    "particle_momentum_y": 4.472877676788654e-20,
-    "particle_momentum_z": 5.715888461592222e-22,
-    "particle_position_x": 0.14131655717965735,
+    "particle_momentum_x": 7.20892495243305e-22,
+    "particle_momentum_y": 4.473573219477942e-20,
+    "particle_momentum_z": 5.365659054908307e-22,
+    "particle_position_x": 0.14131677052120156,
     "particle_position_y": 0.0,
-    "particle_position_z": 0.18841924274496352,
+    "particle_position_z": 0.18841928792713453,
     "particle_weight": 7935000000000000.0
   },
   "electrons_2": {
-    "particle_momentum_x": 8.062472378156567e-22,
-    "particle_momentum_y": 4.4734386041474336e-20,
-    "particle_momentum_z": 5.693733308776601e-22,
-    "particle_position_x": 0.14130884909088218,
+    "particle_momentum_x": 7.19608350091846e-22,
+    "particle_momentum_y": 4.474137722503026e-20,
+    "particle_momentum_z": 5.348061156363513e-22,
+    "particle_position_x": 0.14130877730442942,
     "particle_position_y": 0.0,
-    "particle_position_z": 0.1884191491920017,
+    "particle_position_z": 0.18841921571899534,
     "particle_weight": 7935000000000000.0
   },
   "ions": {
@@ -27,19 +27,19 @@
     "particle_weight": 1.5870000000000002e+16
   },
   "lev=0": {
-    "Bx": 81.40777526853358,
-    "By": 7.479331253826092,
-    "Bz": 179.59078547809537,
-    "Ex": 3943421613.259184,
-    "Ey": 236328700.86237428,
-    "Ez": 2986880548.005439,
-    "divE": 6158787240793198.0,
-    "jx": 6968870991190.002,
-    "jy": 205170475936356.12,
-    "jz": 7914003839691.248,
-    "rho": 54531.05896601561,
+    "Bx": 51.42199815096172,
+    "By": 6.692709309969485,
+    "Bz": 146.0555633602354,
+    "Ex": 3949923113.453288,
+    "Ey": 219565774.53322405,
+    "Ez": 2980428850.2444572,
+    "divE": 6165065583136238.0,
+    "jx": 6064733858173.254,
+    "jy": 156466741452178.16,
+    "jz": 6801309033096.754,
+    "rho": 54586.64858831406,
     "rho_electrons_1": 1640628873.216,
-    "rho_electrons_2": 1640628873.2159998,
+    "rho_electrons_2": 1640628873.216,
     "rho_ions": 3281257746.432
   }
 }
