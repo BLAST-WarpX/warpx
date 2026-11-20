@@ -52,6 +52,7 @@
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
 #include <AMReX_BoxArray.H>
+#include <AMReX_DenseBins.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_FabArray.H>
@@ -68,6 +69,7 @@
 #include <AMReX_ParticleTile.H>
 #include <AMReX_Particles.H>
 #include <AMReX_Print.H>
+#include <AMReX_Scan.H>
 #include <AMReX_StructOfArrays.H>
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
@@ -92,18 +94,6 @@ namespace
     struct MyFieldList
     {
         Array4< amrex::Real const > Ex, Ey, Ez, Bx, By, Bz;
-    };
-
-    struct SecondaryEmissionFilter
-    {
-        amrex::Real m_probability;
-
-        template <typename SrcData>
-        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        int operator() (const SrcData& /*src*/, int /*i*/, amrex::RandomEngine const& engine) const noexcept
-        {
-            return amrex::Random(engine) < m_probability;
-        }
     };
 
     struct SecondaryEmissionTransform
@@ -597,9 +587,8 @@ MultiParticleContainer::ReadParameters ()
                         "secondary_emission_energy_eV",
                         m_secondary_emission_energy_eV[spec_index]);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        m_secondary_emission_yield[spec_index] >= 0.0_rt &&
-                        m_secondary_emission_yield[spec_index] <= 1.0_rt,
-                        name + ".secondary_emission_yield must be between 0 and 1");
+                        m_secondary_emission_yield[spec_index] >= 0.0_rt,
+                        name + ".secondary_emission_yield must be non-negative");
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         m_secondary_emission_energy_eV[spec_index] >= 0.0_rt,
                         name + ".secondary_emission_energy_eV must be non-negative");
@@ -1353,8 +1342,7 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
             int const normal_index =
                 source_pc->GetRealCompIndex("nx") - WarpXParticleContainer::NArrayReal;
 
-            // The filter flags which particles will yield secondaries
-            auto const filter = SecondaryEmissionFilter{m_secondary_emission_yield[source_species]};
+            amrex::Real const yield = m_secondary_emission_yield[source_species];
 
             auto const& geom = WarpX::GetInstance().Geom(0);
 
@@ -1405,12 +1393,53 @@ MultiParticleContainer::doSecondaryEmission (amrex::Real const cur_time, amrex::
                         uth, GetPosition, dt, product_pc.getMass(), do_cropping};
 
                     auto& dst_tile = product_pc.ParticlesAt(lev, pti.index(), pti.LocalTileIndex());
-                    const auto np_dst = dst_tile.numParticles();
+                    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+                    using index_type = amrex::DenseBins<
+                        typename ParticleTileType::ParticleTileDataType>::index_type;
 
-                    // Now add the emitted particles
-                    const auto num_added = filterCopyTransformParticles<1>(
-                        product_pc, dst_tile, src_tile, np_dst, filter, copy, transform);
-                    setNewParticleIDs(dst_tile, np_dst, num_added);
+                    auto const np_src = src_tile.numParticles();
+                    auto const np_dst = dst_tile.numParticles();
+
+                    amrex::Gpu::DeviceVector<int> num_new_particles(np_src, 0);
+                    int* const num_new_particles_ptr = num_new_particles.dataPtr();
+
+                    // Determine how many particles will be emitted before resizing the tile.
+                    amrex::ParallelForRNG(np_src,
+                        [=] AMREX_GPU_DEVICE (
+                            int const ip, amrex::RandomEngine const& engine) noexcept
+                        {
+                            num_new_particles_ptr[ip] = static_cast<int>(yield + amrex::Random(engine));
+                        });
+
+                    amrex::Gpu::DeviceVector<index_type> offsets(np_src);
+                    index_type const total_new = amrex::Scan::ExclusiveSum(
+                        np_src, num_new_particles.dataPtr(), offsets.dataPtr());
+
+                    if (total_new == 0) { continue; }
+
+                    dst_tile.resize(np_dst + total_new);
+
+                    auto const src_data = src_tile.getParticleTileData();
+                    auto const dst_data = dst_tile.getParticleTileData();
+                    index_type const* const offsets_ptr = offsets.dataPtr();
+
+                    // Now add the emitted particles.
+                    amrex::ParallelForRNG(np_src,
+                        [=] AMREX_GPU_DEVICE (
+                            int const ip, amrex::RandomEngine const& engine) noexcept
+                        {
+                            for (int j = 0; j < num_new_particles_ptr[ip]; ++j) {
+                                int const dst_index = static_cast<int>(np_dst + offsets_ptr[ip] + j);
+                                copy(dst_data, src_data, ip, dst_index, engine);
+                                transform(dst_data, src_data, ip, dst_index, engine);
+                            }
+                        });
+
+                    ParticleCreation::DefaultInitializeRuntimeAttributes(
+                        dst_tile, product_pc, np_dst, np_dst + total_new);
+
+                    amrex::Gpu::synchronize();
+                    setNewParticleIDs(dst_tile, np_dst, total_new);
 
                 }
             }
