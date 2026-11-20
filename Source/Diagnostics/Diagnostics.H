@@ -285,6 +285,8 @@ protected:
      *  The second vector is loops over the total number of levels.
      */
     amrex::Vector< amrex::Vector <amrex::MultiFab > > m_sum_mf_output;
+    /** Number of steps summed in m_sum_mf_output, for each snapshot */
+    amrex::Vector<int> m_num_summed_steps;
 
     /** Geometry that defines the domain attributes corresponding to output multifab.
      *  Specifically, the user-defined physical co-ordinates for the diagnostics
