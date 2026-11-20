@@ -2456,6 +2456,293 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
     }
 }
 
+void
+WarpXParticleContainer::DepositNGPPressureTensor (const int lev)
+{
+    using namespace amrex::literals;
+    using ablastr::fields::Direction;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass > 0.,
+        "The pressure tensor can not be calculated for a massless species.");
+
+    WarpX & warpx = WarpX::GetInstance();
+
+    // First pass: the per-cell weight sum N_<species> and the mean velocity
+    // u_<species> are exactly the moments deposited by
+    // DepositTotalNGPTemperature, so they are reused here rather than
+    // recomputed. Note that this also computes T_<species>, which the pressure
+    // tensor does not need; see the note on the declaration in the header.
+    DepositTotalNGPTemperature(lev);
+
+    std::string const u_field_name = "u_" + species_name;
+    std::string const P_field_name = "P_" + species_name;
+
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+    int const ncomps = 6;
+    amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
+    bool const remake = true;
+    bool const redistribute_on_remake = false;
+    if (!warpx.m_fields.has(P_field_name, lev)) {
+        warpx.m_fields.alloc_init(P_field_name, lev, ba, dm, ncomps, ng, 0.,
+                                  remake, redistribute_on_remake);
+    }
+
+    amrex::MultiFab & ptensor = *warpx.m_fields.get(P_field_name, lev);
+    ptensor.setVal(0., 0, ptensor.nComp(), ptensor.nGrowVect());
+
+    amrex::MultiFab const & ux_mf = *warpx.m_fields.get(u_field_name, Direction{0}, lev);
+    amrex::MultiFab const & uy_mf = *warpx.m_fields.get(u_field_name, Direction{1}, lev);
+    amrex::MultiFab const & uz_mf = *warpx.m_fields.get(u_field_name, Direction{2}, lev);
+
+    const auto plo = Geom(lev).ProbLoArray();
+    const auto dxi = Geom(lev).InvCellSizeArray();
+
+    // Second pass: accumulate sum(w * du_i * du_j) into the 6 tensor
+    // components, ordered xx, xy, xz, yy, yz, zz (rr, rt, rz, tt, tz, zz in
+    // RZ/RCYLINDER; rr, rt, rp, tt, tp, pp in RSPHERE).
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+    {
+        const long np = pti.numParticles();
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
+        amrex::ParticleReal const * wp = pti.GetAttribs(PIdx::w).dataPtr();
+        amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
+        amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
+        amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * phip = pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
+
+        amrex::Array4<const amrex::Real> const& ux_array = ux_mf.const_array(pti);
+        amrex::Array4<const amrex::Real> const& uy_array = uy_mf.const_array(pti);
+        amrex::Array4<const amrex::Real> const& uz_array = uz_mf.const_array(pti);
+        amrex::Array4<amrex::Real> const& pt_array = ptensor.array(pti);
+
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
+            [=] AMREX_GPU_DEVICE (long ip) {
+                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
+
+                const amrex::ParticleReal w   = wp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal ux = uxp[ip];
+                amrex::ParticleReal uy = uyp[ip];
+                amrex::ParticleReal uz = uzp[ip];
+#if defined(WARPX_DIM_RSPHERE)
+                const amrex::ParticleReal phi = phip[ip];
+#else
+                const amrex::ParticleReal phi = 0._prt;
+#endif
+                // The mean velocity from the first pass is in the local curvilinear basis
+                // ([ur,uth,uz] in RZ/RCYLINDER, [ur,uth,uph] in RSPHERE), so the particle
+                // velocity is transformed to the same basis before taking the difference.
+                transform_momentum_to_curvilinear(ux, uy, uz, thetap[ip], phi);
+#else
+                const amrex::ParticleReal ux = uxp[ip];
+                const amrex::ParticleReal uy = uyp[ip];
+                const amrex::ParticleReal uz = uzp[ip];
+#endif
+                const amrex::ParticleReal dux = ux - ux_array(ii, jj, kk);
+                const amrex::ParticleReal duy = uy - uy_array(ii, jj, kk);
+                const amrex::ParticleReal duz = uz - uz_array(ii, jj, kk);
+
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 0), (amrex::Real)(w*dux*dux)); // xx
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 1), (amrex::Real)(w*dux*duy)); // xy
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 2), (amrex::Real)(w*dux*duz)); // xz
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 3), (amrex::Real)(w*duy*duy)); // yy
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 4), (amrex::Real)(w*duy*duz)); // yz
+                amrex::Gpu::Atomic::AddNoRet(&pt_array(ii, jj, kk, 5), (amrex::Real)(w*duz*duz)); // zz
+            });
+    }
+
+    // Finalize: divide by the cell volume and multiply by the mass, giving Pa.
+    const amrex::ParticleReal mass = m_mass;
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(ptensor, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
+#endif
+
+        amrex::Array4<amrex::Real> const& pt_array = ptensor.array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
+#else
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                const amrex::Real factor = mass / (dV * volume_factor);
+                for (int comp = 0; comp < 6; ++comp) {
+                    pt_array(i,j,k,comp) *= factor;
+                }
+            });
+    }
+
+}
+
+void
+WarpXParticleContainer::DepositNGPHeatFlux (const int lev)
+{
+    using namespace amrex::literals;
+    using ablastr::fields::Direction;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass > 0.,
+        "The heat flux can not be calculated for a massless species.");
+
+    WarpX & warpx = WarpX::GetInstance();
+
+    // See the note in DepositNGPPressureTensor: the first-pass moments
+    // N_<species> and u_<species> are reused from the temperature deposition.
+    DepositTotalNGPTemperature(lev);
+
+    std::string const u_field_name = "u_" + species_name;
+    std::string const Q_field_name = "Q_" + species_name;
+
+    auto const& ba = m_gdb->ParticleBoxArray(lev);
+    auto const& dm = m_gdb->DistributionMap(lev);
+    int const ncomps = 3;
+    amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
+    bool const remake = true;
+    bool const redistribute_on_remake = false;
+    if (!warpx.m_fields.has(Q_field_name, lev)) {
+        warpx.m_fields.alloc_init(Q_field_name, lev, ba, dm, ncomps, ng, 0.,
+                                  remake, redistribute_on_remake);
+    }
+
+    amrex::MultiFab & heatflux = *warpx.m_fields.get(Q_field_name, lev);
+    heatflux.setVal(0., 0, heatflux.nComp(), heatflux.nGrowVect());
+
+    amrex::MultiFab const & ux_mf = *warpx.m_fields.get(u_field_name, Direction{0}, lev);
+    amrex::MultiFab const & uy_mf = *warpx.m_fields.get(u_field_name, Direction{1}, lev);
+    amrex::MultiFab const & uz_mf = *warpx.m_fields.get(u_field_name, Direction{2}, lev);
+
+    const auto plo = Geom(lev).ProbLoArray();
+    const auto dxi = Geom(lev).InvCellSizeArray();
+
+    // Second pass: accumulate sum(w * |du|^2 * du_i) into Qx, Qy, Qz.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+    {
+        const long np = pti.numParticles();
+        auto& tile = pti.GetParticleTile();
+        auto ptd = tile.getParticleTileData();
+        amrex::ParticleReal const * wp = pti.GetAttribs(PIdx::w).dataPtr();
+        amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
+        amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
+        amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * phip = pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
+
+        amrex::Array4<const amrex::Real> const& ux_array = ux_mf.const_array(pti);
+        amrex::Array4<const amrex::Real> const& uy_array = uy_mf.const_array(pti);
+        amrex::Array4<const amrex::Real> const& uz_array = uz_mf.const_array(pti);
+        amrex::Array4<amrex::Real> const& hf_array = heatflux.array(pti);
+
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
+            [=] AMREX_GPU_DEVICE (long ip) {
+                const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
+
+                const amrex::ParticleReal w   = wp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal ux = uxp[ip];
+                amrex::ParticleReal uy = uyp[ip];
+                amrex::ParticleReal uz = uzp[ip];
+#if defined(WARPX_DIM_RSPHERE)
+                const amrex::ParticleReal phi = phip[ip];
+#else
+                const amrex::ParticleReal phi = 0._prt;
+#endif
+                // The mean velocity from the first pass is in the local curvilinear basis
+                // ([ur,uth,uz] in RZ/RCYLINDER, [ur,uth,uph] in RSPHERE), so the particle
+                // velocity is transformed to the same basis before taking the difference.
+                transform_momentum_to_curvilinear(ux, uy, uz, thetap[ip], phi);
+#else
+                const amrex::ParticleReal ux = uxp[ip];
+                const amrex::ParticleReal uy = uyp[ip];
+                const amrex::ParticleReal uz = uzp[ip];
+#endif
+                const amrex::ParticleReal dux = ux - ux_array(ii, jj, kk);
+                const amrex::ParticleReal duy = uy - uy_array(ii, jj, kk);
+                const amrex::ParticleReal duz = uz - uz_array(ii, jj, kk);
+                const amrex::ParticleReal dusq = dux*dux + duy*duy + duz*duz;
+
+                amrex::Gpu::Atomic::AddNoRet(&hf_array(ii, jj, kk, 0), (amrex::Real)(w*dusq*dux)); // Qx
+                amrex::Gpu::Atomic::AddNoRet(&hf_array(ii, jj, kk, 1), (amrex::Real)(w*dusq*duy)); // Qy
+                amrex::Gpu::Atomic::AddNoRet(&hf_array(ii, jj, kk, 2), (amrex::Real)(w*dusq*duz)); // Qz
+            });
+    }
+
+    // Finalize: divide by the cell volume and multiply by mass/2, giving W/m^2.
+    const amrex::ParticleReal mass = m_mass;
+    auto const dV = AMREX_D_TERM(Geom(lev).CellSize(0), *Geom(lev).CellSize(1), *Geom(lev).CellSize(2));
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(heatflux, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const amrex::Box& box = mfi.tilebox();
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        int const box_lo_r = box.smallEnd(0);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+        amrex::Real const rmin = xyzmin.x;
+        amrex::Real const dr = Geom(lev).CellSize(0);
+#endif
+
+        amrex::Array4<amrex::Real> const& hf_array = heatflux.array(mfi);
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                // This is (pi*(r+dr)**2 - pi*r**2)/dr
+                amrex::Real const volume_factor = MathConst::pi*(2.0_rt*r + dr);
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::Real const r = rmin + (i - box_lo_r)*dr;
+                amrex::Real const r_cell = r + 0.5_rt*dr;
+                amrex::Real const volume_factor = 4.0_rt*MathConst::pi*r_cell*r_cell;
+#else
+                amrex::Real constexpr volume_factor = 1._rt;
+#endif
+                const amrex::Real factor = 0.5_rt * mass / (dV * volume_factor);
+                for (int comp = 0; comp < 3; ++comp) {
+                    hf_array(i,j,k,comp) *= factor;
+                }
+            });
+    }
+
+}
+
 /* \brief Calculate number density from the particles
  * \param number_density Full array of number density
  * \param lev         Level of box that contains particles

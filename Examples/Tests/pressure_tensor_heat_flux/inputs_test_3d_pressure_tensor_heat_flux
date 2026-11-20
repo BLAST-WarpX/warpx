@@ -1,0 +1,91 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+# Only the initial state (step 0) is analyzed.
+max_step = 0
+amr.n_cell = 8 8 8
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = 0. 0. 0.
+geometry.prob_hi = 8.e-5 8.e-5 8.e-5
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 1.e-15
+warpx.random_seed = 2034958209
+algo.maxwell_solver = none
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+# Electrons: a warm beam on a cooler background, drifting relative to each other along
+# e = (1,2,3)/sqrt(14), plus a common bulk drift. All six pressure-tensor components and all
+# three heat-flux components are nonzero; the bulk drift must not change them (central moments).
+particles.species_names = electron ion
+my_constants.ubx = 0.2
+my_constants.uby = -0.1
+my_constants.ubz = 0.15
+my_constants.ud = 0.05
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_sources = background beam
+electron.background.injection_style = NUniformPerCell
+electron.background.num_particles_per_cell_each_dim = 4 4 4
+electron.background.profile = constant
+electron.background.momentum_distribution_type = gaussian
+electron.background.density = 0.75e22
+electron.background.ux_m = ubx
+electron.background.uy_m = uby
+electron.background.uz_m = ubz
+electron.background.ux_th = 0.01
+electron.background.uy_th = 0.01
+electron.background.uz_th = 0.01
+electron.beam.injection_style = NUniformPerCell
+electron.beam.num_particles_per_cell_each_dim = 4 4 4
+electron.beam.profile = constant
+electron.beam.momentum_distribution_type = gaussian
+electron.beam.density = 0.25e22
+electron.beam.ux_m = ubx + ud*1/sqrt(14)
+electron.beam.uy_m = uby + ud*2/sqrt(14)
+electron.beam.uz_m = ubz + ud*3/sqrt(14)
+electron.beam.ux_th = 0.02
+electron.beam.uy_th = 0.02
+electron.beam.uz_th = 0.02
+
+# Ions: anisotropic drifting Maxwellian (diagonal pressure tensor, zero heat flux)
+ion.charge = q_e
+ion.mass = m_p
+ion.injection_style = NUniformPerCell
+ion.num_particles_per_cell_each_dim = 4 4 4
+ion.profile = constant
+ion.density = 1.e22
+ion.momentum_distribution_type = gaussian
+ion.ux_m = 0.01
+ion.uy_m = 0.
+ion.uz_m = -0.02
+ion.ux_th = 0.0003
+ion.uy_th = 0.0004
+ion.uz_th = 0.0005
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = P_electron Q_electron T_electron P_ion Q_ion T_ion
+diag1.electron.variables = x y z ux uy uz w
+diag1.ion.variables = x y z ux uy uz w

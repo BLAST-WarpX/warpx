@@ -1,0 +1,87 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+# Only the initial state (step 0) is analyzed.
+max_step = 0
+amr.n_cell = 16 16
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = RZ
+geometry.prob_lo = 0. 0.
+geometry.prob_hi = 16.e-5 16.e-5
+warpx.n_rz_azimuthal_modes = 1
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = reflecting periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 1.e-15
+warpx.random_seed = 2034958209
+algo.maxwell_solver = none
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+# Electrons: a beam on a background, drifting relative to each other along z, both rotating
+# rigidly with the same azimuthal velocity u_theta and sharing a bulk drift along z.
+# In the local (r, theta, z) basis, the pressure tensor is diagonal and set by the thermal
+# spreads plus the beam-background drift (zz only), and the heat flux is along z only:
+# the rotation and the bulk drift must not contribute.
+particles.species_names = electron
+my_constants.uth = 0.1
+my_constants.ubz = 0.1
+my_constants.ud = 0.05
+# Regularized at r = 0, where the azimuthal direction is undefined
+my_constants.eps2 = 1.e-30
+
+electron.charge = -q_e
+electron.mass = m_e
+electron.injection_sources = background beam
+
+electron.background.injection_style = NUniformPerCell
+electron.background.num_particles_per_cell_each_dim = 2 8 4
+electron.background.profile = constant
+electron.background.density = 0.75e22
+electron.background.momentum_distribution_type = maxwellian
+electron.background.maxwellian_u_mean_distribution_type = parser
+electron.background.ux_mean_function(x,y,z) = -uth*y/sqrt(x*x + y*y + eps2)
+electron.background.uy_mean_function(x,y,z) = uth*x/sqrt(x*x + y*y + eps2)
+electron.background.uz_mean_function(x,y,z) = ubz
+electron.background.maxwellian_u_std_distribution_type = constant
+electron.background.ux_std = 0.01
+electron.background.uy_std = 0.01
+electron.background.uz_std = 0.02
+
+electron.beam.injection_style = NUniformPerCell
+electron.beam.num_particles_per_cell_each_dim = 2 8 4
+electron.beam.profile = constant
+electron.beam.density = 0.25e22
+electron.beam.momentum_distribution_type = maxwellian
+electron.beam.maxwellian_u_mean_distribution_type = parser
+electron.beam.ux_mean_function(x,y,z) = -uth*y/sqrt(x*x + y*y + eps2)
+electron.beam.uy_mean_function(x,y,z) = uth*x/sqrt(x*x + y*y + eps2)
+electron.beam.uz_mean_function(x,y,z) = ubz + ud
+electron.beam.maxwellian_u_std_distribution_type = constant
+electron.beam.ux_std = 0.01
+electron.beam.uy_std = 0.01
+electron.beam.uz_std = 0.02
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = P_electron Q_electron T_electron
+diag1.electron.variables = x z theta ux uy uz w
