@@ -2,6 +2,8 @@
 
 #include "Diagnostics/ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "ComputeDiagFunctors/BackTransformParticleFunctor.H"
+#include "ComputeDiagFunctors/HeatFluxFunctor.H"
+#include "ComputeDiagFunctors/PressureTensorFunctor.H"
 #include "Diagnostics/FlushFormats/FlushFormat.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "FlushFormats/FlushFormatCatalyst.H"
@@ -212,7 +214,58 @@ Diagnostics::BaseReadParameters ()
         m_varnames_fields.clear();
     }
 
-    m_varnames = m_varnames_fields;
+    // Expand multi-component diagnostic entries in m_varnames.
+    // m_varnames_fields retains single entries (one functor slot per diagnostic),
+    // while m_varnames expands them into individual component names.
+    // Also validate species names and store species indices.
+    {
+        amrex::Vector<std::string> expanded_varnames;
+        for (const auto& f : m_varnames_fields) {
+            if (f.starts_with("P_")) {
+                // Pressure tensor: 6 components (Pxx, Pxy, Pxz, Pyy, Pyz, Pzz, or the
+                // curvilinear equivalents)
+                const std::string sp = f.substr(2);
+                const std::string suffix = "_" + sp;
+                bool species_name_is_wrong = true;
+                for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                    if (sp == m_all_species_names[i]) {
+                        m_P_per_species_index.push_back(i);
+                        species_name_is_wrong = false;
+                    }
+                }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !species_name_is_wrong,
+                    "Input error: string " + f + " in " + m_diag_name
+                    + ".fields_to_plot does not match any species"
+                );
+                for (auto const& comp : PressureTensorFunctor::ComponentNames()) {
+                    expanded_varnames.push_back(comp + suffix);
+                }
+            } else if (f.starts_with("Q_")) {
+                // Heat flux: 3 components (Qx, Qy, Qz, or the curvilinear equivalents)
+                const std::string sp = f.substr(2);
+                const std::string suffix = "_" + sp;
+                bool species_name_is_wrong = true;
+                for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                    if (sp == m_all_species_names[i]) {
+                        m_Q_per_species_index.push_back(i);
+                        species_name_is_wrong = false;
+                    }
+                }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !species_name_is_wrong,
+                    "Input error: string " + f + " in " + m_diag_name
+                    + ".fields_to_plot does not match any species"
+                );
+                for (auto const& comp : HeatFluxFunctor::ComponentNames()) {
+                    expanded_varnames.push_back(comp + suffix);
+                }
+            } else {
+                expanded_varnames.push_back(f);
+            }
+        }
+        m_varnames = expanded_varnames;
+    }
     // Generate names of averaged particle fields and append to m_varnames
     for (const auto& fname : m_pfield_varnames) {
         for (const auto& sname : m_pfield_species) {

@@ -14,5 +14,7 @@ CEXE_sources += BackTransformParticleFunctor.cpp
 CEXE_sources += ParticleReductionFunctor.cpp
 CEXE_sources += TemperatureFunctor.cpp
 CEXE_sources += PhiFunctor.cpp
+CEXE_sources += PressureTensorFunctor.cpp
+CEXE_sources += HeatFluxFunctor.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Diagnostics/ComputeDiagFunctors

@@ -6,6 +6,9 @@
  */
 #include "WarpXOpenPMD.H"
 
+#include "Diagnostics/ComputeDiagFunctors/HeatFluxFunctor.H"
+#include "Diagnostics/ComputeDiagFunctors/PressureTensorFunctor.H"
+
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleIO.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
@@ -389,6 +392,24 @@ namespace detail
             });
     }
 
+    /** \brief Check if a field name is a component of a per-species multi-component field
+     *
+     * @param[in] field_name      name of the field, without mesh-refinement level suffix
+     * @param[in] component_names component names without species suffix, e.g. `Pxx`
+     * @param[in] species_names   names of all particle species in the simulation
+     * @return true if field_name is `<component>_<species>` for one of the components
+     */
+    inline bool
+    isPerSpeciesComponentField ( std::string const & field_name,
+                                 std::vector<std::string> const & component_names,
+                                 std::vector<std::string> const & species_names )
+    {
+        return std::ranges::any_of(component_names,
+            [&](std::string const & comp) {
+                return isPerSpeciesField(field_name, comp + "_", species_names);
+            });
+    }
+
     /** \brief For a given field that is to be written to an openPMD file,
      * set the metadata that indicates the physical unit.
      *
@@ -442,11 +463,20 @@ namespace detail
         } else if (field_name == "Te" || isPerDirectionTemperature(field_name, species_names)){
             // hybrid-PIC electron temperature Te and per-direction temperatures, stored in K
             mesh.setUnitDimension({{openPMD::UnitDimension::theta, 1}});
-        } else if (field_name == "Pe"){ // hybrid-PIC electron pressure, stored in Pa
+        } else if (field_name == "Pe" || isPerSpeciesComponentField(
+                       field_name, PressureTensorFunctor::ComponentNames(), species_names)){
+            // hybrid-PIC electron pressure Pe and species pressure tensor components, in Pa
             mesh.setUnitDimension({
                                           {openPMD::UnitDimension::L, -1},
                                           {openPMD::UnitDimension::M,  1},
                                           {openPMD::UnitDimension::T, -2},
+                                  });
+        } else if (isPerSpeciesComponentField(
+                       field_name, HeatFluxFunctor::ComponentNames(), species_names)){
+            // species heat flux components, in W/m^2
+            mesh.setUnitDimension({
+                                          {openPMD::UnitDimension::M,  1},
+                                          {openPMD::UnitDimension::T, -3},
                                   });
         }
     }
