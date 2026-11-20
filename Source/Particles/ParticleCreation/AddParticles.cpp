@@ -872,18 +872,45 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 auto index = overlap_box.index(iv);
                 const amrex::Long r = (fine_overlap_box.ok() && fine_overlap_box.contains(iv))?
                     (AMREX_D_TERM(rrfac[0],*rrfac[1],*rrfac[2])) : (1);
-                pcounts[index] = num_ppc*r;
+
                 // update pcount by checking if cell-corners or cell-center
                 // has non-zero density
-                const auto xlim = amrex::GpuArray<Real, 3>{lo.x,(lo.x+hi.x)/2._rt,hi.x};
-                const auto ylim = amrex::GpuArray<Real, 3>{lo.y,(lo.y+hi.y)/2._rt,hi.y};
-                const auto zlim = amrex::GpuArray<Real, 3>{lo.z,(lo.z+hi.z)/2._rt,hi.z};
+#if defined(WARPX_DIM_1D_Z)
+                const auto xlim = amrex::GpuArray<Real, 1>{0.};
+#else
+                const auto xlim = amrex::GpuArray<Real, 3>{lo.x, (lo.x+hi.x)/2._rt, hi.x};
+#endif
+#if defined(WARPX_DIM_3D)
+                const auto ylim = amrex::GpuArray<Real, 3>{lo.y, (lo.y+hi.y)/2._rt, hi.y};
+#else
+                const auto ylim = amrex::GpuArray<Real, 1>{0._rt};
+#endif
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const auto zlim = amrex::GpuArray<Real, 1>{0._rt};
+#else
+                const auto zlim = amrex::GpuArray<Real, 3>{lo.z, (lo.z+hi.z)/2._rt, hi.z};
+#endif
 
                 const auto checker = [&](){
                     for (const auto& x : xlim) {
                         for (const auto& y : ylim) {
                             for (const auto& z : zlim) {
-                                if (inj_pos->insideBounds(x,y,z) and (inj_rho->getDensity(x,y,z) > 0) ) {
+
+                                // Apply the same mapping for radial coordinates that is done for
+                                // the particle, except that theta and phi are set to zero.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                                amrex::Real const xu = (x - rmin)/(rmax - rmin);
+                                amrex::Real const rc = std::pow(rmax, 1._rt + radial_numpercell_power)
+                                                     - std::pow(rmin, 1._rt + radial_numpercell_power);
+                                amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
+                                amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
+#else
+                                amrex::Real const xb = x;
+#endif
+
+                                if (inj_pos->insideBounds(xb, y, z) and
+                                    (inj_rho->getDensity(xb, y, z) > 0))
+                                {
                                     return 1;
                                 }
                             }
