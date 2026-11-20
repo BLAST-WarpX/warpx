@@ -31,15 +31,3 @@ electron.ux = 0.0
 electron.uy = 0.0
 electron.uz = 25000
 electron.initialize_self_fields = 1
-
-diagnostics.diags_names = diag1 diag2
-
-diag1.intervals = 1
-diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By rho
-diag1.format = plotfile
-
-diag2.intervals = 1
-diag2.diag_type = Full
-diag2.fields_to_plot = Ex Ey
-diag2.format = openpmd
