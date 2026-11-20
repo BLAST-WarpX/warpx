@@ -31,6 +31,10 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 python3 -m pip cache purge || true
 rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
 
+# Aurora is touchy about PYTHONPATH
+export OLD_PYTHONPATH=${PYTHONPATH}
+unset PYTHONPATH
+
 # General extra dependencies ##################################################
 #
 
@@ -39,13 +43,17 @@ if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
   git fetch --prune
-  git checkout v2024.05.31
+  git checkout v2025.05.28
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
+  git clone -b v2025.05.28 https://github.com/icl-utk-edu/blaspp.git $HOME/src/blaspp
 fi
 rm -rf $HOME/src/blaspp-aurora-gpu-build
-CXX=icpx CXXFLAGS="-qmkl" cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-aurora-gpu-build -Duse_openmp=OFF -Dgpu_backend=sycl -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31 -DCMAKE_EXE_LINKER_FLAGS="-qmkl"
+# NOTE: -qmkl-ilp64 (not plain -qmkl) is required for a genuine ILP64 build.
+# On SDK 26.181.0, plain "-qmkl=sequential" links libmkl_intel_lp64, whereas
+# AMReX's HankelTransform (RZ PSATD) passes int64_t ipiv to lapack::getrf/getri
+# and must match WarpX's own ILP64 override
+CXX=icpx CXXFLAGS="-qmkl-ilp64=sequential" cmake -S $HOME/src/blaspp -B $HOME/src/blaspp-aurora-gpu-build -Duse_openmp=OFF -Dgpu_backend=sycl -Dblas_int=int64 -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2025.05.28 -DCMAKE_EXE_LINKER_FLAGS="-qmkl-ilp64=sequential"
 cmake --build $HOME/src/blaspp-aurora-gpu-build --target install --parallel 16
 rm -rf $HOME/src/blaspp-aurora-gpu-build
 
@@ -54,24 +62,37 @@ if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
   git fetch --prune
-  git checkout v2024.05.31
+  git checkout v2025.05.28
   cd -
 else
-  git clone -b v2024.05.31 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
+  git clone -b v2025.05.28 https://github.com/icl-utk-edu/lapackpp.git $HOME/src/lapackpp
 fi
 rm -rf $HOME/src/lapackpp-aurora-gpu-build
-CXX=icpx CXXFLAGS="-DLAPACK_FORTRAN_ADD_ -qmkl" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-aurora-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31 -DCMAKE_EXE_LINKER_FLAGS="-qmkl"
+# NOTE: -Dblaspp_DIR is passed explicitly so this configure does not depend on
+# CMAKE_PREFIX_PATH being set correctly in the calling shell (this previously
+# failed with "BLAS++ not found" even though blaspp had just installed).
+# LAPACK_ILP64 is auto-derived from blaspp's BLAS_ILP64 (see lapack/config.h),
+# so -qmkl-ilp64 here just needs to match the BLAS++ ILP64 build above.
+CXX=icpx CXXFLAGS="-DLAPACK_FORTRAN_ADD_ -qmkl-ilp64=sequential" cmake -S $HOME/src/lapackpp -B $HOME/src/lapackpp-aurora-gpu-build -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -Dblaspp_DIR=${SW_DIR}/blaspp-2025.05.28/lib64/cmake/blaspp -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2025.05.28 -DCMAKE_EXE_LINKER_FLAGS="-qmkl-ilp64=sequential"
 cmake --build $HOME/src/lapackpp-aurora-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-aurora-gpu-build
 
 # Python ######################################################################
-#
-python3 -m pip install --upgrade pip
-python3 -m pip install --upgrade virtualenv
+
+unset PYTHONPATH
+echo "module load python/3.12.12"
+module load python/3.12.12
+echo "module load py-pip/25.1.1"
+module load py-pip/25.1.1
 rm -rf ${SW_DIR}/venvs/warpx-aurora
 python3 -m venv ${SW_DIR}/venvs/warpx-aurora
+echo "created venv"
+echo "module restore"
+module restore
+unset PYTHONPATH
 source ${SW_DIR}/venvs/warpx-aurora/bin/activate
 python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade virtualenv
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel
@@ -93,3 +114,7 @@ python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
 #python3 -m pip install --upgrade torch  # should get from frameworks module on Aurora
 #python3 -m pip install -r $HOME/src/warpx/Tools/optimas/requirements.txt
+python3 -m pip install dill
+
+# Aurora is touchy about PYTHONPATH
+export PYTHONPATH=${OLD_PYTHONPATH}
