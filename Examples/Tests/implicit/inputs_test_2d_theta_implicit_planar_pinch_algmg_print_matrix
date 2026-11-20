@@ -1,0 +1,5 @@
+# Writes the pc_algmg matrix in MatrixMarket format at its first update
+FILE = inputs_test_2d_theta_implicit_planar_pinch_algmg
+
+max_step = 1
+pc_algmg.print_matrix = 1

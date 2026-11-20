@@ -7,15 +7,23 @@
 #ifndef MASS_MATRIX_SOLVER_OPS_H_
 #define MASS_MATRIX_SOLVER_OPS_H_
 
+#include "MatrixMarketWriter.H"
+#include "WarpXSolverDOF.H"
 #include "NonlinearSolvers/MatrixSolverOps.H"
+#include "Utils/TextMsg.H"
 
 #include <AMReX.H>
 #include <AMReX_Array.H>
+#include <AMReX_BaseFab.H>
+#include <AMReX_Loop.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParallelReduce.H>
 #include <AMReX_Reduce.H>
 #include <AMReX_Vector.H>
+
+#include <string>
+#include <vector>
 
 /**
  * \brief Matrix ops for A = I + M, with M the preconditioner mass matrices.
@@ -75,6 +83,8 @@ public:
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
     [[nodiscard]] RT EstimateOmega () const override;
+    void PrintMatrix (const std::string& a_filename,
+                      const std::vector<std::string>& a_header) override;
     [[nodiscard]] bool HasOffDiag () const override { return m_has_offdiag; }
     [[nodiscard]] bool IsDefined () const override { return m_is_defined; }
 
@@ -410,6 +420,79 @@ auto MassMatrixSolverOps<T,Ops>::computeResidualNormInternal (
         }
     }
     return std::sqrt(res_sq);
+}
+
+template <class T, class Ops>
+void MassMatrixSolverOps<T,Ops>::PrintMatrix (const std::string& a_filename,
+                                                  const std::vector<std::string>& a_header)
+{
+    BL_PROFILE("MassMatrixSolverOps::PrintMatrix()");
+    using namespace amrex;
+
+    const auto* dofs = T::getDOFsObject().get();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(dofs != nullptr,
+        "MassMatrixSolverOps::PrintMatrix(): DOF object is a nullptr");
+
+    std::vector<std::string> header = a_header;
+    header.emplace_back("matrix_ops: MassMatrixSolverOps (stencil)");
+    header.emplace_back(m_bcoefs != nullptr ? "operator: A = I + M, M = PC mass matrices"
+                                            : "operator: A = I (no PC mass matrices)");
+
+    MatrixMarketWriter::Triplets local;
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        for (int dim = 0; dim < 3; dim++) {
+            const auto& dof_mf = *(dofs->m_array[n][dim]);
+            const MultiFab* a_mf = (m_bcoefs != nullptr) ? (*m_bcoefs)[n][dim] : nullptr;
+            const int ncomp = (a_mf != nullptr) ? a_mf->nComp() : 0;
+            const int diag_comp = (ncomp - 1) / 2;
+
+            GpuArray<int,3> nc = {1, 1, 1};
+            GpuArray<int,3> w = {0, 0, 0};
+            if (ncomp > 1) {
+                for (int d = 0; d < AMREX_SPACEDIM; d++) {
+                    nc[d] = m_ops->GetMassMatricesPCnComp(dim, d);
+                    w[d] = (nc[d] - 1) / 2;
+                }
+            }
+            if (n == 0) {
+                header.emplace_back("stencil_size_comp" + std::to_string(dim) + ": "
+                    + std::to_string(nc[0]) + " " + std::to_string(nc[1]) + " "
+                    + std::to_string(nc[2]));
+            }
+
+            for (MFIter mfi(dof_mf); mfi.isValid(); ++mfi) {
+                const auto dof_h = MatrixMarketWriter::HostCopy(dof_mf[mfi]);
+                const auto dof = dof_h.const_array();
+                BaseFab<Real> a_h;
+                if (a_mf != nullptr) { a_h = MatrixMarketWriter::HostCopy((*a_mf)[mfi]); }
+                const auto a = a_h.const_array();
+
+                LoopOnCpu(mfi.validbox(), [&] (int i, int j, int k)
+                {
+                    if (dof(i,j,k,0) < 0) { return; }  // not owned by this rank
+                    const Long row = dof(i,j,k,1);
+                    if (ncomp == 0) { local.add(row, row, Real(1.0)); return; }
+                    if (ncomp == 1) { local.add(row, row, Real(1.0) + a(i,j,k,0)); return; }
+                    int comp = 0;
+                    for (int c2 = 0; c2 < nc[2]; c2++) {
+                        for (int c1 = 0; c1 < nc[1]; c1++) {
+                            for (int c0 = 0; c0 < nc[0]; c0++) {
+                                const int col = dof(i + c0 - w[0], j + c1 - w[1], k + c2 - w[2], 1);
+                                // Neighbors outside the domain have no DOF
+                                if (col >= 0) {
+                                    local.add(row, col, (comp == diag_comp ? Real(1.0) : Real(0.0))
+                                                        + a(i,j,k,comp));
+                                }
+                                comp++;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    MatrixMarketWriter::Write(a_filename, header, *dofs, local);
 }
 
 #endif
