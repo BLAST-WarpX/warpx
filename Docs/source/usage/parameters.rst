@@ -1377,8 +1377,8 @@ The following parameters are set on the source species. The parameters apply to 
 .. pp:param:: <species_name>.secondary_emission_yield
     :type: ``float``
 
-    The secondary emission yield, the number of electrons emitted for each absorbed particle.
-    This value must be between ``0`` and ``1`` and is required when ``secondary_emission_product_species`` is specified.
+    The secondary emission yield, the average number of electrons emitted for each absorbed particle.
+    This value must be non-negative and is required when ``secondary_emission_product_species`` is specified.
 
 .. pp:param:: <species_name>.secondary_emission_energy_eV
     :type: ``float``
