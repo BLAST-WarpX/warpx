@@ -51,20 +51,23 @@ void FiniteDifferenceSolver::EvolveEPML (
     int level,
     std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const& eb_update_E,
     MultiSigmaBox const& sigba,
-    amrex::Real const dt, bool pml_has_particles ) {
+    amrex::Real const dt, bool pml_has_particles,
+    std::optional<ablastr::fields::VectorField> Efield_rhs ) {
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    amrex::ignore_unused(fields, patch_type, level, eb_update_E, sigba, dt, pml_has_particles);
+    amrex::ignore_unused(fields, patch_type, level, eb_update_E, sigba, dt,
+                         pml_has_particles, Efield_rhs);
     WARPX_ABORT_WITH_MESSAGE(
         "PML are only implemented in Cartesian geometry.");
 #elif !defined(WARPX_DIM_RSPHERE)
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
-        fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
+    const ablastr::fields::VectorField Efield = Efield_rhs ? *Efield_rhs :
+        ((patch_type == PatchType::fine) ? fields.get_alldirs(FieldType::pml_E_fp, level)
+                                       : fields.get_alldirs(FieldType::pml_E_cp, level));
     const ablastr::fields::VectorField Bfield = (patch_type == PatchType::fine) ?
         fields.get_alldirs(FieldType::pml_B_fp, level) : fields.get_alldirs(FieldType::pml_B_cp, level);
     const ablastr::fields::VectorField Jfield = (patch_type == PatchType::fine) ?
