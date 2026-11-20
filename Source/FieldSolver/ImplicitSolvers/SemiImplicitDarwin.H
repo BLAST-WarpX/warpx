@@ -119,6 +119,22 @@ public:
     void ClearParticleVelocities ();
     void FinishVelocityUpdate ();
 
+    /**
+     * \brief Add the grad-div (Coulomb-gauge penalty) term
+     *  -grad(alpha div(Z)) to the operator output `a_rhs`, on its valid cells.
+     *  The curl(chi curl(Z)) term annihilates curl-free Z modes, which are then
+     *  only constrained by the bilaplacian (eigenvalues ~k^4, many orders of
+     *  magnitude below the k^4 + chi k^2 of the solenoidal modes in domains
+     *  large compared to the electron skin depth), and this term lifts them to
+     *  k^4 + alpha k^2. With alpha spatially uniform, the term is discretely
+     *  curl-free, so it does not change dA = curl(Z). `a_Z` must have 2 guard
+     *  layers filled (with the periodic image values). No-op if
+     *  implicit_evolve.graddiv_factor is zero.
+     */
+    void AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
+                           const ablastr::fields::VectorField& a_Z,
+                           int lev );
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -130,6 +146,25 @@ private:
      * \brief Solver vectors for delta A
      */
     WarpXSolverVec m_Z, m_source;
+
+    /**
+     * \brief Multiplier of the grad-div penalty coefficient
+     *  (implicit_evolve.graddiv_factor; 0, the default, disables the term)
+     */
+    amrex::Real m_graddiv_factor = 0.0;
+
+    /**
+     * \brief Grad-div penalty coefficient alpha, refreshed every step from
+     *  the mass matrices: m_graddiv_factor times the domain mean of the
+     *  (2 mu0/dt)-scaled row sums of the diagonal mass-matrix blocks, i.e.,
+     *  the mean chi that curl(chi curl(Z)) applies to solenoidal modes
+     */
+    amrex::Real m_graddiv_alpha = 0.0;
+
+    /**
+     * \brief Cell-centered scratch holding div(Z) in AddGradDivZTerm()
+     */
+    amrex::MultiFab m_divZ;
 
     /**
      * \brief The linear operator whose action on a vector the linear solver
