@@ -9,7 +9,7 @@ add_warpx_test(
     "analysis.py"  # analysis
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
-    PREPARE inputs_test_3d_initial_distribution_prepare.py
+    PREPARE test_3d_initial_distribution_prepare.py
 )
 
 add_warpx_test(
