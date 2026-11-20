@@ -322,6 +322,7 @@ Overall simulation parameters
           - ``implicit_evolve.max_particle_iterations`` (``integer``, default: 21)
           - ``implicit_evolve.particle_tolerance`` (``float``, default: 1.e-10)
           - ``implicit_evolve.particle_suborbits`` (``bool``, default: false)
+            With mesh refinement and field gather buffers (:pp:param:`warpx.n_field_gather_buffer` > 0 or :pp:param:`particles.gather_from_main_grid`), sub-orbits also need current deposition buffers (:pp:param:`warpx.n_current_deposition_buffer` > 0).
           - ``implicit_evolve.suborbit_warning_threshold`` (``int``, default: 5)
           - ``implicit_evolve.suborbit_statistics_interval`` (``int``, default: 100)
           - ``implicit_evolve.print_unconverged_particle_details`` (``bool``, default: false)
