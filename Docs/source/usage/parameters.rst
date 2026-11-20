@@ -1782,7 +1782,7 @@ Particle initialization
       If the external file also contains ``openPMD::Records`` for ``mass`` and ``charge`` (constant ``double`` scalars) then the species will use these, unless overwritten in the input file (see :pp:param:`<species_name>.mass`, :pp:param:`<species_name>.charge` or :pp:param:`<species_name>.species_type`).
       The ``external_file`` option is currently implemented for 2D, 3D and RZ geometries, with record components in the cartesian coordinates ``(x,y,z)`` for 3D and RZ, and ``(x,z)`` for 2D.
       For more information on the `openPMD format <https://github.com/openPMD>`__ and how to build WarpX with it, please visit :ref:`the install section <install-build-cmake>`.
-      See `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/gaussian_beam/inputs_test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
+      See `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/gaussian_beam/test_3d_focusing_gaussian_beam_from_openpmd_prepare.py>`__
       for an example of how to prepare the openPMD data file.
 
     * ``NFluxPerCell``: Continuously inject a flux of macroparticles from a surface. The emitting surface can be chosen to be either a plane
@@ -1906,12 +1906,12 @@ Particle initialization
       file must contain a field with the name given by ``<species_name>.density_mesh_name``
       (default ``density``). See the following files for examples of how to prepare
       the openPMD data file in each geometry:
-      `1D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_1d_load_density_prepare.py>`__,
-      `2D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_2d_load_density_prepare.py>`__,
-      `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__,
-      `RZ <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rz_load_density_prepare.py>`__
+      `1D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/test_1d_load_density_prepare.py>`__,
+      `2D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/test_2d_load_density_prepare.py>`__,
+      `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/test_3d_load_density_prepare.py>`__,
+      `RZ <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/test_rz_load_density_prepare.py>`__
       and
-      `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rsphere_load_density_prepare.py>`__.
+      `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/test_rsphere_load_density_prepare.py>`__.
       There is another optional parameter,
       ``<species_name>.read_density_distributed=true``, which controls how the
       openPMD data are distributed among processes. If it is set to false, the
@@ -2026,7 +2026,7 @@ Particle initialization
           not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
           an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
@@ -2052,7 +2052,7 @@ Particle initialization
           not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_std_from_path`` (openPMD file path). The file must contain
           an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
@@ -2076,9 +2076,9 @@ Particle initialization
           contain a scalar openPMD mesh with the name given by
           ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
           following files for examples of how to prepare the openPMD data file in each geometry:
-          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_3d_initial_distribution_prepare.py>`__
           and
-          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_rsphere_initial_distribution_prepare.py>`__.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
       More specifically, the plasma is initialized with a Maxwell-Juttner distribution
@@ -2116,7 +2116,7 @@ Particle initialization
           not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
           an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.maxwell_juttner_temperature_in_eV_distribution_type`` (`string`, default ``constant``):
@@ -2135,9 +2135,9 @@ Particle initialization
           contain a scalar openPMD mesh with the name given by
           ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
           following files for examples of how to prepare the openPMD data file in each geometry:
-          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_3d_initial_distribution_prepare.py>`__
           and
-          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/test_rsphere_initial_distribution_prepare.py>`__.
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance

@@ -46,7 +46,7 @@ solver = picmi.ElectromagneticSolver(grid=grid)
 # Create species with external file injection
 
 beam1_distribution = picmi.FromFileDistribution(
-    file_path="../test_3d_focusing_gaussian_beam_from_openpmd_prepare/openpmd_generated_particles.h5",
+    file_path="openpmd_generated_particles.h5",
 )
 
 beam1 = picmi.Species(

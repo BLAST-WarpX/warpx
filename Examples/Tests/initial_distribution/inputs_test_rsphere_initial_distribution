@@ -45,7 +45,7 @@ electrons.ux_mean = 0
 electrons.uy_mean = 0
 electrons.uz_mean = 0
 electrons.maxwellian_temperature_in_eV_distribution_type = "read_from_file"
-electrons.read_temperature_in_eV_from_path = "../test_rsphere_initial_distribution_prepare/example-temperature-in-eV.h5"
+electrons.read_temperature_in_eV_from_path = "example-temperature-in-eV.h5"
 
 #################################
 ########## DIAGNOSTICS ##########
