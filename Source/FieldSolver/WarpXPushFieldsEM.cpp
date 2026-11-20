@@ -987,10 +987,10 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         } else {
             m_fdtd_solver_cp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         }
     }
 
@@ -1091,7 +1091,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 void
 WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1102,7 +1102,7 @@ WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     EvolveF(lev, PatchType::fine, a_dt, rho_comp);
     if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, rho_comp); }
@@ -1111,23 +1111,25 @@ WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveF()");
 
     // Evolve F field in regular cells
-    if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
-    } else {
-        m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+    if (do_dive_cleaning) {
+        if (patch_type == PatchType::fine) {
+            m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                            m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
+        } else {
+            m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                            m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+        }
     }
 
     // Evolve F field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml_dive_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
                 m_fields.get(FieldType::pml_F_fp, lev),
