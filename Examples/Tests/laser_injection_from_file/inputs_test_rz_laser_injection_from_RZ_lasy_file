@@ -40,7 +40,7 @@ lasy_RZ_laser.e_max        = 1.e14        # Maximum amplitude of the laser field
 lasy_RZ_laser.wavelength = 1.0e-6         # The wavelength of the laser (in meters)
 lasy_RZ_laser.profile      = from_file
 lasy_RZ_laser.time_chunk_size = 50
-lasy_RZ_laser.lasy_file_name = "../test_rz_laser_injection_from_RZ_lasy_file_prepare/diags/laguerre_laser_RZ_00000.h5"
+lasy_RZ_laser.lasy_file_name = "diags/laguerre_laser_RZ_00000.h5"
 lasy_RZ_laser.delay = 0.0
 
 # Diagnostics

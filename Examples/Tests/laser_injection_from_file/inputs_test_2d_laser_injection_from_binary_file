@@ -40,7 +40,7 @@ binary_laser.polarization = 0. 1. 0.     # The main polarization vector
 binary_laser.e_max        = 1.e12        # Maximum amplitude of the laser field (in V/m)
 binary_laser.wavelength = 1.0e-6         # The wavelength of the laser (in meters)
 binary_laser.profile      = from_file
-binary_laser.binary_file_name = "../test_2d_laser_injection_from_binary_file_prepare/gauss_2d"
+binary_laser.binary_file_name = "gauss_2d"
 binary_laser.time_chunk_size = 50
 binary_laser.delay = 0.0
 
