@@ -33,7 +33,6 @@ from input_file_parser import parse_input_file
 
 matplotlib.use("Agg")
 
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
@@ -80,30 +79,8 @@ def linear_fit(x, y):
     return slope, intercept, r_sq
 
 
-def save_field_animation(
-    iterations, t, get_field_frame, vmin, vmax, colorbar_label, title_prefix, filename
-):
-    """Save a GIF of a 2D field, one frame per snapshot.
-
-    Parameters
-    ----------
-    iterations : array of int
-        Step number of each snapshot.
-    t : array of float
-        Time of each snapshot [s].
-    get_field_frame : function
-        Maps a step number to (data, info), as returned by openPMD-viewer's ``get_field``.
-    vmin, vmax : float
-        Color-scale limits, shared by all frames so that they can be compared.
-    colorbar_label : str
-        Color-bar label.
-    title_prefix : str
-        Frame title; the step number and time are appended.
-    filename : str
-        Output GIF file name.
-    """
-    fig, ax = plt.subplots()
-    data, info = get_field_frame(iterations[0])
+def plot_field(ax, data, info, vmin, vmax, colorbar_label, title):
+    """Show a 2D field from openPMD-viewer's ``get_field`` on *ax*, with a color bar."""
     im = ax.imshow(
         data,
         origin="lower",
@@ -114,25 +91,11 @@ def save_field_animation(
         vmax=vmax,
         cmap="RdBu_r",
     )
-    cb = fig.colorbar(im, ax=ax)
+    cb = ax.figure.colorbar(im, ax=ax)
     cb.set_label(colorbar_label)
-    title = ax.set_title(
-        f"{title_prefix}, iteration {iterations[0]}, time {t[0]:.2e} s"
-    )
+    ax.set_title(title)
     ax.set_xlabel(f"{info.axes[1]} (m)")
     ax.set_ylabel(f"{info.axes[0]} (m)")
-
-    def update(i):
-        iteration = iterations[i]
-        data, info = get_field_frame(iteration)
-        im.set_data(data)
-        im.set_extent(info.imshow_extent)
-        title.set_text(f"{title_prefix}, iteration {iteration}, time {t[i]:.2e} s")
-        return im, title
-
-    ani = animation.FuncAnimation(fig, update, frames=len(iterations), interval=100)
-    ani.save(filename, writer="pillow")
-    plt.close(fig)
 
 
 def load_input_deck():
@@ -272,12 +235,6 @@ if max_step is not None:
 Bx_2 = np.empty_like(t)
 By_2 = np.empty_like(t)
 Bz_2 = np.empty_like(t)
-# Color scale of the B_z animation.
-Bz_abs_max = 0.0
-# Mean charge density of electrons_1 in the first snapshot, before filaments form, and the
-# largest deviation from it; together they set the color scale of the rho animation.
-rho_spatial_mean = None
-rho_dev_max = 0.0
 # Fourier power of B_z per snapshot, normalized so that its sum over all modes is <B_z^2>
 # (Parseval). Shape: (snapshot, grid axis 0, grid axis 1).
 Bz_mode_power = None
@@ -288,7 +245,6 @@ for i, iteration in enumerate(iterations):
     Bx, _ = ts.get_field(field="B", coord="x", iteration=iteration, plot=False)
     By, _ = ts.get_field(field="B", coord="y", iteration=iteration, plot=False)
     Bz, Bz_info = ts.get_field(field="B", coord="z", iteration=iteration, plot=False)
-    rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iteration, plot=False)
 
     if grid_shape is None:
         grid_shape = Bz.shape
@@ -302,15 +258,11 @@ for i, iteration in enumerate(iterations):
     By_2[i] = np.mean(np.square(By))
     Bz_2[i] = np.mean(np.square(Bz))
     Bz_mode_power[i] = np.abs(np.fft.fft2(Bz)) ** 2 / Bz.size**2
-    Bz_abs_max = max(Bz_abs_max, float(np.max(np.abs(Bz))))
-    if rho_spatial_mean is None:
-        rho_spatial_mean = float(np.mean(rho_1))
-    rho_dev_max = max(rho_dev_max, float(np.max(np.abs(rho_1 - rho_spatial_mean))))
 
 assert np.all(np.isfinite(Bx_2))
 assert np.all(np.isfinite(By_2))
 assert np.all(np.isfinite(Bz_2))
-assert Bz_abs_max > 0.0, "B_z is identically zero across all field diagnostics"
+assert np.any(Bz_2 > 0.0), "B_z is identically zero across all field diagnostics"
 
 # FieldEnergy reduced diagnostic. Columns: step, time, total, electric, magnetic energy.
 field_energy = np.atleast_2d(np.loadtxt("diags/reducedfiles/EF.txt", skiprows=1))
@@ -346,7 +298,9 @@ assert magnetic_energy.max() > 2.0 * early_reference, (
 )
 
 # At the last snapshot, the total rho must equal the sum of the species' charge densities.
-rho_1, _ = ts.get_field(field="rho_electrons_1", iteration=iterations[-1], plot=False)
+rho_1, rho_info = ts.get_field(
+    field="rho_electrons_1", iteration=iterations[-1], plot=False
+)
 rho_2, _ = ts.get_field(field="rho_electrons_2", iteration=iterations[-1], plot=False)
 rho_i, _ = ts.get_field(field="rho_ions", iteration=iterations[-1], plot=False)
 rho, _ = ts.get_field(field="rho", iteration=iterations[-1], plot=False)
@@ -499,32 +453,39 @@ fig.tight_layout()
 fig.savefig("weibel_magnetic_energy_growth.png", dpi=150)
 plt.close(fig)
 
-# Animations of B_z and of the electrons_1 charge density. For rho, white is the initial mean,
-# so filaments show up as red and blue regions.
-save_field_animation(
-    iterations,
-    t,
-    get_field_frame=lambda it: ts.get_field(
-        field="B", coord="z", iteration=it, plot=False
-    ),
-    vmin=-Bz_abs_max,
-    vmax=Bz_abs_max,
+# B_z and the electrons_1 charge density at the last snapshot. For rho, white is the mean, so
+# filaments show up as red and blue regions.
+Bz_last, Bz_last_info = ts.get_field(
+    field="B", coord="z", iteration=iterations[-1], plot=False
+)
+Bz_last_abs_max = float(np.max(np.abs(Bz_last)))
+rho_1_mean = float(np.mean(rho_1))
+rho_1_dev_max = float(np.max(np.abs(rho_1 - rho_1_mean)))
+fig, axes = plt.subplots(2, 1, figsize=(6.4, 7.2))
+plot_field(
+    axes[0],
+    Bz_last,
+    Bz_last_info,
+    vmin=-Bz_last_abs_max,
+    vmax=Bz_last_abs_max,
     colorbar_label=r"$B_z$ (T)",
-    title_prefix="B_z",
-    filename="weibel_Bz.gif",
+    title="B_z",
 )
-save_field_animation(
-    iterations,
-    t,
-    get_field_frame=lambda it: ts.get_field(
-        field="rho_electrons_1", iteration=it, plot=False
-    ),
-    vmin=rho_spatial_mean - rho_dev_max,
-    vmax=rho_spatial_mean + rho_dev_max,
+plot_field(
+    axes[1],
+    rho_1,
+    rho_info,
+    vmin=rho_1_mean - rho_1_dev_max,
+    vmax=rho_1_mean + rho_1_dev_max,
     colorbar_label=r"$\rho_{\mathrm{e1}}$ (C/m$^3$)",
-    title_prefix="rho_electrons_1",
-    filename="weibel_rho_electrons_1.gif",
+    title="rho_electrons_1",
 )
+fig.suptitle(
+    f"Weibel fields ({solver_name}), iteration {iterations[-1]}, time {t[-1]:.2e} s"
+)
+fig.tight_layout()
+fig.savefig("weibel_fields_last_snapshot.png", dpi=150)
+plt.close(fig)
 
 # Check the fit after plotting, so that the plots exist even if a check fails: the growth must
 # be exponential (good linear fit) at a rate close to the cold-beam gamma(k).
