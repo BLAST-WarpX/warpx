@@ -129,12 +129,13 @@ bool WarpX::do_shared_mem_current_deposition = false;
 #if defined(WARPX_DIM_3D)
 amrex::IntVect WarpX::shared_tilesize(AMREX_D_DECL(6,6,8));
 #elif (AMREX_SPACEDIM == 2)
-amrex::IntVect WarpX::shared_tilesize(AMREX_D_DECL(14,14,0));
+amrex::IntVect WarpX::shared_tilesize(AMREX_D_DECL(8,8,0));
 #else
 //Have not experimented with good tilesize here because expect use case to be low
 amrex::IntVect WarpX::shared_tilesize(AMREX_D_DECL(1,1,1));
 #endif
-int WarpX::shared_mem_current_tpb = 128;
+int WarpX::shared_mem_current_tpb = 256;
+int WarpX::shared_mem_charge_tpb = 256;
 
 int WarpX::n_rz_azimuthal_modes = 1;
 int WarpX::ncomps = 1;
@@ -964,6 +965,7 @@ WarpX::ReadParameters ()
         );
 #endif
         pp_warpx.query("shared_mem_current_tpb", shared_mem_current_tpb);
+        pp_warpx.query("shared_mem_charge_tpb", shared_mem_charge_tpb);
 
         // initialize the shared tilesize
         Vector<int> vect_shared_tilesize(AMREX_SPACEDIM, 1);

@@ -257,8 +257,11 @@ public:
     //! use shared memory algorithm for current deposition
     static bool do_shared_mem_current_deposition;
 
-    //! number of threads to use per block in shared deposition
+    //! number of threads to use per block in shared current deposition
     static int shared_mem_current_tpb;
+
+    //! number of threads to use per block in shared charge deposition
+    static int shared_mem_charge_tpb;
 
     //! tileSize to use for shared current deposition operations
     static amrex::IntVect shared_tilesize;
