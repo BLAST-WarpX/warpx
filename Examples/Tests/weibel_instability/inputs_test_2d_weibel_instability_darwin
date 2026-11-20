@@ -1,15 +1,15 @@
 # base input parameters
 FILE = inputs_base_2d_weibel_instability
 
-# test input parameters: semi-implicit Darwin field solver (no light waves)
-algo.evolve_scheme = semi_implicit_darwin                # semi-implicit Darwin field solver
-amrex_gmres.pc_type = pc_darwin_mlmg                     # multigrid preconditioner for the Darwin GMRES solve
-amrex_gmres.relative_tolerance = 1.0e-2                  # looser than the 1e-4 default, for fewer GMRES iterations
-diag1.average_period_steps = 2                           # average 2 consecutive steps (one even, one odd) to filter the even/odd B oscillation
-diag1.diag_type = TimeAveraged                           # time-averaged field output (overrides Full from the base input)
-diag1.intervals = 4::2                                   # every 8e-15 s from step 4; the first averaging window must start after step 0
-diag1.time_average_mode = dynamic_start                  # fixed-length averaging window ending at each output step
-implicit_evolve.magnetostatic_particle_shape = 1         # linear shape for the magnetostatic part (smaller mass-matrix stencil)
-max_step = 352                                           # t_end = 1.408e-12 s; on an output step, so the last snapshot is a full average
-warpx.const_dt = 4.0e-15                                 # omega_p * dt ~ 1 (no light-wave CFL limit with Darwin)
-warpx.do_electrostatic = labframe                        # electrostatic solve, required by the Darwin scheme
+# test input parameters
+algo.evolve_scheme = semi_implicit_darwin
+amrex_gmres.pc_type = pc_darwin_mlmg                     # multigrid preconditioner for GMRES
+amrex_gmres.relative_tolerance = 1.0e-2                  # looser than the default, for fewer GMRES iterations
+diag1.average_period_steps = 2                           # average an even and an odd step to remove the even/odd oscillation of B
+diag1.diag_type = TimeAveraged
+diag1.intervals = 4::2                                   # the first averaging window must start after step 0
+diag1.time_average_mode = dynamic_start                  # averaging window ends at each output step
+implicit_evolve.magnetostatic_particle_shape = 1         # linear shape for the magnetostatic part (smaller stencil)
+max_step = 352                                           # same end time as the explicit test; an output step, so the last average is complete
+warpx.const_dt = 4.0e-15                                 # omega_p * dt ~ 1 (Darwin has no light-wave CFL limit)
+warpx.do_electrostatic = labframe                        # required by the Darwin scheme

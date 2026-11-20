@@ -1,11 +1,11 @@
 # base input parameters
 FILE = inputs_base_2d_weibel_instability
 
-# test input parameters: explicit (full Maxwell, Yee FDTD) field solver
-diag1.average_period_steps = 15                          # average over one period (~15.2e-15 s) of the light wave launched by the seed
-diag1.diag_type = TimeAveraged                           # time-averaged field output (overrides Full from the base input)
-diag1.intervals = 16                                     # every 16e-15 s; must be >= the averaging period (non-overlapping windows)
-diag1.time_average_mode = dynamic_start                  # fixed-length averaging window ending at each output step
-max_step = 1408                                          # t_end = 1.408e-12 s, same as the Darwin test
-warpx.const_dt = 1.0e-15                                 # 1/4 of the Darwin time step; below the CFL limit (~1.68e-15 s)
-warpx.use_filter = 0                                     # no current filter: it damps the short-wavelength, fastest-growing modes
+# test input parameters
+diag1.average_period_steps = 15                          # about one period of the light wave launched by the seed
+diag1.diag_type = TimeAveraged
+diag1.intervals = 16                                     # must be >= average_period_steps (non-overlapping windows)
+diag1.time_average_mode = dynamic_start                  # averaging window ends at each output step
+max_step = 1408                                          # same end time as the Darwin test
+warpx.const_dt = 1.0e-15                                 # below the CFL limit
+warpx.use_filter = 0                                     # a current filter would damp the fastest-growing short wavelengths
