@@ -3,9 +3,22 @@
 # Contribute to WarpX
 
 We welcome new contributors!
-Here is how to participate to the WarpX development.
+
+(developers-contributing-ai)=
+
+## Using AI tools
+
+You may use AI tools, such as large language models (LLMs), to help you contribute to WarpX.
+However, **you are responsible for everything you contribute**, including code, documentation, pull request descriptions, and comments, whether you wrote it yourself or an AI tool generated it.
+Every contribution must follow these contributing guidelines and our [Code of Conduct](https://warpx.readthedocs.io/en/latest/coc.html).
+
+In practice, this means that you review your contribution yourself before you ask others to review it, that you understand what you submit and can explain it to reviewers, and that you keep your contribution as small and focused as possible.
+
+For tips on how to use AI tools with the WarpX code, see our [guide to LLM-assisted development](https://warpx.readthedocs.io/en/latest/developers/how_to_develop_with_llms.html).
 
 ## Git workflow
+
+Here is how to participate in the WarpX development.
 
 The WarpX project uses [Git](https://git-scm.com) for version control.
 If you are new to Git, you can follow [this tutorial](https://swcarpentry.github.io/git-novice/).
