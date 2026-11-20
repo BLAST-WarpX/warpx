@@ -108,3 +108,39 @@ if(WarpX_EB)
         OFF  # dependency
     )
 endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_rz_embedded_boundary_em_particle_absorption_gauss_sh_factor_1_picmi  # name
+        RZ  # dims
+        1  # nprocs
+        "inputs_test_rz_embedded_boundary_em_particle_absorption_gauss_picmi.py --shape 1"  # inputs
+        OFF  # analysis (the input asserts the discrete Gauss law)
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_rz_embedded_boundary_em_particle_absorption_gauss_sh_factor_2_picmi  # name
+        RZ  # dims
+        1  # nprocs
+        "inputs_test_rz_embedded_boundary_em_particle_absorption_gauss_picmi.py --shape 2"  # inputs
+        OFF  # analysis (the input asserts the discrete Gauss law)
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_rz_embedded_boundary_em_particle_absorption_gauss_sh_factor_3_picmi  # name
+        RZ  # dims
+        1  # nprocs
+        "inputs_test_rz_embedded_boundary_em_particle_absorption_gauss_picmi.py --shape 3"  # inputs
+        OFF  # analysis (the input asserts the discrete Gauss law)
+        OFF  # checksum
+        OFF  # dependency
+    )
+endif()

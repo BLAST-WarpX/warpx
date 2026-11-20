@@ -43,9 +43,18 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                const amrex::XDim3 & xyzmin,
                                amrex::Dim3 lo,
                                amrex::Real q,
-                               [[maybe_unused]] int n_rz_azimuthal_modes)
+                               [[maybe_unused]] int n_rz_azimuthal_modes,
+                               [[maybe_unused]]
+                               amrex::Array4<const int> const& reduced_particle_shape_mask = {},
+                               bool enable_reduced_shape = false)
 {
     using namespace amrex;
+
+    // With the EB reduced-shape mask (see MarkReducedShapeCells), rho uses the same
+    // per-particle shape as Esirkepov current deposition, so that rho and J satisfy
+    // the discrete continuity equation next to embedded boundaries.
+    bool const use_reduced_shape = enable_reduced_shape && (depos_order > 1);
+    amrex::ignore_unused(use_reduced_shape);
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
     // (do_ionization=1)
@@ -56,7 +65,6 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::Array4<amrex::Real> const& rho_arr = rho_fab.array();
     amrex::IntVect const rho_type = rho_fab.box().type();
 
-    constexpr int NODE = amrex::IndexType::NODE;
     constexpr int CELL = amrex::IndexType::CELL;
 
     // Loop over particles and deposit into rho_fab.
@@ -77,6 +85,40 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
             // --- Compute shape factors
             Compute_shape_factor< depos_order > const compute_shape_factor;
+            Compute_shape_factor< 1 > const compute_shape_factor_order1;
+            amrex::ignore_unused(compute_shape_factor_order1);
+
+            // A particle in a marked cell deposits with an order-1 shape. This cell
+            // lookup is copied from doEsirkepovDepositionShapeN (CurrentDeposition.H),
+            // evaluated at the current position; keep the two in sync.
+            bool reduce_shape = false;
+            if (use_reduced_shape) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                const amrex::Real xc = (std::sqrt(xp*xp + yp*yp) - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+                const amrex::Real xc = (std::sqrt(xp*xp + yp*yp + zp*zp) - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+                const amrex::Real xc = (xp - xyzmin.x)*dinv.x;
+#endif
+#if defined(WARPX_DIM_3D)
+                reduce_shape = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(xc)),
+                    lo.y + int(amrex::Math::floor((yp - xyzmin.y)*dinv.y)),
+                    lo.z + int(amrex::Math::floor((zp - xyzmin.z)*dinv.z)));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                reduce_shape = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(xc)),
+                    lo.y + int(amrex::Math::floor((zp - xyzmin.z)*dinv.z)), 0);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                reduce_shape = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor(xc)), 0, 0);
+#elif defined(WARPX_DIM_1D_Z)
+                reduce_shape = reduced_particle_shape_mask(
+                    lo.x + int(amrex::Math::floor((zp - xyzmin.z)*dinv.z)), 0, 0);
+#endif
+            }
+            // Number of shape intervals actually used by this particle
+            const int ns = reduce_shape ? 1 : depos_order;
 #if !defined(WARPX_DIM_1D_Z)
             // x direction
             // Get particle position in grid coordinates
@@ -100,10 +142,10 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             // i: leftmost grid point that the particle touches
             amrex::Real sx[depos_order + 1] = {0._rt};
             int i = 0;
-            if (rho_type[0] == NODE) {
-                i = compute_shape_factor(sx, x);
-            } else if (rho_type[0] == CELL) {
-                i = compute_shape_factor(sx, x - 0.5_rt);
+            {
+                const amrex::Real xs = (rho_type[0] == CELL) ? x - 0.5_rt : x;
+                i = reduce_shape ? compute_shape_factor_order1(sx, xs)
+                                 : compute_shape_factor(sx, xs);
             }
 #endif // !defined(WARPX_DIM_1D_Z)
 #if defined(WARPX_DIM_3D)
@@ -111,10 +153,10 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real y = (yp - xyzmin.y)*dinv.y;
             amrex::Real sy[depos_order + 1] = {0._rt};
             int j = 0;
-            if (rho_type[1] == NODE) {
-                j = compute_shape_factor(sy, y);
-            } else if (rho_type[1] == CELL) {
-                j = compute_shape_factor(sy, y - 0.5_rt);
+            {
+                const amrex::Real ys = (rho_type[1] == CELL) ? y - 0.5_rt : y;
+                j = reduce_shape ? compute_shape_factor_order1(sy, ys)
+                                 : compute_shape_factor(sy, ys);
             }
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
@@ -122,29 +164,29 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const amrex::Real z = (zp - xyzmin.z)*dinv.z;
             amrex::Real sz[depos_order + 1] = {0._rt};
             int k = 0;
-            if (rho_type[WARPX_ZINDEX] == NODE) {
-                k = compute_shape_factor(sz, z);
-            } else if (rho_type[WARPX_ZINDEX] == CELL) {
-                k = compute_shape_factor(sz, z - 0.5_rt);
+            {
+                const amrex::Real zs = (rho_type[WARPX_ZINDEX] == CELL) ? z - 0.5_rt : z;
+                k = reduce_shape ? compute_shape_factor_order1(sz, zs)
+                                 : compute_shape_factor(sz, zs);
             }
 #endif
 
             // Deposit charge into rho_arr
 #if defined(WARPX_DIM_1D_Z)
-            for (int iz=0; iz<=depos_order; iz++){
+            for (int iz=0; iz<=ns; iz++){
                 amrex::Gpu::Atomic::AddNoRet(
                     &rho_arr(lo.x+k+iz, 0, 0, 0),
                     sz[iz]*wq);
             }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            for (int ix=0; ix<=depos_order; ix++){
+            for (int ix=0; ix<=ns; ix++){
                 amrex::Gpu::Atomic::AddNoRet(
                     &rho_arr(lo.x+i+ix, 0, 0, 0),
                     sx[ix]*wq);
             }
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            for (int iz=0; iz<=depos_order; iz++){
-                for (int ix=0; ix<=depos_order; ix++){
+            for (int iz=0; iz<=ns; iz++){
+                for (int ix=0; ix<=ns; ix++){
                     amrex::Gpu::Atomic::AddNoRet(
                         &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, 0),
                         sx[ix]*sz[iz]*wq);
@@ -160,9 +202,9 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 }
             }
 #elif defined(WARPX_DIM_3D)
-            for (int iz=0; iz<=depos_order; iz++){
-                for (int iy=0; iy<=depos_order; iy++){
-                    for (int ix=0; ix<=depos_order; ix++){
+            for (int iz=0; iz<=ns; iz++){
+                for (int iy=0; iy<=ns; iy++){
+                    for (int ix=0; ix<=ns; ix++){
                         amrex::Gpu::Atomic::AddNoRet(
                             &rho_arr(lo.x+i+ix, lo.y+j+iy, lo.z+k+iz),
                             sx[ix]*sy[iy]*sz[iz]*wq);
