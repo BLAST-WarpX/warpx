@@ -117,7 +117,7 @@ void FiniteDifferenceSolver::EvolveECartesian (
     int lev, amrex::Real const dt ) {
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-    Real constexpr c2 = PhysConst::c2;
+    Real const c2 = PhysConst::c2 / WarpX::epsilon_r;
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -293,7 +293,7 @@ void FiniteDifferenceSolver::EvolveECylindrical (
         Box const& tet  = mfi.tilebox(Efield[1]->ixType().toIntVect());
         Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
 
-        Real constexpr c2 = PhysConst::c2;
+        Real const c2 = PhysConst::c2 / WarpX::epsilon_r;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(ter, tet, tez,
@@ -490,7 +490,7 @@ void FiniteDifferenceSolver::EvolveESpherical (
         // Extract tileboxes for which to loop
         Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
 
-        Real constexpr c2 = PhysConst::c2;
+        Real const c2 = PhysConst::c2 / WarpX::epsilon_r;
 
         // Loop over the cells and update the fields
         amrex::ParallelFor(ter,
