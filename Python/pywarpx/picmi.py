@@ -971,11 +971,22 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
 
 
 class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_FromFileDistribution)
+    )
+    external_file_species_name: str | None = Field(
+        default=None,
+        description="Name of species in data file to load",
+    )
+
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
         species.add_new_group_attr(source_name, "injection_style", "external_file")
         species.add_new_group_attr(source_name, "injection_file", self.file_path)
+        species.add_new_group_attr(
+            source_name, "external_file_species_name", self.external_file_species_name
+        )
 
 
 class ParticleDistributionPlanarInjector(
