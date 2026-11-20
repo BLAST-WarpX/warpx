@@ -1,6 +1,20 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+foreach(style IN ITEMS constant parser)
+    foreach(levels IN ITEMS 0 1)
+        add_warpx_test(
+            test_3d_initial_field_${style}_level_${levels}  # name
+            3  # dims
+            1  # nprocs
+            "inputs_base_3d_initial_field_level.py --style ${style} --levels ${levels}"
+            OFF  # analysis (assertions in the script)
+            OFF  # checksum (analytic stationary-field oracle)
+            OFF  # dependency
+        )
+    endforeach()
+endforeach()
+
 add_warpx_test(
     test_3d_load_external_field_grid_picmi  # name
     3  # dims
