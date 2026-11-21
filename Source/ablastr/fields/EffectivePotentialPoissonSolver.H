@@ -78,6 +78,7 @@ namespace ablastr::fields {
  * \param[in] rho The charge density a given species
  * \param[out] phi The potential to be computed by this function
  * \param[in] sigma The matrix representing the mass operator used to lower the local plasma frequency
+ *                  (one MultiFab per mesh refinement level)
  * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
  * \param[in] geom the geometry per level (e.g., from AmrMesh)
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
@@ -101,7 +102,7 @@ void
 computeEffectivePotentialPhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
-    amrex::MultiFab const & sigma,
+    ablastr::fields::MultiLevelScalarField const& sigma,
     MLMGOptions const & mlmg_options,
     amrex::Vector<amrex::Geometry> const& geom,
     amrex::Vector<amrex::DistributionMapping> const& dmap,
@@ -179,7 +180,7 @@ computeEffectivePotentialPhi (
             if (is_rz) {
                 linop_nodelap->setRZ(true);
             }
-            linop_nodelap->setSigma(lev, sigma);
+            linop_nodelap->setSigma(0, *sigma[lev]);
             linop = std::move(linop_nodelap);
 #endif
         }
@@ -193,7 +194,7 @@ computeEffectivePotentialPhi (
                 info
             );
             linop_nodelap->setRZ(true);
-            linop_nodelap->setSigma(lev, sigma);
+            linop_nodelap->setSigma(0, *sigma[lev]);
             linop = std::move(linop_nodelap);
         }
         else
@@ -205,7 +206,7 @@ computeEffectivePotentialPhi (
                 amrex::Vector<amrex::DistributionMapping>{dmap[lev]},
                 info
             );
-            linop_nodelap->setSigma(lev, sigma);
+            linop_nodelap->setSigma(0, *sigma[lev]);
             linop = std::move(linop_nodelap);
         }
 
