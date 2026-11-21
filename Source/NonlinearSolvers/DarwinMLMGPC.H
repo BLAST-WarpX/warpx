@@ -53,6 +53,14 @@
  *  averaged: pair-averaging multiplies the nodal-dimension Nyquist modes by
  *  cos(k dx/2) = 0, making the preconditioner exactly singular on those planes.
  *
+ *  At conducting (PEC) walls, Z obeys the B-type image symmetry: the
+ *  wall-normal component (nodal in the wall-normal direction) is odd and the
+ *  tangential components (cell-centered in that direction) are even. The
+ *  cell-centered solves therefore use homogeneous Dirichlet conditions for the
+ *  former and homogeneous Neumann conditions for the latter, which is why each
+ *  component has its own Poisson operator, and the result is projected onto
+ *  the constrained wall degrees of freedom (see SemiImplicitDarwin::ApplyPECtoZ).
+ *
  *  The MLMG solves run a fixed number of V-cycles (max_iter) so the
  *  preconditioner is a fixed linear operator across a GMRES solve.
  */
@@ -149,9 +157,9 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
         amrex::MultiFab m_rhs_cc, m_mid_cc, m_sol_cc;
 
         std::unique_ptr<amrex::LPInfo> m_info;
-        std::unique_ptr<amrex::MLABecLaplacian> m_poisson;
+        std::unique_ptr<amrex::MLABecLaplacian> m_poisson[3];
         std::unique_ptr<amrex::MLABecLaplacian> m_helmholtz[3];
-        std::unique_ptr<amrex::MLMG> m_poisson_mg;
+        std::unique_ptr<amrex::MLMG> m_poisson_mg[3];
         std::unique_ptr<amrex::MLMG> m_helmholtz_mg[3];
 
         /**
@@ -222,35 +230,42 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
     m_grids = u_mfarrvec[0][0]->boxArray();
     m_grids.enclosedCells();
 
-    // The Darwin solver is restricted to fully periodic domains (see
-    // SemiImplicitDarwin::Define()), so the cell-centered operators are too.
-    Array<LinOpBCType, AMREX_SPACEDIM> bc_lo, bc_hi;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_geom.isPeriodic(idim),
-            "DarwinMLMGPC::Define(): only periodic boundaries are supported");
-        bc_lo[idim] = LinOpBCType::Periodic;
-        bc_hi[idim] = LinOpBCType::Periodic;
-    }
-
     m_info = std::make_unique<LPInfo>();
     m_info->setAgglomeration(m_agglomeration);
     m_info->setConsolidation(m_consolidation);
     m_info->setMaxCoarseningLevel(m_max_coarsening_level);
 
-    // All three components share the same cell-centered grid, boundary
-    // conditions and coefficients, so one operator pair serves all of them.
-    m_poisson = std::make_unique<MLABecLaplacian>(
-        Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
-        Vector<DistributionMapping>{m_dmap}, *m_info);
-    m_poisson->setDomainBC(bc_lo, bc_hi);
-    m_poisson->setLevelBC(0, nullptr);
-    m_poisson->setScalars(RT(0.0), RT(1.0));
-    m_poisson->setACoeffs(0, RT(0.0));
-    m_poisson->setBCoeffs(0, RT(1.0));
-
-    // One Helmholtz operator per diagonal chi component.
+    // The Darwin solver supports periodic boundaries and conducting (PEC)
+    // walls (see SemiImplicitDarwin::Define()). At a wall, the component of Z
+    // that is nodal in the wall-normal direction is the wall-normal one (odd
+    // image symmetry, Dirichlet) and the others are tangential (even image
+    // symmetry, Neumann), so the boundary conditions differ per component.
     for (int comp = 0; comp < 3; ++comp) {
+        const IntVect z_nodal = u_mfarrvec[0][comp]->ixType().toIntVect();
+        Array<LinOpBCType, AMREX_SPACEDIM> bc_lo, bc_hi;
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (m_geom.isPeriodic(idim)) {
+                bc_lo[idim] = LinOpBCType::Periodic;
+                bc_hi[idim] = LinOpBCType::Periodic;
+            } else {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    m_ops->HasPEC(),
+                    "DarwinMLMGPC::Define(): only periodic and PEC boundaries are supported");
+                bc_lo[idim] = (z_nodal[idim] == 1) ? LinOpBCType::Dirichlet : LinOpBCType::Neumann;
+                bc_hi[idim] = bc_lo[idim];
+            }
+        }
+
+        m_poisson[comp] = std::make_unique<MLABecLaplacian>(
+            Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
+            Vector<DistributionMapping>{m_dmap}, *m_info);
+        m_poisson[comp]->setDomainBC(bc_lo, bc_hi);
+        m_poisson[comp]->setLevelBC(0, nullptr);
+        m_poisson[comp]->setScalars(RT(0.0), RT(1.0));
+        m_poisson[comp]->setACoeffs(0, RT(0.0));
+        m_poisson[comp]->setBCoeffs(0, RT(1.0));
+
+        // One Helmholtz operator per diagonal chi component.
         m_helmholtz[comp] = std::make_unique<MLABecLaplacian>(
             Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
             Vector<DistributionMapping>{m_dmap}, *m_info);
@@ -260,19 +275,17 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
         m_helmholtz[comp]->setACoeffs(0, RT(0.0)); // chi(x) set in Update()
         m_helmholtz[comp]->setBCoeffs(0, RT(1.0));
 
+        m_poisson_mg[comp] = std::make_unique<MLMG>(*m_poisson[comp]);
         m_helmholtz_mg[comp] = std::make_unique<MLMG>(*m_helmholtz[comp]);
-    }
-
-    m_poisson_mg = std::make_unique<MLMG>(*m_poisson);
-    for (auto* mg : {m_poisson_mg.get(),
-                      m_helmholtz_mg[0].get(), m_helmholtz_mg[1].get(), m_helmholtz_mg[2].get()}) {
-        mg->setFixedIter(m_max_iter);
-        // A Krylov bottom solver stops on a tolerance, making the preconditioner
-        // nonlinear; smoothing keeps it a fixed linear operator, as GMRES requires.
-        mg->setBottomSolver(BottomSolver::smoother);
-        mg->setVerbose(static_cast<int>(m_verbose));
-        mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
-        mg->setNoGpuSync(true);
+        for (auto* mg : {m_poisson_mg[comp].get(), m_helmholtz_mg[comp].get()}) {
+            mg->setFixedIter(m_max_iter);
+            // A Krylov bottom solver stops on a tolerance, making the preconditioner
+            // nonlinear; smoothing keeps it a fixed linear operator, as GMRES requires.
+            mg->setBottomSolver(BottomSolver::smoother);
+            mg->setVerbose(static_cast<int>(m_verbose));
+            mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
+            mg->setNoGpuSync(true);
+        }
     }
 
     for (auto& chi_cc : m_chi_cc) {
@@ -356,13 +369,14 @@ void DarwinMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         // The two factored solves: Poisson then Helmholtz. Fixed V-cycle
         // count (setFixedIter in Define) keeps this a fixed linear operator.
         m_mid_cc.setVal(0.0);
-        m_poisson_mg->solve({&m_mid_cc}, {&m_rhs_cc}, m_rtol, m_atol);
+        m_poisson_mg[comp]->solve({&m_mid_cc}, {&m_rhs_cc}, m_rtol, m_atol);
         m_sol_cc.setVal(0.0);
         m_helmholtz_mg[comp]->solve({&m_sol_cc}, {&m_mid_cc}, m_rtol, m_atol);
 
         // Map back to the B-staggering (cell i -> node i). Only the top node
         // plane in the nodal dimension reads a guard cell: the periodic
-        // image filled by FillBoundary here.
+        // image filled by FillBoundary here. In a non-periodic dimension, that
+        // plane lies on a PEC wall and is zeroed by the projection below.
         m_sol_cc.FillBoundary(m_geom.periodicity());
 
 #ifdef AMREX_USE_OMP
@@ -379,6 +393,10 @@ void DarwinMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
             });
         }
     }
+
+    // Project the result at conducting (PEC) walls (zero the wall-normal
+    // components on the wall), consistent with the projected operator.
+    m_ops->ApplyPECtoZ(x_mfarrvec[lev], lev, amrex::IntVect(0));
 }
 
 #endif
