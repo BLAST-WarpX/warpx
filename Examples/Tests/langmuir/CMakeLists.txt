@@ -232,6 +232,19 @@ if(WarpX_FFT)
     )
 endif()
 
+# Shared memory deposition is only available on CUDA and HIP
+if(WarpX_FFT AND (WarpX_COMPUTE STREQUAL CUDA OR WarpX_COMPUTE STREQUAL HIP))
+    add_warpx_test(
+        test_2d_langmuir_multi_psatd_vay_deposition_shared_mem  # name
+        2  # dims
+        1  # nprocs
+        inputs_test_2d_langmuir_multi_psatd_vay_deposition_shared_mem  # inputs
+        "analysis_2d.py diags/diag1000080"  # analysis
+        "analysis_default_regression.py --path diags/diag1000080"  # checksum
+        OFF  # dependency
+    )
+endif()
+
 if(WarpX_FFT)
     add_warpx_test(
         test_2d_langmuir_multi_psatd_vay_deposition_nodal  # name
@@ -423,6 +436,19 @@ if(WarpX_FFT)
         3  # dims
         1  # nprocs
         inputs_test_3d_langmuir_multi_psatd_vay_deposition  # inputs
+        "analysis_3d.py diags/diag1000040"  # analysis
+        "analysis_default_regression.py --path diags/diag1000040"  # checksum
+        OFF  # dependency
+    )
+endif()
+
+# Shared memory deposition is only available on CUDA and HIP
+if(WarpX_FFT AND (WarpX_COMPUTE STREQUAL CUDA OR WarpX_COMPUTE STREQUAL HIP))
+    add_warpx_test(
+        test_3d_langmuir_multi_psatd_vay_deposition_shared_mem  # name
+        3  # dims
+        1  # nprocs
+        inputs_test_3d_langmuir_multi_psatd_vay_deposition_shared_mem  # inputs
         "analysis_3d.py diags/diag1000040"  # analysis
         "analysis_default_regression.py --path diags/diag1000040"  # checksum
         OFF  # dependency
