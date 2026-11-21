@@ -1,0 +1,2 @@
+FILE = inputs_test_2d_collision_host_streams
+amr.restart = "../test_2d_collision_host_streams/diags/chk000004"
