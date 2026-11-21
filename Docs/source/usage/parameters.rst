@@ -3309,17 +3309,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :math:`A` is the mass number.
     If this is not provided, or if a non-positive value is provided,
     a Coulomb logarithm will be computed automatically according to the algorithm in
-    :cite:t:`param-PerezPOP2012`.
-
-.. pp:param:: <collision_name>.use_global_debye_length
-    :type: ``bool``
-    :optional:
-
-    Only for ``pairwisecoulomb``. When set, the Debye length used in the Coulomb log
-    is calculated including all species in the simulation. The lengths are combined
-    using the square root of one over the sum of one over the squares of the Debye lengths
-    of each species. By default, this is turned off. Note that if :pp:param:`<collision_name>.CoulombLog`
-    is specified, this Debye length is not used.
+    :cite:t:`param-PerezPOP2012`, including all species.
 
 .. pp:param:: <collision_name>.event_multiplier
     :type: ``float``
