@@ -21,17 +21,22 @@
 
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_FabFactory.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_iMultiFab.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_Periodicity.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
 #include <AMReX_BaseFwd.H>
 
 #include <array>
+#include <list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -212,9 +217,93 @@ public:
     void CheckPoint (ablastr::fields::MultiFabRegister& fields, const std::string& dir) const;
     void Restart (ablastr::fields::MultiFabRegister& fields, const std::string& dir);
 
-    static void Exchange (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom, int do_pml_in_domain);
+    /** Exchange data between one component of a PML field and of the regular field
+     *
+     * Copies the sum of the split PML field to the regular grid (to its valid cells,
+     * for PMLs inside the domain, otherwise to its guard cells) and copies the
+     * regular field to the guard cells of the PML.
+     */
+    void Exchange (amrex::MultiFab& pml, amrex::MultiFab& reg, const amrex::Geometry& geom,
+                   int do_pml_in_domain);
 
 private:
+    /** Layout of a PML field and of the regular field it exchanges data with
+     *
+     * Which cells Exchange copies only depends on this layout.
+     */
+    struct ExchangeLayout
+    {
+        ExchangeLayout () = default;
+        ExchangeLayout (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                        amrex::Periodicity const& a_period);
+
+        //! true if pml, reg and a_period have this layout (compares BoxArray and
+        //! DistributionMapping contents)
+        [[nodiscard]] bool matches (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                                    amrex::Periodicity const& a_period) const;
+
+        //! true if pml and reg use the same BoxArray and DistributionMapping objects as this layout
+        [[nodiscard]] bool same_objects (amrex::MultiFab const& pml,
+                                         amrex::MultiFab const& reg) const;
+
+        amrex::BoxArray reg_ba;
+        amrex::DistributionMapping reg_dm;
+        amrex::BoxArray pml_ba;
+        amrex::DistributionMapping pml_dm;
+        amrex::IntVect pml_ngrow;
+        int pml_ncomp = 0;
+        amrex::Periodicity period;
+    };
+
+    /** Which cells Exchange copies, for one ExchangeLayout
+     *
+     * Exchange is called many times per time step. The layout of its temporaries is thus
+     * kept between calls, while their data is allocated per call. PML fields with the same
+     * ExchangeLayout share one plan.
+     */
+    struct ExchangePlan
+    {
+        //! layout this plan was built for
+        ExchangeLayout layout;
+        //! number of PML fields that currently use this plan
+        int n_users = 0;
+
+        /** Layout of the temporary with the valid cells of the regular grid that overlap with
+         *  the PML boxes grown by their guard cells (including periodic images), with as many
+         *  components as the PML field. Each box is a subset of one box of the regular grid
+         *  and is owned by the same process. Not defined if no regular-grid cell overlaps.
+         *
+         *  No data is allocated: this only keeps AMReX's cached copy plans for this
+         *  BoxArray and DistributionMapping alive between calls.
+         */
+        amrex::MultiFab reg_near_pml;
+        //! for each local box of reg_near_pml: local index of the regular-grid box containing it
+        amrex::Gpu::DeviceVector<int> reg_near_pml_parent;
+    };
+
+    //! A PML field that calls Exchange: its layout at the last call and the plan it uses
+    struct ExchangeUser
+    {
+        ExchangeLayout layout;
+        ExchangePlan* plan = nullptr;
+    };
+
+    //! Exchange plans, one per distinct layout (std::list: pointers to elements stay valid)
+    std::list<ExchangePlan> m_exchange_plans;
+    //! Exchange plan used by each PML field (key)
+    std::map<amrex::MultiFab const*, ExchangeUser> m_exchange_users;
+
+    /** Return the Exchange plan for this PML field, reusing an existing plan when possible */
+    ExchangePlan& GetExchangePlan (amrex::MultiFab const& pml, amrex::MultiFab const& reg,
+                                   amrex::Periodicity const& period);
+
+    /** Build plan for plan.layout
+     *
+     * @param[in,out] plan plan to define, with plan.layout already set
+     * @param[in] reg a regular field with the layout plan.layout (used for its local box indices)
+     */
+    static void DefineExchangePlan (ExchangePlan& plan, amrex::MultiFab const& reg);
+
     bool m_ok;
 
     bool m_dive_cleaning;
