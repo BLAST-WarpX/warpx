@@ -6,6 +6,7 @@
  */
 
 #include "SparseJacobianMatrix.H"
+#include "MatrixMarketWriter.H"
 #include "WarpXSolverDOF.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
@@ -20,7 +21,10 @@
 #include <AMReX_Print.H>
 
 #include <algorithm>
+#include <cstddef>
 #include <sstream>
+#include <string>
+#include <vector>
 
 void SparseJacobianMatrix::readParameters ()
 {
@@ -85,6 +89,7 @@ void SparseJacobianMatrix::Update (
         "SparseJacobianMatrix::Update() called on undefined object");
 
     m_include_mass_matrices = (a_mass_matrices != nullptr);
+    m_theta_dt = a_theta_dt;
 
     const amrex::Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
     if (m_verbose) {
@@ -148,6 +153,48 @@ void SparseJacobianMatrix::GetMatrix (
                           a_a_ij.begin());
 
     amrex::Gpu::streamSynchronize();
+}
+
+void SparseJacobianMatrix::PrintMatrix (const std::string& a_filename,
+                                        const std::vector<std::string>& a_header,
+                                        const WarpXSolverDOF& a_dofs) const
+{
+    BL_PROFILE("SparseJacobianMatrix::PrintMatrix()");
+    using namespace amrex;
+
+    const auto n = static_cast<std::size_t>(m_ndofs_l);
+    const auto nnz_max = static_cast<std::size_t>(m_pc_mat_nnz);
+    std::vector<int> r_h(n), nz_h(n), c_h(n*nnz_max);
+    std::vector<Real> a_h(n*nnz_max);
+    Gpu::copyAsync(Gpu::deviceToHost, m_r_indices_g.begin(), m_r_indices_g.begin() + n, r_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_num_nz.begin(), m_num_nz.begin() + n, nz_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_c_indices_g.begin(), m_c_indices_g.begin() + n*nnz_max, c_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_a_ij.begin(), m_a_ij.begin() + n*nnz_max, a_h.begin());
+    Gpu::streamSynchronize();
+
+    MatrixMarketWriter::Triplets local;
+    for (std::size_t row = 0; row < n; ++row) {
+        for (std::size_t k = 0; k < static_cast<std::size_t>(nz_h[row]); ++k) {
+            local.add(r_h[row], c_h[row*nnz_max + k], a_h[row*nnz_max + k]);
+        }
+    }
+
+    const Real alpha = (m_theta_dt * PhysConst::c) * (m_theta_dt * PhysConst::c);
+    std::ostringstream ss_theta_dt, ss_alpha;
+    ss_theta_dt.precision(10);
+    ss_alpha.precision(10);
+    ss_theta_dt << "theta_dt: " << m_theta_dt;
+    ss_alpha << "alpha: " << alpha;
+    std::vector<std::string> header = a_header;
+    header.emplace_back("matrix: SparseJacobianMatrix (CSR)");
+    header.emplace_back(std::string("operator: A = I")
+                        + (m_theta_dt > 0 ? " + curl(alpha curl)" : "")
+                        + (m_include_mass_matrices ? " + M, M = PC mass matrices" : ""));
+    header.emplace_back(ss_theta_dt.str());
+    header.emplace_back(ss_alpha.str());
+    header.emplace_back("nnz_max_per_row: " + std::to_string(m_pc_mat_nnz));
+
+    MatrixMarketWriter::Write(a_filename, header, a_dofs, local);
 }
 
 int SparseJacobianMatrix::Assemble (

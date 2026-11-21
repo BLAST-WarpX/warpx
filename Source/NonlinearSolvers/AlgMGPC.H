@@ -9,6 +9,7 @@
 
 #include "Fields.H"
 #include "MatrixPCAlgMG.H"
+#include "MatrixPrintControl.H"
 #include "Preconditioner.H"
 #include "PreconditionerTypes.H"
 #include "Utils/TextMsg.H"
@@ -65,6 +66,8 @@ protected:
 
     std::string m_name = amrex::getEnumNameString(PreconditionerType::pc_algmg);
 
+    MatrixPrintControl m_print;
+
     std::unique_ptr<MatrixPCAlgMG> m_algmg;
     bool m_algmg_is_set_up = false;
     RT m_algmg_theta_dt = RT(0); // theta*dt of the last AlgMG setup
@@ -78,6 +81,7 @@ void AlgMGPC<T,Ops>::printParameters () const
 {
     amrex::Print() << m_name << " verbose:                " << (m_verbose?"true":"false") << "\n";
     if (m_algmg) { m_algmg->printParameters(); }
+    m_print.printParameters();
 }
 
 template <class T, class Ops>
@@ -102,6 +106,7 @@ void AlgMGPC<T,Ops>::Define (const T& a_U,
     pp.query("verbose", m_verbose);
 
     m_algmg = std::make_unique<MatrixPCAlgMG>(m_name, a_U.dofRowOffsets());
+    m_print.Define(m_name);
 
     m_is_defined = true;
 }
@@ -116,6 +121,10 @@ void AlgMGPC<T,Ops>::Update ()
         "AlgMGPC::Update() called on undefined object");
 
     m_ops->AssemblePCMatrix();
+
+    if (m_print.ShouldPrint(m_ops->GetCurrentStep())) {
+        m_ops->PrintPCMatrix(m_print.FileName(), m_print.HeaderLines());
+    }
 
     // Without mass matrices, the matrix only depends on theta*dt.
     // Load balancing is not supported by the implicit solvers. If it is
