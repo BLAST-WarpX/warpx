@@ -29,6 +29,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 
 /**
  * \brief Top-level class for the electromagnetic finite-difference solver
@@ -134,7 +135,8 @@ class FiniteDifferenceSolver
             std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const& eb_update_E,
             MultiSigmaBox const& sigba,
             amrex::Real dt,
-            bool pml_has_particles
+            bool pml_has_particles,
+            std::optional<ablastr::fields::VectorField> Efield_rhs = std::nullopt
         );
 
        void EvolveFPML ( amrex::MultiFab* Ffield,
