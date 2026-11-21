@@ -268,8 +268,6 @@ public:
         return exe;
     }
 
-    bool calculate_debye_length() { return false; }
-
 private:
     // Factor used to increase the number of fusion reaction by decreasing the weight of the
     // produced particles

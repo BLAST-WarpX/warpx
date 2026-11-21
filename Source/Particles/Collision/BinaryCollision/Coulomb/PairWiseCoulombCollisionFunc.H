@@ -66,7 +66,6 @@ public:
 
         if (m_CoulombLog < 0.0) {
             m_calculate_debye_length = true;
-            m_exe.m_calculate_debye_length = m_calculate_debye_length;
         }
 
         std::string scattering_model_str = "BOBYLEV";
@@ -139,7 +138,6 @@ public:
 
         amrex::ParticleReal m_CoulombLog;
         CumulativeScatteringModel m_scattering_model;
-        bool m_calculate_debye_length = false;
         bool m_computeSpeciesDensities = true;
         bool m_need_product_data = false;
         bool m_isSameSpecies;
@@ -157,7 +155,6 @@ public:
         }
         return exe;
     }
-
 
     [[nodiscard]] bool calculate_debye_length() const { return m_calculate_debye_length; }
 

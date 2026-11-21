@@ -408,13 +408,9 @@ public:
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    [[nodiscard]] bool calculate_debye_length() const { return m_calculate_debye_length; }
-
 private:
 
     Executor m_exe;
-
-    bool m_calculate_debye_length = false;
 
     // Cross section data
 

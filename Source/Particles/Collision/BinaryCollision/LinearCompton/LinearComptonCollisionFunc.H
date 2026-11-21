@@ -222,8 +222,6 @@ public:
 
     [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    bool calculate_debye_length() { return false; }
-
 private:
     // Factor used to increase the number of collisions by decreasing the weight of the
     // produced particles

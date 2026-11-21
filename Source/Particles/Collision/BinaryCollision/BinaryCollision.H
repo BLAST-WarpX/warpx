@@ -103,8 +103,6 @@ public:
 
         m_binary_collision_functor = CollisionFunctor(collision_name, mypc, m_isSameSpecies);
 
-        m_calculate_debye_length = m_binary_collision_functor.calculate_debye_length();
-
         const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
