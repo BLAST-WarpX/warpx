@@ -632,8 +632,10 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
             // Impose t_lab as being the time stored in the openPMD file
             t_lab = it.time<double>() * it.timeUnitSI();
         }
-        std::string const ps_name = it.particles.begin()->first;
-        openPMD::ParticleSpecies ps = it.particles.begin()->second;
+        std::string const ps_name = plasma_injector.m_external_file_species_name.empty() ?
+                                        it.particles.begin()->first :
+                                        plasma_injector.m_external_file_species_name;
+        openPMD::ParticleSpecies ps = it.particles.at(ps_name);
 
         auto const npart = ps["position"]["x"].getExtent()[0];
 #if !defined(WARPX_DIM_1D_Z)  // 2D, 3D, RZ, 1D_R
