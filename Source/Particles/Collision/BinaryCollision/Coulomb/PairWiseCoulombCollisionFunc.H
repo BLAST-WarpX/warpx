@@ -13,6 +13,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "WarpX.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_ParmParse.H>
@@ -65,6 +66,7 @@ public:
 
         if (m_CoulombLog < 0.0) {
             m_calculate_debye_length = true;
+            m_exe.m_calculate_debye_length = m_calculate_debye_length;
         }
 
         std::string scattering_model_str = "BOBYLEV";
@@ -96,12 +98,12 @@ public:
          * @param[in] I1,I2 index arrays. They determine all elements that will be used.
          * @param[in,out] soa_1,soa_2 contain the struct of array data of the two species.
          * @param[in] n1,n2 are local densities.
-         * @param[in] global_lamdb global Debye length.
          * @param[in] q1,q2 are charges.
          * @param[in] m1,m2 are masses.
          * @param[in] dt is the time step length between two collision calls.
          * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
+         * @param[in] global_index grid cell where collision is taking place
          * @param[in] engine the random engine.
          */
         AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -113,11 +115,10 @@ public:
             const SoaData_type& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const  n1, amrex::ParticleReal const  n2,
-            amrex::Real const global_lamdb,
             amrex::ParticleReal const  q1, amrex::ParticleReal const  q2,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const /*cell_start_pair*/, amrex::IntVect const /*global_index*/,
+            index_type const /*cell_start_pair*/, amrex::IntVect const global_index,
             index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
@@ -126,22 +127,37 @@ public:
         {
             using namespace amrex::literals;
 
+            amrex::Real const global_debye_length = m_global_debye_length.ok() ? m_global_debye_length(global_index) : 0.;
+
             ElasticCollisionPerez(
                     I1s, I1e, I2s, I2e, I1, I2,
                     soa_1, soa_2, n1, n2,
                     q1, q2, m1, m2,
-                    dt, global_lamdb, m_scattering_model, m_CoulombLog,
+                    dt, global_debye_length, m_scattering_model, m_CoulombLog,
                     dV, engine, m_isSameSpecies, coll_idx);
         }
 
         amrex::ParticleReal m_CoulombLog;
         CumulativeScatteringModel m_scattering_model;
+        bool m_calculate_debye_length = false;
         bool m_computeSpeciesDensities = true;
         bool m_need_product_data = false;
         bool m_isSameSpecies;
+
+        amrex::Array4<amrex::Real> m_global_debye_length;
     };
 
-    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
+    [[nodiscard]] Executor executor (int const lev, amrex::MFIter const& mfi) const {
+        // A copy is needed to get around const correctness
+        Executor exe = m_exe;
+        if (m_calculate_debye_length) {
+            WarpX & warpx = WarpX::GetInstance();
+            amrex::MultiFab * global_debye_length = warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
+            exe.m_global_debye_length = global_debye_length->array(mfi);
+        }
+        return exe;
+    }
+
 
     [[nodiscard]] bool calculate_debye_length() const { return m_calculate_debye_length; }
 

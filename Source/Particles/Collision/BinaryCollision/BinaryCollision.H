@@ -322,14 +322,6 @@ public:
         }
         auto *tile_products_data = tile_products.data();
 
-        bool const calculate_debye_length = m_calculate_debye_length;
-        amrex::Array4<amrex::Real> global_debye_length_array;
-        if (calculate_debye_length) {
-            WarpX & warpx = WarpX::GetInstance();
-            amrex::MultiFab * global_debye_length = warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
-            global_debye_length_array = global_debye_length->array(mfi);
-        }
-
         const amrex::Box tilebox = mfi.tilebox();
 
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
@@ -625,11 +617,6 @@ public:
                         n1 = n1_in_each_cell[i_cell];
                     }
 
-                    amrex::Real global_lamdb = 0.;
-                    if (calculate_debye_length) {
-                        global_lamdb = global_debye_length_array(global_index);
-                    }
-
                     // Call the function in order to perform collisions
                     // If there are product species, mask, p_pair_indices_1/2, and
                     // p_pair_reaction_weight and p_product_data are filled here
@@ -638,7 +625,7 @@ public:
                         cell_half_1, cell_stop_1,
                         indices_1, indices_1,
                         soa_1, soa_1, get_position_1, get_position_1,
-                        n1, n1, global_lamdb,
+                        n1, n1,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
@@ -1122,11 +1109,6 @@ public:
                         n2 = n2_in_each_cell[i_cell];
                     }
 
-                    amrex::Real global_lamdb = 0.;
-                    if (calculate_debye_length) {
-                        global_lamdb = global_debye_length_array(global_index);
-                    }
-
                     // Call the function in order to perform collisions
                     // If there are product species, p_mask, p_pair_indices_1/2, and
                     // p_pair_reaction_weight and p_product_data are filled here
@@ -1134,7 +1116,7 @@ public:
                         cell_start_1, cell_stop_1, cell_start_2, cell_stop_2,
                         indices_1, indices_2,
                         soa_1, soa_2, get_position_1, get_position_2,
-                        n1, n2, global_lamdb,
+                        n1, n2,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);

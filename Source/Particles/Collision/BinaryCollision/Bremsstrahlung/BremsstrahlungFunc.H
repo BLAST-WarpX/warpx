@@ -89,7 +89,6 @@ public:
             SoaData_type const& soa_1, const SoaData_type& soa_2,
             GetParticlePosition<PIdx> /*get_position_1*/, GetParticlePosition<PIdx> /*get_position_2*/,
             amrex::ParticleReal const n1, amrex::ParticleReal const n2,
-            amrex::Real const /*global_lamdb*/,
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const m1, amrex::ParticleReal const m2,
             amrex::Real const dt, amrex::Real const /*dV*/, index_type coll_idx,

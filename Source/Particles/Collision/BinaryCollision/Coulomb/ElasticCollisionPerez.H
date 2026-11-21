@@ -70,7 +70,7 @@ void ElasticCollisionPerez (
     T_PR * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
     // compute Debye length lmdD (if not using a fixed L = Coulomb log)
-    T_PR const lmdD = L <= T_PR(0.0) ? global_lamdb : T_PR(-1.0);
+    T_PR const lmdD = global_lamdb;
 
     // compute atomic spacing
     const T_PR maxn = amrex::max(n1,n2);
