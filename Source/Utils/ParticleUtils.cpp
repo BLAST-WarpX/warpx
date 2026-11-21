@@ -33,7 +33,7 @@ namespace ParticleUtils
        Note that this does *not* rearrange particle arrays */
     amrex::DenseBins<ParticleTileDataType>
     findParticlesInEachCell (amrex::Geometry const& geom_lev,
-                             amrex::MFIter const & mfi,
+                             amrex::Box const & cbx,
                              ParticleTileType & ptile) {
 
         // Extract particle structures for this tile
@@ -41,7 +41,6 @@ namespace ParticleUtils
         auto ptd = ptile.getParticleTileData();
 
         // Extract box properties
-        Box const& cbx = mfi.tilebox(IntVect::TheZeroVector()); //Cell-centered box
         const auto lo = lbound(cbx);
         const auto dxi = geom_lev.InvCellSizeArray();
         const auto plo = geom_lev.ProbLoArray();
@@ -60,6 +59,15 @@ namespace ParticleUtils
             });
 
         return bins;
+    }
+
+    /* Find the particles and count the particles that are in each cell.
+       Note that this does *not* rearrange particle arrays */
+    amrex::DenseBins<ParticleTileDataType>
+    findParticlesInEachCell (amrex::Geometry const& geom_lev,
+                             amrex::MFIter const & mfi,
+                             ParticleTileType & ptile) {
+        return findParticlesInEachCell(geom_lev, mfi.tilebox(amrex::IntVect::TheZeroVector()), ptile);
     }
 
 } // namespace ParticleUtils
