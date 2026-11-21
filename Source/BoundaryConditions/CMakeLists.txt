@@ -14,6 +14,7 @@ foreach(D IN LISTS WarpX_DIMS)
         target_sources(lib_${SD}
           PRIVATE
             PML_RZ.cpp
+            PML_RZ_FDTD.cpp
         )
     endif()
 endforeach()
