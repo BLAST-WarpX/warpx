@@ -34,6 +34,7 @@ jobs:
       run: .github/workflows/source/check_analysis_file_type.py
     - name: Doxygen
       run: |
+        .github/workflows/dependencies/ubuntu_apt.sh
         sudo apt update
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
