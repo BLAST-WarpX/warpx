@@ -65,6 +65,7 @@ Boundary Conditions
    :maxdepth: 1
 
    boundary_conditions
+   embedded_boundary
 
 Multiphysics Processes
 ======================
