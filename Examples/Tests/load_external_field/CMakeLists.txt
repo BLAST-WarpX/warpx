@@ -1,6 +1,21 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+foreach(ratio IN ITEMS "2 1" "1 2" "3 3" "2 2")
+    string(REPLACE " " "x" layout "${ratio}")
+    foreach(buffer IN ITEMS 0 2)
+        add_warpx_test(
+            test_2d_nodal_gather_${layout}_buffer${buffer}
+            2
+            1
+            "inputs_base_2d_nodal_gather 'amr.ref_ratio_vect=${ratio}' warpx.n_field_gather_buffer=${buffer}"
+            analysis_nodal_gather.py
+            OFF
+            OFF
+        )
+    endforeach()
+endforeach()
+
 add_warpx_test(
     test_3d_load_external_field_grid_picmi  # name
     3  # dims
