@@ -1,0 +1,36 @@
+name: CodeOwnersPR
+
+# Triggers .github/workflows/codeowners.yml for pull requests.
+#
+# This workflow runs on `pull_request` with a read-only token and does nothing
+# itself: for pull requests from forks, only the `workflow_run` workflow it
+# triggers can request reviews and comment. The approval rules for workflows
+# of first-time contributors apply to this workflow, and so to the code owner
+# requests and pings.
+#
+# Pull requests that are drafts or whose title starts with `[WIP]` are skipped.
+# Code owners are contacted once they are ready for review: when a draft is
+# marked ready (`ready_for_review`) or when `[WIP]` is removed from the title
+# (`edited`), or on a later push.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  trigger:
+    name: Trigger code owner requests
+    # `startsWith` is case-insensitive. Of all edits, only react to removing
+    # `[WIP]` from the title (edits of the description etc. are ignored).
+    if: >-
+      github.repository == 'BLAST-WarpX/warpx' &&
+      github.event.pull_request.draft == false &&
+      !startsWith(github.event.pull_request.title, '[WIP]') &&
+      (github.event.action != 'edited' ||
+       startsWith(github.event.changes.title.from, '[WIP]'))
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No OP
+        run: echo "This workflow triggers the Code Owners workflow."
