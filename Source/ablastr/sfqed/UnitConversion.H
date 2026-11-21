@@ -241,7 +241,7 @@ namespace ablastr::qed
     * Schwinger field in heaviside_lorentz units
     */
     template <typename RealType>
-    constexpr auto heaviside_lorentz_schwinger_field = static_cast<RealType>(
+    constexpr auto heaviside_lorentz_schwinger_field_v = static_cast<RealType>(
         convert_from_to<unit_system::SI, unit_system::heaviside_lorentz,quantity::E>(
             ablastr::constant::SI::schwinger_field_v<double>));
 
@@ -249,7 +249,7 @@ namespace ablastr::qed
     * Elementary charge in heaviside_lorentz units
     */
     template <typename RealType>
-    constexpr auto heaviside_lorentz_elementary_charge = static_cast<RealType>(
+    constexpr auto heaviside_lorentz_elementary_charge_v = static_cast<RealType>(
         convert_from_to<unit_system::SI, unit_system::heaviside_lorentz,quantity::charge>(
             ablastr::constant::SI::q_e_v<double>));
 }

@@ -9,7 +9,6 @@
 
 #include "BreitWheelerEngineWrapper_fwd.H"
 
-#include "QedChiFunctions.H"
 #include "QedWrapperCommons.H"
 #include "Utils/WarpXConst.H"
 
@@ -25,6 +24,8 @@
 #include <picsar_qed/physics/quantum_sync/quantum_sync_engine_core.hpp>
 #include <picsar_qed/physics/quantum_sync/quantum_sync_engine_tables.hpp>
 #include <picsar_qed/physics/unit_conversion.hpp>
+
+#include <ablastr/sfqed/ChiFunctions.H>
 
 #include <cmath>
 #include <vector>
@@ -150,7 +151,7 @@ public:
         const amrex::ParticleReal gamma = std::sqrt(1._rt + (ux*ux + uy*uy + uz*uz)*inv_c2);
         const auto energy = gamma*m_e*PhysConst::c2;
 
-        const auto chi_part = QedUtils::chi_ele_pos(
+        const auto chi_part = ablastr::qed::chi_ele_pos(
             m_e*ux, m_e*uy, m_e*uz, ex, ey, ez, bx, by, bz);
 
         if (chi_part < m_qs_minimum_chi_part) {
@@ -235,7 +236,7 @@ public:
         auto py = uy*me;
         auto pz = uz*me;
 
-        const auto chi_particle = QedUtils::chi_ele_pos(
+        const auto chi_particle = ablastr::qed::chi_ele_pos(
             px, py, pz, ex, ey, ez, bx, by, bz);
 
         auto momentum_particle = pxr_m::vec3<amrex::ParticleReal>{px, py, pz};
