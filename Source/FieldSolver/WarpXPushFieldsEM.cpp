@@ -987,10 +987,10 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
     if (do_pml && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         } else {
             m_fdtd_solver_cp[lev]->EvolveBPML(
-                m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
+                m_fields, patch_type, lev, a_dt, WarpX::do_pml_dive_cleaning);
         }
     }
 
@@ -1091,7 +1091,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
 void
 WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1102,7 +1102,7 @@ WarpX::EvolveF (amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     EvolveF(lev, PatchType::fine, a_dt, rho_comp);
     if (lev > 0) { EvolveF(lev, PatchType::coarse, a_dt, rho_comp); }
@@ -1111,23 +1111,25 @@ WarpX::EvolveF (int lev, amrex::Real a_dt, int const rho_comp)
 void
 WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_comp)
 {
-    if (!do_dive_cleaning) { return; }
+    if (!do_dive_cleaning && !do_pml_dive_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveF()");
 
     // Evolve F field in regular cells
-    if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                                        m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
-    } else {
-        m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
-                                        m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                                        m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+    if (do_dive_cleaning) {
+        if (patch_type == PatchType::fine) {
+            m_fdtd_solver_fp[lev]->EvolveF( m_fields.get(FieldType::F_fp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                                            m_fields.get(FieldType::rho_fp,lev), rho_comp, a_dt );
+        } else {
+            m_fdtd_solver_cp[lev]->EvolveF( m_fields.get(FieldType::F_cp, lev),
+                                            m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                                            m_fields.get(FieldType::rho_cp,lev), rho_comp, a_dt );
+        }
     }
 
     // Evolve F field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml_dive_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
                 m_fields.get(FieldType::pml_F_fp, lev),
@@ -1145,7 +1147,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
 void
 WarpX::EvolveG (amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -1156,7 +1158,7 @@ WarpX::EvolveG (amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     EvolveG(lev, PatchType::fine, a_dt);
 
@@ -1169,21 +1171,21 @@ WarpX::EvolveG (int lev, amrex::Real a_dt)
 void
 WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
 {
-    if (!do_divb_cleaning) { return; }
+    if (!do_divb_cleaning && !do_pml_divb_cleaning) { return; }
 
     ABLASTR_PROFILE("WarpX::EvolveG()");
 
     bool const skip_lev0_coarse_patch = true;
 
     // Evolve G field in regular cells
-    if (patch_type == PatchType::fine)
+    if (do_divb_cleaning && patch_type == PatchType::fine)
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
         m_fdtd_solver_fp[lev]->EvolveG(
             m_fields.get(FieldType::G_fp, lev),
             Bfield_fp[lev], a_dt);
     }
-    else // coarse patch
+    else if (do_divb_cleaning) // coarse patch
     {
         ablastr::fields::MultiLevelVectorField const& Bfield_cp_new = m_fields.get_mr_levels_alldirs(FieldType::Bfield_cp, finest_level, skip_lev0_coarse_patch);
         m_fdtd_solver_cp[lev]->EvolveG(
@@ -1191,7 +1193,13 @@ WarpX::EvolveG (int lev, PatchType patch_type, amrex::Real a_dt)
             Bfield_cp_new[lev], a_dt);
     }
 
-    // TODO Evolution in PML cells will go here
+    if (do_pml_divb_cleaning && do_pml && pml[lev] && pml[lev]->ok()) {
+        bool const fine = patch_type == PatchType::fine;
+        auto* const solver = fine ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+        solver->EvolveGPML(m_fields.get(fine ? FieldType::pml_G_fp : FieldType::pml_G_cp, lev),
+                          m_fields.get_alldirs(fine ? FieldType::pml_B_fp : FieldType::pml_B_cp, lev),
+                          a_dt);
+    }
 }
 
 void

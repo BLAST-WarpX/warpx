@@ -141,6 +141,9 @@ class FiniteDifferenceSolver
                          ablastr::fields::VectorField Efield,
                          amrex::Real dt );
 
+        void EvolveGPML (amrex::MultiFab* Gfield,
+                         ablastr::fields::VectorField Bfield, amrex::Real dt);
+
         /**
           * \brief E-update in the hybrid PIC algorithm as described in
           * Winske et al. (2003) Eq. 10.
@@ -535,6 +538,7 @@ class FiniteDifferenceSolver
         void EvolveBPMLCartesian (
             std::array< amrex::MultiFab*, 3 > Bfield,
             ablastr::fields::VectorField Efield,
+            amrex::MultiFab const* Gfield,
             amrex::Real dt,
             bool dive_cleaning);
 
@@ -546,12 +550,16 @@ class FiniteDifferenceSolver
             std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const& eb_update_E,
             amrex::MultiFab* Ffield,
             MultiSigmaBox const& sigba,
-            amrex::Real dt, bool pml_has_particles );
+            amrex::Real dt, bool pml_has_particles, bool divb_cleaning );
 
         template< typename T_Algo >
         void EvolveFPMLCartesian ( amrex::MultiFab* Ffield,
                                    ablastr::fields::VectorField Efield,
                                    amrex::Real dt );
+
+        template<typename T_Algo>
+        void EvolveGPMLCartesian (amrex::MultiFab* Gfield,
+                                  ablastr::fields::VectorField Bfield, amrex::Real dt);
 
         template<typename T_Algo>
         void HybridPICSolveECartesian (
