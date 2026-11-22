@@ -175,7 +175,6 @@ Human developers read everything you write: PR descriptions, commit messages, an
 
 - Write a few sentences on what changed and why, plus what reviewers need to know (e.g., changed defaults, checksum updates, open questions). A short bulleted list is fine.
 - Do not walk through the diff file by file or paste long test logs.
-- Do not add empty sections, promotional wording, or exaggerated claims.
 
 ### Code comments and commit messages
 
