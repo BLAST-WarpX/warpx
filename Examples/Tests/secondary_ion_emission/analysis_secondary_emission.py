@@ -70,7 +70,7 @@ t_impact[:N_eb] = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 # ions hitting the domain boundary
 ion_r0 = np.sqrt(ion_x0[N_eb] ** 2 + ion_y0[N_eb] ** 2)
 ion_theta0 = np.arctan2(ion_y0[N_eb], ion_x0[N_eb])
-vr0 = vx0[N_eb]*np.cos(ion_theta0) + vy0[N_eb]*np.sin(ion_theta0)
+vr0 = vx0[N_eb] * np.cos(ion_theta0) + vy0[N_eb] * np.sin(ion_theta0)
 t_impact[N_eb] = (rmax - ion_r0) / vr0  # Upper radial boundary
 t_impact[N_eb + 1] = (zmin - ion_z0[N_eb + 1]) / vz0[N_eb + 1]  # Lower z boundary
 t_impact[N_eb + 2] = (zmax - ion_z0[N_eb + 2]) / vz0[N_eb + 2]  # Upper z boundary
