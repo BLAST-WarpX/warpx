@@ -49,15 +49,19 @@ PML_RZ::PML_RZ (int lev, amrex::BoxArray const& grid_ba, amrex::DistributionMapp
     amrex::MultiFab const& Et_fp = *fields.get(FieldType::Efield_fp, Direction{1}, lev);
     amrex::BoxArray const ba_Er = amrex::convert(grid_ba, Er_fp.ixType().toIntVect());
     amrex::BoxArray const ba_Et = amrex::convert(grid_ba, Et_fp.ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Er, grid_dm, Er_fp.nComp(), Er_fp.nGrowVect(), 0.0_rt);
-    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Et, grid_dm, Et_fp.nComp(), Et_fp.nGrowVect(), 0.0_rt);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Er, grid_dm, Er_fp.nComp(), Er_fp.nGrowVect(), 0.0_rt,
+                      true, true, true);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Et, grid_dm, Et_fp.nComp(), Et_fp.nGrowVect(), 0.0_rt,
+                      true, true, true);
 
     amrex::MultiFab const& Br_fp = *fields.get(FieldType::Bfield_fp,Direction{0},lev);
     amrex::MultiFab const& Bt_fp = *fields.get(FieldType::Bfield_fp,Direction{1},lev);
     amrex::BoxArray const ba_Br = amrex::convert(grid_ba, Br_fp.ixType().toIntVect());
     amrex::BoxArray const ba_Bt = amrex::convert(grid_ba, Bt_fp.ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Br, grid_dm, Br_fp.nComp(), Br_fp.nGrowVect(), 0.0_rt);
-    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_Bt, grid_dm, Bt_fp.nComp(), Bt_fp.nGrowVect(), 0.0_rt);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Br, grid_dm, Br_fp.nComp(), Br_fp.nGrowVect(), 0.0_rt,
+                      true, true, true);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_Bt, grid_dm, Bt_fp.nComp(), Bt_fp.nGrowVect(), 0.0_rt,
+                      true, true, true);
 
 }
 
@@ -154,32 +158,6 @@ PML_RZ::FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patc
         amrex::Periodicity const& period = m_geom->periodicity();
         const amrex::Vector<amrex::MultiFab*> mf = {pml_Br, pml_Bt};
         ablastr::utils::communication::FillBoundary(mf, do_single_precision_comms, period, nodal_sync);
-    }
-}
-
-void
-PML_RZ::CheckPoint (ablastr::fields::MultiFabRegister& fields, std::string const& dir) const
-{
-    using ablastr::fields::Direction;
-
-    if (fields.has(FieldType::pml_E_fp, Direction{0}, 0)) {
-        amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_E_fp, Direction{0}, 0), dir+"_Er_fp");
-        amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_E_fp, Direction{1}, 0), dir+"_Et_fp");
-        amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_B_fp, Direction{0}, 0), dir+"_Br_fp");
-        amrex::VisMF::AsyncWrite(*fields.get(FieldType::pml_B_fp, Direction{1}, 0), dir+"_Bt_fp");
-    }
-}
-
-void
-PML_RZ::Restart (ablastr::fields::MultiFabRegister& fields, std::string const& dir)
-{
-    using ablastr::fields::Direction;
-
-    if (fields.has(FieldType::pml_E_fp, Direction{0}, 0)) {
-        amrex::VisMF::Read(*fields.get(FieldType::pml_E_fp, Direction{0}, 0), dir+"_Er_fp");
-        amrex::VisMF::Read(*fields.get(FieldType::pml_E_fp, Direction{1}, 0), dir+"_Et_fp");
-        amrex::VisMF::Read(*fields.get(FieldType::pml_B_fp, Direction{0}, 0), dir+"_Br_fp");
-        amrex::VisMF::Read(*fields.get(FieldType::pml_B_fp, Direction{1}, 0), dir+"_Bt_fp");
     }
 }
 
