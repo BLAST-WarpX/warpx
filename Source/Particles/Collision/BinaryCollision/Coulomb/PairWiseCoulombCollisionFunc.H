@@ -64,10 +64,6 @@ public:
         m_CoulombLog = CoulombLog;
         m_exe.m_CoulombLog = m_CoulombLog;
 
-        if (m_CoulombLog < 0.0) {
-            m_calculate_debye_length = true;
-        }
-
         std::string scattering_model_str = "BOBYLEV";
         pp_collision_name.query("cumulative_scattering_angle_model", scattering_model_str);
 
@@ -148,7 +144,7 @@ public:
     [[nodiscard]] Executor executor (int const lev, amrex::MFIter const& mfi) const {
         // A copy is needed to get around const correctness
         Executor exe = m_exe;
-        if (m_calculate_debye_length) {
+        if (uses_global_debye_length()) {
             WarpX & warpx = WarpX::GetInstance();
             amrex::MultiFab * global_debye_length = warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
             exe.m_global_debye_length = global_debye_length->array(mfi);
@@ -156,7 +152,10 @@ public:
         return exe;
     }
 
-    [[nodiscard]] bool calculate_debye_length() const { return m_calculate_debye_length; }
+    [[nodiscard]] bool uses_global_debye_length () const
+    {
+        return m_CoulombLog < 0.0;
+    }
 
 private:
     amrex::ParticleReal m_CoulombLog;
@@ -164,7 +163,6 @@ private:
 
     Executor m_exe;
 
-    bool m_calculate_debye_length = false;
     CumulativeScatteringModel m_scattering_model;
 
 };

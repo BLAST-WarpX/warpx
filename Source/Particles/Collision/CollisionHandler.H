@@ -37,8 +37,6 @@ private:
     amrex::Vector<std::string> collision_types;
     amrex::Vector< std::unique_ptr<CollisionBase> > allcollisions;
 
-    bool m_calculate_debye_length = false;
-
 };
 
 #endif // WARPX_PARTICLES_COLLISION_COLLISIONHANDLER_H_

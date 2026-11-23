@@ -1343,6 +1343,15 @@ public:
 
     }
 
+    [[nodiscard]] bool uses_global_debye_length () const override
+    {
+        if constexpr (requires { m_binary_collision_functor.uses_global_debye_length(); }) {
+            return m_binary_collision_functor.uses_global_debye_length();
+        } else {
+            return false;
+        }
+    }
+
 private:
 
     bool m_isSameSpecies;

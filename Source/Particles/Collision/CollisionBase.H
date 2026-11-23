@@ -42,7 +42,7 @@ public:
     [[nodiscard]] CollisionSteppingMode get_collision_stepping_mode() const
         { return m_collision_stepping_mode; }
 
-    [[nodiscard]] bool calculate_debye_length() const {return m_calculate_debye_length;}
+    [[nodiscard]] virtual bool uses_global_debye_length () const { return false; }
 
 protected:
 
@@ -51,8 +51,6 @@ protected:
     int m_ndt = 1;
     int m_start_step = 0;
     CollisionSteppingMode m_collision_stepping_mode = CollisionSteppingMode::Supercycle;
-
-    bool m_calculate_debye_length = false;
 
 };
 
