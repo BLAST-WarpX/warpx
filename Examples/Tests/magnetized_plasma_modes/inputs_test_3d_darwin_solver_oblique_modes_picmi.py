@@ -72,7 +72,7 @@ class ObliqueModes(object):
     NPPC = 4  # seed macroparticles/cell/species before symmetrization (x3 after)
     ES_SHAPE = 3  # particle shape for the electrostatic part of the solve
     MS_SHAPE = 1  # particle shape for the magnetostatic part of the solve
-    GMRES_TOL = 1e-5
+    GMRES_TOL = 1e-4
     DT_WCI = 0.04  # dt * Omega_ci
     TOTAL_STEPS = 130
 
