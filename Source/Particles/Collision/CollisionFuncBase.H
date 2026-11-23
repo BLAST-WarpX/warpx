@@ -24,6 +24,8 @@ public:
     //! Optional hook to allocate additional data structures.
     virtual void AllocData () {}
 
+    [[nodiscard]] bool uses_global_debye_length () const { return false; }
+
 };
 
 #endif /* WARPX_COLLISION_FUNC_BASE_H_ */

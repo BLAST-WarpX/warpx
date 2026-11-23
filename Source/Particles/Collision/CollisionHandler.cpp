@@ -29,6 +29,7 @@
 #endif
 #include <AMReX_ParmParse.H>
 
+#include <algorithm>
 #include <vector>
 
 CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
