@@ -326,9 +326,10 @@ Overall simulation parameters
           - ``implicit_evolve.suborbit_statistics_interval`` (``int``, default: 100)
           - ``implicit_evolve.print_unconverged_particle_details`` (``bool``, default: false)
 
-        - ``implicit_evolve.petsc_reinit_interval`` (``integer``, default: 1000 on GPU builds, 0 otherwise)
+        - ``implicit_evolve.petsc_reinit_interval`` (``integer``, default: 1000 on GPU builds with PETSc older than 3.26.1, 0 otherwise)
           With ``newton.linear_solver = petsc_ksp`` or ``implicit_evolve.nonlinear_solver = petsc_snes``, finalize and re-initialize PETSc every this many steps, recreating the PETSc solver objects.
-          This works around host memory that the GPU builds of PETSc (3.24 to 3.26, CUDA and HIP) accumulate in every GMRES iteration and release only in ``PetscFinalize``, which otherwise grows without bound in long runs.
+          This works around host memory that the GPU builds of PETSc (3.24 to 3.26.0, CUDA and HIP) accumulate in every GMRES iteration and release only in ``PetscFinalize``, which otherwise grows without bound in long runs.
+          PETSc 3.26.1 fixes this.
           The leak is a few kB per GMRES iteration, so the default interval bounds it to tens of MB per rank; 0 never re-initializes PETSc.
           Output that PETSc produces at finalization (for example with ``-log_view``) is produced at every re-initialization.
           Set the interval to 0 if the run holds PETSc objects outside WarpX's implicit solvers (for example petsc4py objects in a PICMI script), which a re-initialization would invalidate.
@@ -357,6 +358,13 @@ Overall simulation parameters
           Wider stencils are supported by ``jacobian.pc_type = pc_petsc``, ``pc_algmg``, and ``pc_jacobi``.
           For these preconditioners, a width of 1 is sufficient for good GMRES performance in most cases.
           The ``pc_curl_curl_mlmg`` preconditioner forces the width to 0.
+
+        - ``jacobian.epsJFNK`` (``float``, default: 1.0e-6).
+          Relative perturbation factor for the matrix-free finite-difference Jacobian; must be finite and nonzero.
+          The perturbation magnitude scales with the base solution norm, using the right-hand-side norm when the base solution is zero.
+          This accommodates poorly scaled solution vectors whose norms are not of order unity.
+          For known linear systems (affine residuals), a value of ``1.0`` can reduce cancellation error and is useful for testing the solver and preconditioner.
+          For nonlinear problems, retain a small value such as the default: an order-one perturbation can produce an inaccurate Jacobian and impair convergence.
 
         - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
@@ -1904,10 +1912,15 @@ Particle initialization
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
       file must contain a field with the name given by ``<species_name>.density_mesh_name``
-      (default ``density``). See
-      `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file. There is
-      another optional parameter,
+      (default ``density``). See the following files for examples of how to prepare
+      the openPMD data file in each geometry:
+      `1D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_1d_load_density_prepare.py>`__,
+      `2D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_2d_load_density_prepare.py>`__,
+      `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__,
+      `RZ <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rz_load_density_prepare.py>`__
+      and
+      `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rsphere_load_density_prepare.py>`__.
+      There is another optional parameter,
       ``<species_name>.read_density_distributed=true``, which controls how the
       openPMD data are distributed among processes. If it is set to false, the
       openPMD data are loaded and duplicated on every process. If it is set to
@@ -2066,12 +2079,14 @@ Particle initialization
         * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
           from an openPMD file and converted to an isotropic vector
           :math:`u_\mathrm{std}` at the particle positions (requires a WarpX build with openPMD;
-          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          not supported yet in ``RZ`` / ``RCYLINDER``). The following is required:
           ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
           contain a scalar openPMD mesh with the name given by
-          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
-          for an example of how to prepare the openPMD data file.
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
+          following files for examples of how to prepare the openPMD data file in each geometry:
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          and
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
       More specifically, the plasma is initialized with a Maxwell-Juttner distribution
@@ -2122,13 +2137,15 @@ Particle initialization
         * If ``parser``, the following is required:
           ``<species_name>.temperature_in_eV_function(x,y,z)``.
         * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
-          from an openPMD file (requires a WarpX build with openPMD; not supported yet in ``RZ`` / ``RCYLINDER`` /
-          ``RSPHERE``). The following is required:
+          from an openPMD file (requires a WarpX build with openPMD; not supported yet in ``RZ`` /
+          ``RCYLINDER``). The following is required:
           ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
           contain a scalar openPMD mesh with the name given by
-          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
-          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
-          for an example of how to prepare the openPMD data file.
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See the
+          following files for examples of how to prepare the openPMD data file in each geometry:
+          `3D <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          and
+          `RSPHERE <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_rsphere_initial_distribution_prepare.py>`__.
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
@@ -3245,6 +3262,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using two-product ``nuclearfusion`` with ``scattering_angle_model = legendre``, consider the reaction to be ordered as ``A + B -> C + D``, as described for :pp:param:`<collision_name>.species`.
     The first entry in ``product_species`` must be product ``C``, and the second must be product ``D``.
     For example, T(d,n)He4 corresponds to ``d + T -> n + He4``, so ``product_species`` must list the neutron first and helium4 second.
+    For two-product ``nuclearfusion`` reactions, the product macroparticles are created so that charge is conserved locally.
+    If each product has the same charge as one of the reactants (e.g. ``D + D -> T + p`` or ``D + He3 -> He4 + p``), one macroparticle is created per product, at the position of the reactant with the same charge.
+    Otherwise (e.g. ``D + T -> n + He4`` or ``D + D -> n + He3``), two macroparticles are created per product, one at the position of each reactant, each with half of the reaction weight.
 
 .. pp:param:: <collision_name>.ndt_supercycle
     :type: ``int``
@@ -4632,7 +4652,8 @@ Additional parameters
     memory, which is faster than the usual ``__global__``
     memory. Performance impact will depend on the relative overhead
     of assigning the particles to bins small enough to fit in the
-    space available for the temporary buffers.
+    space available for the temporary buffers. With CUDA and HIP, this
+    cannot be used with more than one azimuthal mode in RZ geometry.
 
 .. pp:param:: warpx.do_shared_mem_current_deposition
     :type: ``bool``
@@ -4647,8 +4668,12 @@ Additional parameters
     of assigning the particles to bins small enough to fit in the
     space available for the temporary buffers. Performance is mostly improved
     when there is lots of contention between particles writing to the same cell
-    (e.g. for high particles per cell). This feature is only available for CUDA
-    and HIP, and is only recommended for 3D or 2D.
+    (e.g. for high particles per cell). We have observed this option to be faster
+    on AMD GPUs such as the MI250X and MI300A for greater than ~4 particles per cell,
+    but not neccesarily on NVIDIA hardware such as the A100. This feature is only available
+    for CUDA and HIP, and is only recommended for 3D or 2D. It supports the ``direct``,
+    ``esirkepov`` and ``villasenor`` values of :pp:param:`algo.current_deposition` with the
+    explicit particle push, and cannot be used with more than one azimuthal mode in RZ.
 
 .. pp:param:: warpx.shared_tilesize
     :type: list of ``int``
@@ -4877,8 +4902,10 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, and ``part_per_cell_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
-    ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
+    ``T_<species_name>`` is the temperature in eV (valid for relativistic velocities, consistent with the Maxwell-Juttner distribution).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
+    With :pp:param:`<species_name>.do_temperature_deposition`, the per-direction temperatures ``Tx_<species_name>``, ``Ty_<species_name>`` and ``Tz_<species_name>`` (``Tr_``, ``Tt_`` and ``Tz_`` in RZ and RCYLINDER, ``Tr_``, ``Tt_`` and ``Tp_`` in RSPHERE) are also available, in K.
+    In openPMD output, all of these temperatures carry the temperature unit dimension. ``T_<species_name>`` is still written in eV, but with ``unitSI`` = :math:`q_e/k_B`, so readers that apply ``unitSI`` (e.g., openPMD-viewer) return it in K. Plotfile readers (e.g., yt) return ``T_<species_name>`` in eV.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
@@ -4983,7 +5010,8 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Reduce size of the selected diagnostic fields output by this ratio in each dimension.
-    (For a ratio of N, this is done by averaging the fields over N or (N+1) points depending on the staggering).
+    Coarsening uses ``ablastr::coarsen::sample``, which samples one or two nearby source points per dimension, depending on the field staggering.
+    See :ref:`developers-fields-coarsening-interpolation-helpers`.
     If ``blocking_factor`` and ``max_grid_size`` are used for the domain decomposition, as detailed in
     the :ref:`domain decomposition <usage_domain_decomposition>` section, ``coarsening_ratio`` should be an integer
     divisor of ``blocking_factor``. If :pp:param:`warpx.numprocs` is used instead, the total number of cells in a given
@@ -6094,6 +6122,7 @@ Schwinger process
     :optional:
 
     If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
+    Activating the Schwinger process does not require the code to be compiled with ``QED=TRUE``.
     If :pp:param:`warpx.do_qed_schwinger = 1`, Schwinger product species must be specified with
     :pp:param:`qed_schwinger.ele_product_species` and :pp:param:`qed_schwinger.pos_product_species`.
     Schwinger process requires either :pp:param:`warpx.grid_type = collocated` or

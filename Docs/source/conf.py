@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2017-2020 Andrew Myers, Axel Huebl, Burlen Loring
+# Copyright 2017-2026 Andrew Myers, Axel Huebl, Burlen Loring
 # Maxence Thevenet, Remi Lehe
 #
 # This file is part of WarpX.
@@ -25,6 +25,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import datetime
 import json
 import os
 import subprocess
@@ -181,7 +182,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "WarpX"
-copyright = "2017-2021, WarpX collaboration"
+copyright = f"2017-{datetime.date.today().year}, WarpX collaboration"
 author = "WarpX collaboration"
 
 # Parse WarpX version information

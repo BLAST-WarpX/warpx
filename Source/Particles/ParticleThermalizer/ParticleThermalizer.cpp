@@ -90,10 +90,7 @@ ParticleThermalizer::ParticleThermalizer():
     WARPX_ABORT_WITH_MESSAGE("particle_thermalizer: one or three values must be specified for 'momentum_threshold'");
   }
   WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-      std::all_of(
-          m_momentum_threshold.begin(),
-          m_momentum_threshold.end(),
-          [](const auto& el){return (el >= 0._rt);}),
+      std::ranges::all_of(m_momentum_threshold, [](const auto& el){return (el >= 0._rt);}),
         "particle_thermalizer: 'momentum_threshold' must be non-negative");
 
   pp.get("theta", m_theta);

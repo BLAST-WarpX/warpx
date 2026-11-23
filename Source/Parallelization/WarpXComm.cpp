@@ -491,7 +491,7 @@ namespace
 }
 
 void
-WarpX::UpdateAuxiliaryData ()
+WarpX::UpdateAuxiliaryData (std::optional<amrex::Real> field_time)
 {
     ABLASTR_PROFILE("WarpX::UpdateAuxiliaryData()");
 
@@ -527,7 +527,7 @@ WarpX::UpdateAuxiliaryData ()
 
             // Apply each external field map with its time-dependent scale factor.
             for (int ic = 0; ic < ncomp_src; ++ic) {
-                const amrex::ParticleReal time_factor = metaE[ic].time_executor(t_new[lev]);
+                const amrex::ParticleReal time_factor = metaE[ic].time_executor(field_time.value_or(t_new[lev]));
 
                 // dst += time_factor * src(component=ic)
                 amrex::Saxpy(*E_aux[0], time_factor, *E_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
@@ -555,7 +555,7 @@ WarpX::UpdateAuxiliaryData ()
 
             // Apply each external field map with its time-dependent scale factor.
             for (int ic = 0; ic < ncomp_src; ++ic) {
-                const amrex::ParticleReal time_factor = metaB[ic].time_executor(t_new[lev]);
+                const amrex::ParticleReal time_factor = metaB[ic].time_executor(field_time.value_or(t_new[lev]));
 
                 // dst += time_factor * src(component=ic)
                 amrex::Saxpy(*B_aux[0], time_factor, *B_ext[0], /*src_comp=*/ic, /*dst_comp=*/0, /*ncomp=*/1,
@@ -616,6 +616,16 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
 
         amrex::IntVect const& refinement_ratio = refRatio(lev-1);
         amrex::IntVect const& ng_src = guard_cells.ng_FieldGather;
+
+        // Before reading aux[lev-1] guard cells in the coarse/fine interpolation below,
+        // make them consistent with valid data. For example, at level 0 they were filled by
+        // the staggered-to-nodal centering stencil, which uses zero for source values
+        // beyond the allocated guard cells, so the outermost guard layer is wrong.
+        // Copying those guard cells (e.g., with safe_guard_cells active, so that
+        // ng_FieldGather = ng_alloc_EB) can otherwise overwrite valid data at box boundaries.
+        if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
+            FillBoundaryAux(lev-1, ng_src);
+        }
 
         UpdateAuxiliaryDataStagToNodalField(
             m_fields, Bfield_fp, Bfield_aux, FieldType::Bfield_fp, FieldType::Bfield_cp,

@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_test_rz_langmuir_multi_direct
+
+# test input parameters
+warpx.do_shared_mem_charge_deposition = 1
+warpx.do_shared_mem_current_deposition = 1

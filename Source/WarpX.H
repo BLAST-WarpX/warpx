@@ -125,8 +125,10 @@ public:
         return field_boundary_hi;
     }
 
-    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
-                                               int  bdry_side ) const;
+    [[nodiscard]] int GetPECInsulator_IsESet (int bdry_dir,
+                                              int bdry_side) const;
+
+    void ApplyPECInsulatorToPCMasks (int lev);
 
     void InitData ();
 
@@ -143,7 +145,7 @@ public:
     void SyncMassMatricesPC ();
     void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
-    void FinishImplicitParticleUpdate (amrex::Real a_time);
+    void FinishImplicitParticleUpdate (amrex::Real a_time, amrex::Real a_dt);
     void ResetImplicitParticleData ();
     void SetElectricFieldAndApplyBCs (const WarpXSolverVec& a_E, amrex::Real a_time);
     void UpdateMagneticFieldAndApplyBCs (ablastr::fields::MultiLevelVectorField const& a_Bn,
@@ -681,7 +683,8 @@ public:
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
-    void UpdateAuxiliaryData ();
+    // field_time overrides the per-level t_new used to scale external particle maps.
+    void UpdateAuxiliaryData (std::optional<amrex::Real> field_time = std::nullopt);
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
 
