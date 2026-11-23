@@ -41,13 +41,20 @@ rmax, zmax = [eval(v) for v in input_dict["geometry.prob_hi"]]
 
 R = float(input_dict["my_constants.radius"][0])
 
+# These are uses in the input parameters and are needed for the "eval"s
+cos = np.cos
+sin = np.sin
+
 ion_x0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_pos_x"]])
+ion_y0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_pos_y"]])
 ion_z0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_pos_z"]])
 ion_ux0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_ux"]]) * clight
+ion_uy0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_uy"]]) * clight
 ion_uz0 = np.array([eval(v) for v in input_dict["ions.multiple_particles_uz"]]) * clight
 
-gamma = np.sqrt(1.0 + (ion_ux0**2 + ion_uz0**2) / clight**2)
+gamma = np.sqrt(1.0 + (ion_ux0**2 + ion_uy0**2 + ion_uz0**2) / clight**2)
 vx0 = ion_ux0 / gamma
+vy0 = ion_uy0 / gamma
 vz0 = ion_uz0 / gamma
 
 # Number of ions impacting the EB surface
@@ -61,12 +68,15 @@ c_q = ion_x0[:N_eb] ** 2 + ion_z0[:N_eb] ** 2 - R**2
 t_impact[:N_eb] = (-b_q - np.sqrt(b_q**2 - 4 * a_q * c_q)) / (2 * a_q)
 
 # ions hitting the domain boundary
-t_impact[N_eb] = (rmax - ion_x0[N_eb]) / vx0[N_eb]  # Upper radial boundary
+ion_r0 = np.sqrt(ion_x0[N_eb] ** 2 + ion_y0[N_eb] ** 2)
+ion_theta0 = np.arctan2(ion_y0[N_eb], ion_x0[N_eb])
+vr0 = vx0[N_eb]*np.cos(ion_theta0) + vy0[N_eb]*np.sin(ion_theta0)
+t_impact[N_eb] = (rmax - ion_r0) / vr0  # Upper radial boundary
 t_impact[N_eb + 1] = (zmin - ion_z0[N_eb + 1]) / vz0[N_eb + 1]  # Lower z boundary
 t_impact[N_eb + 2] = (zmax - ion_z0[N_eb + 2]) / vz0[N_eb + 2]  # Upper z boundary
 
 x_impact = ion_x0 + vx0 * t_impact
-y_impact = np.zeros_like(x_impact)
+y_impact = ion_y0 + vy0 * t_impact
 z_impact = ion_z0 + vz0 * t_impact
 
 tolerance = 0.02
