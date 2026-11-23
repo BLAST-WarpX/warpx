@@ -86,6 +86,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         const auto& Zx = *m_Z.getArrayVec()[0][0];
         m_divZ.define(amrex::convert(Zx.boxArray(), amrex::IndexType::TheCellType()),
                       Zx.DistributionMap(), 1, amrex::IntVect(1));
+        for (auto& chi_cc : m_chi_cc) {
+            chi_cc.define(m_divZ.boxArray(), m_divZ.DistributionMap(), 1, 0);
+        }
     }
 
     // Set parameters used by `InitializeMassMatrices`
@@ -416,22 +419,13 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // The coefficient must be uniform, since a varying alpha would couple the
     // curl-free and solenoidal modes, and change dA.
     if (m_graddiv_factor > 0.0_rt) {
-        using ablastr::fields::Direction;
-        const amrex::MultiFab* Sdiag[3] = {
-            m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+        ComputeScaledMassMatrixCC(m_chi_cc[0], m_chi_cc[1], m_chi_cc[2]);
         amrex::Real chi_mean = 0.0_rt;
-        for (const auto* S : Sdiag) {
-            amrex::Real S_sum = 0.0_rt;
-            for (int c = 0; c < S->nComp(); ++c) {
-                S_sum += S->sum(c, true);
-            }
-            amrex::ParallelDescriptor::ReduceRealSum(S_sum);
-            chi_mean += S_sum / static_cast<amrex::Real>(S->boxArray().numPts());
+        for (const auto& chi_cc : m_chi_cc) {
+            chi_mean += chi_cc.sum(0, false)
+                / static_cast<amrex::Real>(chi_cc.boxArray().numPts());
         }
-        m_graddiv_alpha =
-            m_graddiv_factor * 2.0_rt * PhysConst::mu0 / m_dt * chi_mean / 3.0_rt;
+        m_graddiv_alpha = m_graddiv_factor * chi_mean / 3.0_rt;
     }
 }
 

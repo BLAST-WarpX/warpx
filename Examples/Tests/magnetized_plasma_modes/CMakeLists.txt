@@ -45,7 +45,7 @@ add_warpx_test(
     test_3d_darwin_solver_oblique_modes_picmi  # name
     3  # dims
     2  # nprocs
-    "inputs_test_3d_darwin_solver_oblique_modes_picmi.py --test"  # inputs
+    "inputs_test_3d_darwin_solver_oblique_modes_picmi.py"  # inputs
     "analysis_oblique_modes.py"  # analysis
     "analysis_default_regression.py --path diags/field_diag000130"  # checksum
     OFF  # dependency

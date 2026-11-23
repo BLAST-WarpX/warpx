@@ -18,7 +18,6 @@
 # --- analysis_oblique_modes.py for what is checked and why.
 
 import os
-import sys
 
 import numpy as np
 from mpi4py import MPI as mpi
@@ -77,11 +76,9 @@ class ObliqueModes(object):
     GMRES_TOL = 1e-4
     DT_WCI = 0.04  # dt * Omega_ci
     TOTAL_STEPS = 130
+    SEED = 1  # fixed, keeps the checksum comparison reproducible
 
-    def __init__(self, test, seed, graddiv_factor):
-        self.test = test
-        self.seed = seed
-        self.graddiv_factor = graddiv_factor
+    def __init__(self):
         self.nprocs = comm.size
 
         b = np.array([1.0, 1.0, 1.0])
@@ -129,10 +126,8 @@ class ObliqueModes(object):
         self.v_te = np.sqrt(self.T_plasma * constants.q_e / constants.m_e)
 
     def setup_run(self):
-        if self.seed:
-            # picked up by Simulation.initialize_inputs() below; a fixed,
-            # explicit seed keeps the checksum comparison reproducible
-            simulation.random_seed = self.seed
+        # picked up by Simulation.initialize_inputs() below
+        simulation.random_seed = self.SEED
 
         # the cost is dominated by the GMRES/MLMG field solve, so the box
         # decomposition barely matters
@@ -149,16 +144,16 @@ class ObliqueModes(object):
         simulation.max_steps = self.total_steps
         simulation.particle_shape = self.ES_SHAPE
         simulation.use_filter = False
-        simulation.verbose = self.test
+        simulation.verbose = 1
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
             magnetostatic_particle_shape=self.MS_SHAPE,
-            graddiv_factor=self.graddiv_factor,
+            graddiv_factor=self.GRADDIV_FACTOR,
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=self.GMRES_TOL,
                 max_iterations=2048,
                 restart_length=512,
-                verbose_int=(2 if self.test else 0),
+                verbose_int=2,
                 pc_type=picmi.DarwinMLMGPreconditioner(),
             ),
         )
@@ -252,7 +247,7 @@ class ObliqueModes(object):
             w = w / 3.0
             pc.add_particles(x=y, y=z, z=x, ux=uy, uy=uz, uz=ux, w=w)
             pc.add_particles(x=z, y=x, z=y, ux=uz, uy=ux, uz=uy, w=w)
-        if comm.rank == 0 and self.test:
+        if comm.rank == 0:
             print("symmetrize_particles: added 2 cyclic-permuted copies per species")
 
     def _record_modes(self):
@@ -288,15 +283,5 @@ class ObliqueModes(object):
         )
 
 
-test = "--test" in sys.argv or "-t" in sys.argv
-seed = 1
-graddiv_factor = ObliqueModes.GRADDIV_FACTOR
-for i, a in enumerate(sys.argv):
-    if a == "--seed" and i + 1 < len(sys.argv):
-        seed = int(sys.argv[i + 1])
-    if a == "--graddiv_factor" and i + 1 < len(sys.argv):
-        graddiv_factor = float(sys.argv[i + 1])
-sys.argv = [sys.argv[0]]
-
-run = ObliqueModes(test=test, seed=seed, graddiv_factor=graddiv_factor)
+run = ObliqueModes()
 simulation.step()

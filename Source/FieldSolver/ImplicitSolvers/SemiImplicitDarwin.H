@@ -167,6 +167,13 @@ private:
     amrex::MultiFab m_divZ;
 
     /**
+     * \brief Cell-centered (2 mu0/dt)-scaled row sums of the diagonal mass-matrix
+     *  blocks (see ComputeScaledMassMatrixCC), whose domain mean sets
+     *  m_graddiv_alpha
+     */
+    amrex::MultiFab m_chi_cc[3];
+
+    /**
      * \brief The linear operator whose action on a vector the linear solver
      *  evaluates, i.e. the left-hand side of the magnetoinductive equation
      *

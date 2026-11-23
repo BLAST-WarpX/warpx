@@ -2,7 +2,7 @@
 """Analysis for inputs_test_3d_darwin_solver_oblique_modes_picmi.py.
 
 Reduced (16^3, 130 steps) version of a longer verification run (32^3, ~4700
-steps) in which every low-k (k l_i < 0.9) transverse branch peaked within 1-2
+steps) in which every low-k (k l_i < 0.9) transverse branch peaks within 1-2
 frequency bins of cold two-fluid theory. The record here (5.2 W_ci^-1, about
 half a wave period) is too short to measure frequencies, so this script checks:
 
