@@ -122,7 +122,7 @@ public:
         {
             using namespace amrex::literals;
 
-            amrex::Real const global_debye_length = m_global_debye_length.ok() ? m_global_debye_length(global_index) : 0.;
+            amrex::Real const global_debye_length = m_global_debye_length.ok() ? m_global_debye_length(global_index) : 0._rt;
 
             ElasticCollisionPerez(
                     I1s, I1e, I2s, I2e, I1, I2,
