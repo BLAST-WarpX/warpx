@@ -462,7 +462,7 @@ public:
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
             amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
 
-            // create vectors to store density and temperature on cell level
+            // create vectors to store density on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec;
 
             if (binary_collision_functor.m_computeSpeciesDensities) {
@@ -609,7 +609,7 @@ public:
                     index_type const cell_start_pair = have_product_species?
                                                            p_pair_offsets[i_cell] : 0;
 
-                    // Get the local density and temperature for this cell
+                    // Get the local density for this cell
                     amrex::ParticleReal n1 = 0.0;
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         n1 = n1_in_each_cell[i_cell];
@@ -889,7 +889,7 @@ public:
             amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];
 
-            // create vectors to store density and temperature on cell level
+            // create vectors to store density on cell level
             amrex::Gpu::DeviceVector<amrex::ParticleReal> n1_vec, n2_vec;
 
             if (binary_collision_functor.m_computeSpeciesDensities) {
@@ -1100,7 +1100,7 @@ public:
                     // ux_1[ indices_1[i] ], where i is between
                     // cell_start_1 (inclusive) and cell_start_2 (exclusive)
 
-                    // Get the local densities and temperatures for this cell
+                    // Get the local densities for this cell
                     amrex::ParticleReal n1 = 0.0, n2 = 0.0;
                     if (binary_collision_functor.m_computeSpeciesDensities) {
                         n1 = n1_in_each_cell[i_cell];
