@@ -112,6 +112,13 @@ public:
                                      amrex::MultiFab& a_chi_yy_cc,
                                      amrex::MultiFab& a_chi_zz_cc ) const;
 
+    /**
+     * \brief Domain mean of the (2 mu0/dt)-scaled row sums of the diagonal
+     *  mass-matrix blocks (see ComputeScaledMassMatrixCC), averaged over the
+     *  three blocks, computed in a single reduction without storing them
+     */
+    [[nodiscard]] amrex::Real ComputeMeanScaledMassMatrix () const;
+
     void PrepareVelocitiesForCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();
     void CalculateSourceVector ();
@@ -164,13 +171,6 @@ private:
      * \brief Cell-centered scratch holding div(Z) in AddGradDivZTerm()
      */
     amrex::MultiFab m_divZ;
-
-    /**
-     * \brief Cell-centered (2 mu0/dt)-scaled row sums of the diagonal mass-matrix
-     *  blocks (see ComputeScaledMassMatrixCC), whose domain mean sets
-     *  m_graddiv_alpha
-     */
-    amrex::MultiFab m_chi_cc[3];
 
     /**
      * \brief The linear operator whose action on a vector the linear solver

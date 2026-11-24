@@ -14,6 +14,10 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_ParallelContext.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Reduce.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -92,9 +96,6 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         const auto& Zx = *m_Z.getArrayVec()[0][0];
         m_divZ.define(amrex::convert(Zx.boxArray(), amrex::IndexType::TheCellType()),
                       Zx.DistributionMap(), /*nvar=*/1, /*ngrow=*/amrex::IntVect(1));
-        for (auto& chi_cc : m_chi_cc) {
-            chi_cc.define(m_divZ.boxArray(), m_divZ.DistributionMap(), 1, 0);
-        }
     }
 
     // Set parameters used by `InitializeMassMatrices`
@@ -425,13 +426,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // The coefficient must be uniform, since a varying alpha would couple the
     // curl-free and solenoidal modes, and change dA.
     if (m_graddiv_factor > 0.0_rt) {
-        ComputeScaledMassMatrixCC(m_chi_cc[0], m_chi_cc[1], m_chi_cc[2]);
-        amrex::Real chi_mean = 0.0_rt;
-        for (const auto& chi_cc : m_chi_cc) {
-            chi_mean += chi_cc.sum(0, false)
-                / static_cast<amrex::Real>(chi_cc.boxArray().numPts());
-        }
-        m_graddiv_alpha = m_graddiv_factor * chi_mean / 3.0_rt;
+        m_graddiv_alpha = m_graddiv_factor * ComputeMeanScaledMassMatrix();
     }
 }
 
@@ -722,6 +717,50 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_c
             });
         }
     }
+}
+
+amrex::Real SemiImplicitDarwin::ComputeMeanScaledMassMatrix () const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeMeanScaledMassMatrix()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    const int nc[3] = {Sdiag[0]->nComp(), Sdiag[1]->nComp(), Sdiag[2]->nComp()};
+
+    // Same row sums and index identification as ComputeScaledMassMatrixCC,
+    // reduced over the cell-centered boxes without storing them.
+    amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+    amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    for (int d = 0; d < 3; ++d) {
+        const int ncomp = nc[d];
+        for (amrex::MFIter mfi(m_divZ); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& bx = mfi.validbox();
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            reduce_op.eval(bx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                amrex::Real s = 0.0;
+                for (int c = 0; c < ncomp; ++c) {
+                    s += S(i,j,k,c);
+                }
+                return {s};
+            });
+        }
+    }
+
+    amrex::Real sum = amrex::get<0>(reduce_data.value(reduce_op));
+    amrex::ParallelAllReduce::Sum(sum, amrex::ParallelContext::CommunicatorSub());
+
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
+    return fac * sum / (3.0_rt * static_cast<amrex::Real>(m_divZ.boxArray().numPts()));
 }
 
 // NOLINTNEXTLINE(readability-make-member-function-const): writes m_divZ except in RZ
