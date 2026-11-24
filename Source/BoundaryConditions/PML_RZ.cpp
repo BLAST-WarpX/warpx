@@ -87,9 +87,9 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
         amrex::Array4<amrex::Real> const& pml_Et_arr = pml_Et->array(mfi);
         amrex::Array4<amrex::Real> const& pml_Bt_arr = pml_Bt->array(mfi);
 
-        // Get the tileboxes from Efield and Bfield so that they include the guard cells
-        // They are all the same, cell centered
-        amrex::Box tilebox = amrex::convert((*Et_fp)[mfi].box(), Et_fp->ixType().toIntVect());
+        // Tilebox including the guard cells at the edges of the valid box
+        // (Et, Ez, Bt and Bz have the same index type)
+        amrex::Box tilebox = mfi.tilebox(Et_fp->ixType().toIntVect(), Et_fp->nGrowVect());
 
         // Box for the whole simulation domain
         amrex::Box const& domain = m_geom->Domain();
@@ -98,7 +98,8 @@ PML_RZ::ApplyDamping (amrex::MultiFab* Et_fp, amrex::MultiFab* Ez_fp,
         // Set tilebox to only include the upper radial cells
         int const nr_damp = m_ncell;
         int const nr_damp_min = (m_do_pml_in_domain)?(nr_domain - nr_damp):(nr_domain);
-        tilebox.setSmall(0, nr_damp_min + 1);
+        tilebox.setSmall(0, amrex::max(tilebox.smallEnd(0), nr_damp_min + 1));
+        if (!tilebox.ok()) { continue; }
 
         amrex::ParallelFor( tilebox, Et_fp->nComp(),
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int icomp)
