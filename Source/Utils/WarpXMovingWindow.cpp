@@ -74,7 +74,8 @@ namespace
     *            cells must also be exchanged, otherwise the results are incorrect.
     * \param[in] external_field the external field (used to initialize EM fields)
     * \param[in] useparser flag to enable the use of a field parser to initialize EM fields
-    * \param[in] field_parser the field parser
+    * \param[in] field_parser the field parser, a function of (x,y,z,t)
+    * \param[in] field_time the time at which the field parser is evaluated
     */
     void shiftMF (
         amrex::MultiFab& mf, const amrex::Geometry& geom,
@@ -83,7 +84,7 @@ namespace
         amrex::LayoutData<amrex::Real>* cost,
         const bool PMLRZ_flag,
         amrex::Real external_field=0.0, bool useparser = false,
-        amrex::ParserExecutor<3> const& field_parser={})
+        amrex::ParserExecutor<4> const& field_parser={}, amrex::Real field_time=0.0)
     {
         using namespace amrex::literals;
         ABLASTR_PROFILE("warpx::shiftMF()");
@@ -203,7 +204,7 @@ namespace
                         const amrex::Real fac_z = (1.0_rt - mf_type[2]) * dx[2]*0.5_rt;
                         const amrex::Real z = k*dx[2] + real_box.lo(2) + fac_z;
 #endif
-                        srcfab(i,j,k,n) = field_parser(x,y,z);
+                        srcfab(i,j,k,n) = field_parser(x,y,z,field_time);
                     });
                 }
 
@@ -469,35 +470,35 @@ WarpX::MoveWindow (const int step, bool move_j)
         // Shift each component of vector fields (E, B, j)
         for (int dim = 0; dim < 3; ++dim) {
             // Fine grid
-            amrex::ParserExecutor<3> Bfield_parser;
-            amrex::ParserExecutor<3> Efield_parser;
+            amrex::ParserExecutor<4> Bfield_parser;
+            amrex::ParserExecutor<4> Efield_parser;
             bool use_Bparser = false;
             bool use_Eparser = false;
             if (m_p_ext_field_params->B_ext_grid_type ==
                     ExternalFieldType::parse_ext_grid_function) {
                 use_Bparser = true;
-                if (dim == 0) { Bfield_parser = m_p_ext_field_params->Bxfield_parser->compile<3>(); }
-                if (dim == 1) { Bfield_parser = m_p_ext_field_params->Byfield_parser->compile<3>(); }
-                if (dim == 2) { Bfield_parser = m_p_ext_field_params->Bzfield_parser->compile<3>(); }
+                if (dim == 0) { Bfield_parser = m_p_ext_field_params->Bxfield_parser->compile<4>(); }
+                if (dim == 1) { Bfield_parser = m_p_ext_field_params->Byfield_parser->compile<4>(); }
+                if (dim == 2) { Bfield_parser = m_p_ext_field_params->Bzfield_parser->compile<4>(); }
             }
             if (m_p_ext_field_params->E_ext_grid_type ==
                     ExternalFieldType::parse_ext_grid_function) {
                 use_Eparser = true;
-                if (dim == 0) { Efield_parser = m_p_ext_field_params->Exfield_parser->compile<3>(); }
-                if (dim == 1) { Efield_parser = m_p_ext_field_params->Eyfield_parser->compile<3>(); }
-                if (dim == 2) { Efield_parser = m_p_ext_field_params->Ezfield_parser->compile<3>(); }
+                if (dim == 0) { Efield_parser = m_p_ext_field_params->Exfield_parser->compile<4>(); }
+                if (dim == 1) { Efield_parser = m_p_ext_field_params->Eyfield_parser->compile<4>(); }
+                if (dim == 2) { Efield_parser = m_p_ext_field_params->Ezfield_parser->compile<4>(); }
             }
             ::shiftMF(*m_fields.get(FieldType::Bfield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
+                m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser, t_new[lev]);
             ::shiftMF(*m_fields.get(FieldType::Efield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
+                m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser, t_new[lev]);
             if (fft_do_time_averaging) {
                 ablastr::fields::MultiLevelVectorField Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
                 ablastr::fields::MultiLevelVectorField Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
                 ::shiftMF(*Bfield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                    m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
+                    m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser, t_new[lev]);
                 ::shiftMF(*Efield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                   m_p_ext_field_params-> E_external_grid[dim], use_Eparser, Efield_parser);
+                   m_p_ext_field_params-> E_external_grid[dim], use_Eparser, Efield_parser, t_new[lev]);
             }
             if (move_j) {
                 ::shiftMF(*m_fields.get(FieldType::current_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
@@ -519,18 +520,18 @@ WarpX::MoveWindow (const int step, bool move_j)
             if (lev > 0) {
                 // coarse grid
                 ::shiftMF(*m_fields.get(FieldType::Bfield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                    m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
+                    m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser, t_new[lev]);
                 ::shiftMF(*m_fields.get(FieldType::Efield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                    m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
+                    m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser, t_new[lev]);
                 ::shiftMF(*m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 ::shiftMF(*m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 if (fft_do_time_averaging) {
                     ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
                     ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
                     ::shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                        m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
+                        m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser, t_new[lev]);
                     ::shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
-                        m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
+                        m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser, t_new[lev]);
                 }
                 if (move_j) {
                     ::shiftMF(*m_fields.get(FieldType::current_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
