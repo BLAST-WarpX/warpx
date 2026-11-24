@@ -63,7 +63,9 @@ InverseBremsstrahlung::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, M
 
     // Enable tiling
     amrex::MFItInfo info;
-    if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
+    if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+        info.EnableTiling(WarpXParticleContainer::tile_size);
+    }
 
     // Loop over refinement levels
     auto const flvl = photons.finestLevel();

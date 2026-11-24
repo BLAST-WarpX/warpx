@@ -237,7 +237,7 @@ public:
 
         // Enable tiling
         amrex::MFItInfo info;
-        if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(species1.tile_size); }
+        if (species1.do_tiling && amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(species1.tile_size); }
 
         // Loop over refinement levels
         for (int lev = 0; lev <= species1.finestLevel(); ++lev){
