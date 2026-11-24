@@ -4669,7 +4669,7 @@ Additional parameters
 
 .. pp:param:: warpx.shared_tilesize
     :type: list of ``int``
-    :default: ``6 6 8`` in 3D; ``14 14`` in 2D; ``1s`` otherwise
+    :default: ``6 6 8`` in 3D; ``8 8`` in 2D; ``1s`` otherwise
     :optional:
 
     Used to tune performance when ``do_shared_mem_current_deposition`` or
@@ -4685,11 +4685,20 @@ Additional parameters
 
 .. pp:param:: warpx.shared_mem_current_tpb
     :type: ``int``
-    :default: ``128``
+    :default: ``256``
     :optional:
 
     Used to tune performance when ``do_shared_mem_current_deposition`` is
     enabled. ``shared_mem_current_tpb`` controls the number of threads per
+    block (tpb), i.e. the number of threads operating on a shared buffer.
+
+.. pp:param:: warpx.shared_mem_charge_tpb
+    :type: ``int``
+    :default: ``256``
+    :optional:
+
+    Used to tune performance when ``do_shared_mem_charge_deposition`` is
+    enabled. ``shared_mem_charge_tpb`` controls the number of threads per
     block (tpb), i.e. the number of threads operating on a shared buffer.
 
 

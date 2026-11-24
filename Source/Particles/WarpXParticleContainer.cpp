@@ -1805,24 +1805,28 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
                                               rho_fab, ix_type, np_to_deposit, dinv, xyzmin, lo, q,
                                               WarpX::n_rz_azimuthal_modes,
                                               bins, box, max_tbox_size,
+                                              WarpX::shared_mem_charge_tpb,
                                               WarpX::shared_tilesize);
         } else if (WarpX::nox == 2){
             doChargeDepositionSharedShapeN<2>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                               rho_fab, ix_type, np_to_deposit, dinv, xyzmin, lo, q,
                                               WarpX::n_rz_azimuthal_modes,
                                               bins, box, max_tbox_size,
+                                              WarpX::shared_mem_charge_tpb,
                                               WarpX::shared_tilesize);
         } else if (WarpX::nox == 3){
             doChargeDepositionSharedShapeN<3>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                               rho_fab, ix_type, np_to_deposit, dinv, xyzmin, lo, q,
                                               WarpX::n_rz_azimuthal_modes,
                                               bins, box, max_tbox_size,
+                                              WarpX::shared_mem_charge_tpb,
                                               WarpX::shared_tilesize);
         } else if (WarpX::nox == 4){
             doChargeDepositionSharedShapeN<4>(GetPosition, wp.dataPtr()+offset, ion_lev_offset,
                                               rho_fab, ix_type, np_to_deposit, dinv, xyzmin, lo, q,
                                               WarpX::n_rz_azimuthal_modes,
                                               bins, box, max_tbox_size,
+                                              WarpX::shared_mem_charge_tpb,
                                               WarpX::shared_tilesize);
         }
         // The kernel runs asynchronously and reads the bins, which are freed at the end of
