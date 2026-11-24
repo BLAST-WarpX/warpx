@@ -109,6 +109,17 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
 
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
+    // Copy of E, with one guard cell for the finite difference stencil.
+    // It is made for the whole level before E is updated in place below:
+    // a copy made tile by tile would pick up values of E already updated
+    // in the neighboring tiles.
+    MultiFab tmpEx_mf(Ex->boxArray(), Ex->DistributionMap(), 1, 1);
+    MultiFab tmpEy_mf(Ey->boxArray(), Ey->DistributionMap(), 1, 1);
+    MultiFab tmpEz_mf(Ez->boxArray(), Ez->DistributionMap(), 1, 1);
+    MultiFab::Copy(tmpEx_mf, *Ex, 0, 0, 1, 1);
+    MultiFab::Copy(tmpEy_mf, *Ey, 0, 0, 1, 1);
+    MultiFab::Copy(tmpEz_mf, *Ez, 0, 0, 1, 1);
+
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -121,13 +132,9 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         }
         Real wt = static_cast<Real>(amrex::second());
 
-        // Get boxes for E, B, and J
+        // Get boxes for B
 
         const Box& tbx = mfi.tilebox(Bx->ixType().toIntVect());
-
-        const Box& tex = mfi.tilebox(Ex->ixType().toIntVect());
-        const Box& tey = mfi.tilebox(Ey->ixType().toIntVect());
-        const Box& tez = mfi.tilebox(Ez->ixType().toIntVect());
 
         // Get field arrays
         auto const& Bxfab = Bx->array(mfi);
@@ -140,37 +147,9 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         auto const& Jyfab = Jy->array(mfi);
         auto const& Jzfab = Jz->array(mfi);
 
-        // Define grown box with 1 ghost cell for finite difference stencil
-        const Box& gex = amrex::grow(tex,1);
-        const Box& gey = amrex::grow(tey,1);
-        const Box& gez = amrex::grow(tez,1);
-
-        // Temporary arrays for electric field, allocated on the async arena
-        // so that the memory stays valid until the GPU kernels below complete
-        FArrayBox tmpEx_fab(gex,1,amrex::The_Async_Arena());
-        auto const& tmpEx = tmpEx_fab.array();
-
-        FArrayBox tmpEy_fab(gey,1,amrex::The_Async_Arena());
-        auto const& tmpEy = tmpEy_fab.array();
-
-        FArrayBox tmpEz_fab(gez,1,amrex::The_Async_Arena());
-        auto const& tmpEz = tmpEz_fab.array();
-
-        // Copy electric field to temporary arrays
-        AMREX_PARALLEL_FOR_4D(
-            gex, 1, i, j, k, n,
-            { tmpEx(i,j,k,n) = Exfab(i,j,k,n); }
-        );
-
-        AMREX_PARALLEL_FOR_4D(
-            gey, 1, i, j, k, n,
-            { tmpEy(i,j,k,n) = Eyfab(i,j,k,n); }
-        );
-
-        AMREX_PARALLEL_FOR_4D(
-            gez, 1, i, j, k, n,
-            { tmpEz(i,j,k,n) = Ezfab(i,j,k,n); }
-        );
+        auto const& tmpEx = tmpEx_mf.array(mfi);
+        auto const& tmpEy = tmpEy_mf.array(mfi);
+        auto const& tmpEz = tmpEz_mf.array(mfi);
 
         // Make local copy of xi, to use on device.
         const Real xi_c2 = m_quantum_xi_c2;
