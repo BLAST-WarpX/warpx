@@ -48,10 +48,12 @@ void ImplicitSolver::FinishImplicitParticleUpdate (
                         pti.GetiAttribs("nsuborbits").dataPtr();
                     long const np = pti.numParticles();
                     int const suborbit_warning_threshold = m_suborbit_warning_threshold;
-                    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
+                    // amrex::For and HostDevice atomic: all iterations and all
+                    // OpenMP threads increment the same counter.
+                    amrex::For(np, [=] AMREX_GPU_DEVICE (long ip)
                     {
                         if (nsuborbits[ip] >= suborbit_warning_threshold) {
-                            amrex::Gpu::Atomic::Add(
+                            amrex::HostDevice::Atomic::Add(
                                 suborbit_count_ptr, amrex::Long(1));
                         }
                     });

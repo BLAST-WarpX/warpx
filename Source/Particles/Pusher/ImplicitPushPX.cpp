@@ -843,9 +843,30 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::Array4<const amrex::Real> const & bx_arr = bxfab->array();
     amrex::Array4<const amrex::Real> const & by_arr = byfab->array();
     amrex::Array4<const amrex::Real> const & bz_arr = bzfab->array();
+#ifdef AMREX_USE_GPU
+    // GPU, no tiling: deposit directly into J
     amrex::Array4<amrex::Real> const & Jx_arr = jx->array(pti);
     amrex::Array4<amrex::Real> const & Jy_arr = jy->array(pti);
     amrex::Array4<amrex::Real> const & Jz_arr = jz->array(pti);
+#else
+    // CPU, tiling: other threads may be depositing into the same grid from
+    // other tiles, so deposit into tile arrays and add them to J under a lock.
+    const amrex::Box depos_box = (lev == gather_lev) ? pti.tilebox()
+        : amrex::coarsen(pti.tilebox(), WarpX::RefRatio(gather_lev));
+    const amrex::IntVect ng_J = warpx.get_ng_depos_J();
+    const amrex::Box tbx = amrex::grow(amrex::convert(depos_box, jx->ixType()), ng_J);
+    const amrex::Box tby = amrex::grow(amrex::convert(depos_box, jy->ixType()), ng_J);
+    const amrex::Box tbz = amrex::grow(amrex::convert(depos_box, jz->ixType()), ng_J);
+    amrex::FArrayBox local_jx(tbx, jx->nComp());
+    amrex::FArrayBox local_jy(tby, jy->nComp());
+    amrex::FArrayBox local_jz(tbz, jz->nComp());
+    local_jx.setVal<amrex::RunOn::Host>(0.0_rt);
+    local_jy.setVal<amrex::RunOn::Host>(0.0_rt);
+    local_jz.setVal<amrex::RunOn::Host>(0.0_rt);
+    amrex::Array4<amrex::Real> const & Jx_arr = local_jx.array();
+    amrex::Array4<amrex::Real> const & Jy_arr = local_jy.array();
+    amrex::Array4<amrex::Real> const & Jz_arr = local_jz.array();
+#endif
 
     amrex::IndexType const ex_type = exfab->box().ixType();
     amrex::IndexType const ey_type = eyfab->box().ixType();
@@ -1158,6 +1179,12 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         uz[ip] = 0.5_prt*(uzp_n0 + uzp_n);
 
     });
+
+#ifndef AMREX_USE_GPU
+    (*jx)[pti].lockAdd(local_jx, tbx, tbx, 0, 0, jx->nComp());
+    (*jy)[pti].lockAdd(local_jy, tby, tby, 0, 0, jy->nComp());
+    (*jz)[pti].lockAdd(local_jz, tbz, tbz, 0, 0, jz->nComp());
+#endif
 
     // Check for errors after kernel launch
     const int h_position_error_count = *position_error_count.copyToHost();
