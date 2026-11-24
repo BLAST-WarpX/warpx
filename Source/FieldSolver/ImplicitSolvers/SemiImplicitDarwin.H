@@ -127,8 +127,7 @@ public:
      *  magnitude below the k^4 + chi k^2 of the solenoidal modes in domains
      *  large compared to the electron skin depth), and this term lifts them to
      *  k^4 + alpha k^2. With alpha spatially uniform, the term is discretely
-     *  curl-free, so it does not change dA = curl(Z). `a_Z` must have 2 guard
-     *  layers filled (with the periodic image values). No-op if
+     *  curl-free, so it does not change dA = curl(Z). No-op if
      *  implicit_evolve.graddiv_factor is zero.
      */
     void AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,

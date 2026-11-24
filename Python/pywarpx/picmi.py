@@ -2166,8 +2166,8 @@ class SemiImplicitDarwinEvolveScheme(EvolveSchemeBase):
         description="Multiplier of the grad-div (Coulomb-gauge penalty) term added to the "
         "Darwin field operator, which lifts the otherwise nearly singular curl-free modes of "
         "the auxiliary field to the eigenvalue scale of the solenoidal modes, without changing "
-        "the solution. The penalty coefficient is this factor times the domain-mean plasma "
-        "susceptibility. Defaults to 0 (disabled).",
+        "the exact solution of the linear system beyond the solver tolerance. The penalty coefficient "
+        "is this factor times the domain-mean plasma susceptibility. Defaults to 0 (disabled).",
     )
 
     def solver_scheme_initialize_inputs(self):

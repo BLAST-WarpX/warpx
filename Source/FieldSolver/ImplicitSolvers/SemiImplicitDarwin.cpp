@@ -29,6 +29,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
 
+    // The solver only operates on level 0
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_WarpX->maxLevel() == 0,
+        "The semi-implicit Darwin solver does not support mesh refinement "
+        "(amr.max_level must be 0).");
+
     // The guard-cell handling throughout this solver (SumBoundaryJ and
     // FillBoundaryAndSync calls using the domain periodicity) and the GMRES
     // operator in DarwinLinearFieldOperator assume periodic boundaries; with conducting
@@ -85,7 +91,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         // that its gradient can be taken without a boundary fill.
         const auto& Zx = *m_Z.getArrayVec()[0][0];
         m_divZ.define(amrex::convert(Zx.boxArray(), amrex::IndexType::TheCellType()),
-                      Zx.DistributionMap(), 1, amrex::IntVect(1));
+                      Zx.DistributionMap(), /*nvar=*/1, /*ngrow=*/amrex::IntVect(1));
         for (auto& chi_cc : m_chi_cc) {
             chi_cc.define(m_divZ.boxArray(), m_divZ.DistributionMap(), 1, 0);
         }
