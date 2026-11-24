@@ -1925,10 +1925,7 @@ MultiParticleContainer::doQEDSchwinger ()
 
     // Iterate over the particle tiles, not the field tiles: the new particles
     // are added to the tile given by mfi, so its box must match the particle tiling.
-    amrex::MFItInfo info;
-    if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-        info.EnableTiling(WarpXParticleContainer::tile_size);
-    }
+    auto info = ::getMFItInfo(*pc_product_ele, *pc_product_pos);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
