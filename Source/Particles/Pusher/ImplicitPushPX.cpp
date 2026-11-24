@@ -747,6 +747,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jy,
                                                     amrex::MultiFab * const jz,
                                                     long index_offset,
+                                                    int thread_num,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt,
                                                     bool skip_deposition,
@@ -845,6 +846,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::Array4<const amrex::Real> const & bz_arr = bzfab->array();
 #ifdef AMREX_USE_GPU
     // GPU, no tiling: deposit directly into J
+    amrex::ignore_unused(thread_num);
     amrex::Array4<amrex::Real> const & Jx_arr = jx->array(pti);
     amrex::Array4<amrex::Real> const & Jy_arr = jy->array(pti);
     amrex::Array4<amrex::Real> const & Jz_arr = jz->array(pti);
@@ -857,15 +859,15 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::Box tbx = amrex::grow(amrex::convert(depos_box, jx->ixType()), ng_J);
     const amrex::Box tby = amrex::grow(amrex::convert(depos_box, jy->ixType()), ng_J);
     const amrex::Box tbz = amrex::grow(amrex::convert(depos_box, jz->ixType()), ng_J);
-    amrex::FArrayBox tile_jx(tbx, jx->nComp());
-    amrex::FArrayBox tile_jy(tby, jy->nComp());
-    amrex::FArrayBox tile_jz(tbz, jz->nComp());
-    tile_jx.setVal<amrex::RunOn::Host>(0.0_rt);
-    tile_jy.setVal<amrex::RunOn::Host>(0.0_rt);
-    tile_jz.setVal<amrex::RunOn::Host>(0.0_rt);
-    amrex::Array4<amrex::Real> const & Jx_arr = tile_jx.array();
-    amrex::Array4<amrex::Real> const & Jy_arr = tile_jy.array();
-    amrex::Array4<amrex::Real> const & Jz_arr = tile_jz.array();
+    local_jx[thread_num].resize(tbx, jx->nComp());
+    local_jy[thread_num].resize(tby, jy->nComp());
+    local_jz[thread_num].resize(tbz, jz->nComp());
+    local_jx[thread_num].setVal<amrex::RunOn::Host>(0.0_rt);
+    local_jy[thread_num].setVal<amrex::RunOn::Host>(0.0_rt);
+    local_jz[thread_num].setVal<amrex::RunOn::Host>(0.0_rt);
+    amrex::Array4<amrex::Real> const & Jx_arr = local_jx[thread_num].array();
+    amrex::Array4<amrex::Real> const & Jy_arr = local_jy[thread_num].array();
+    amrex::Array4<amrex::Real> const & Jz_arr = local_jz[thread_num].array();
 #endif
 
     amrex::IndexType const ex_type = exfab->box().ixType();
@@ -1181,9 +1183,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     });
 
 #ifndef AMREX_USE_GPU
-    (*jx)[pti].lockAdd(tile_jx, tbx, tbx, 0, 0, jx->nComp());
-    (*jy)[pti].lockAdd(tile_jy, tby, tby, 0, 0, jy->nComp());
-    (*jz)[pti].lockAdd(tile_jz, tbz, tbz, 0, 0, jz->nComp());
+    (*jx)[pti].lockAdd(local_jx[thread_num], tbx, tbx, 0, 0, jx->nComp());
+    (*jy)[pti].lockAdd(local_jy[thread_num], tby, tby, 0, 0, jy->nComp());
+    (*jz)[pti].lockAdd(local_jz[thread_num], tbz, tbz, 0, 0, jz->nComp());
 #endif
 
     // Check for errors after kernel launch
