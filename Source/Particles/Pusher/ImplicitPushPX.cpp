@@ -857,15 +857,15 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::Box tbx = amrex::grow(amrex::convert(depos_box, jx->ixType()), ng_J);
     const amrex::Box tby = amrex::grow(amrex::convert(depos_box, jy->ixType()), ng_J);
     const amrex::Box tbz = amrex::grow(amrex::convert(depos_box, jz->ixType()), ng_J);
-    amrex::FArrayBox local_jx(tbx, jx->nComp());
-    amrex::FArrayBox local_jy(tby, jy->nComp());
-    amrex::FArrayBox local_jz(tbz, jz->nComp());
-    local_jx.setVal<amrex::RunOn::Host>(0.0_rt);
-    local_jy.setVal<amrex::RunOn::Host>(0.0_rt);
-    local_jz.setVal<amrex::RunOn::Host>(0.0_rt);
-    amrex::Array4<amrex::Real> const & Jx_arr = local_jx.array();
-    amrex::Array4<amrex::Real> const & Jy_arr = local_jy.array();
-    amrex::Array4<amrex::Real> const & Jz_arr = local_jz.array();
+    amrex::FArrayBox tile_jx(tbx, jx->nComp());
+    amrex::FArrayBox tile_jy(tby, jy->nComp());
+    amrex::FArrayBox tile_jz(tbz, jz->nComp());
+    tile_jx.setVal<amrex::RunOn::Host>(0.0_rt);
+    tile_jy.setVal<amrex::RunOn::Host>(0.0_rt);
+    tile_jz.setVal<amrex::RunOn::Host>(0.0_rt);
+    amrex::Array4<amrex::Real> const & Jx_arr = tile_jx.array();
+    amrex::Array4<amrex::Real> const & Jy_arr = tile_jy.array();
+    amrex::Array4<amrex::Real> const & Jz_arr = tile_jz.array();
 #endif
 
     amrex::IndexType const ex_type = exfab->box().ixType();
@@ -1181,9 +1181,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     });
 
 #ifndef AMREX_USE_GPU
-    (*jx)[pti].lockAdd(local_jx, tbx, tbx, 0, 0, jx->nComp());
-    (*jy)[pti].lockAdd(local_jy, tby, tby, 0, 0, jy->nComp());
-    (*jz)[pti].lockAdd(local_jz, tbz, tbz, 0, 0, jz->nComp());
+    (*jx)[pti].lockAdd(tile_jx, tbx, tbx, 0, 0, jx->nComp());
+    (*jy)[pti].lockAdd(tile_jy, tby, tby, 0, 0, jy->nComp());
+    (*jz)[pti].lockAdd(tile_jz, tbz, tbz, 0, 0, jz->nComp());
 #endif
 
     // Check for errors after kernel launch
