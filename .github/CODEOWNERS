@@ -14,76 +14,79 @@
 # are not a good choice.
 #
 # The last matching pattern wins, so keep any broader pattern above the
-# narrower ones it should not override.
+# narrower ones it should not override. List the owners of a pattern in
+# alphabetical order, ignoring case.
 
 # Field solvers
-/Source/FieldSolver/ElectrostaticSolvers/                        @roelof-groenewald @RemiLehe @dpgrote @WeiqunZhang @ax3l @cemitch99 @aeriforme
-/Source/FieldSolver/WarpXSolveFieldsES.cpp                       @roelof-groenewald @RemiLehe @dpgrote
-/Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/       @roelof-groenewald @prkkumar-he @clarkse-he
-/Source/FieldSolver/FiniteDifferenceSolver/HybridPICSolveE.cpp   @roelof-groenewald @prkkumar-he @clarkse-he
-/Source/FieldSolver/WarpXPushFieldsHybridPIC.cpp                 @roelof-groenewald @prkkumar-he @clarkse-he
-/Source/FieldSolver/ImplicitSolvers/                             @JustinRayAngus @dpgrote @RemiLehe
-/Source/FieldSolver/SpectralSolver/                              @EZoni @RemiLehe @dpgrote @oshapoval
+/Source/FieldSolver/ElectrostaticSolvers/                        @aeriforme @ax3l @cemitch99 @dpgrote @RemiLehe @roelof-groenewald @WeiqunZhang
+/Source/FieldSolver/WarpXSolveFieldsES.cpp                       @dpgrote @RemiLehe @roelof-groenewald
+/Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/       @clarkse @prkkumar-he @roelof-groenewald
+/Source/FieldSolver/FiniteDifferenceSolver/HybridPICSolveE.cpp   @clarkse @prkkumar-he @roelof-groenewald
+/Source/FieldSolver/WarpXPushFieldsHybridPIC.cpp                 @clarkse @prkkumar-he @roelof-groenewald
+/Source/FieldSolver/ImplicitSolvers/                             @dpgrote @JustinRayAngus @RemiLehe @roelof-groenewald
+/Source/FieldSolver/SpectralSolver/                              @dpgrote @EZoni @oshapoval @RemiLehe
 /Source/NonlinearSolvers/                                        @debog @JustinRayAngus @WeiqunZhang
 
 # Particles
-/Source/Particles/Collision/                                     @RemiLehe @dpgrote @JustinRayAngus
-/Source/Particles/Collision/BackgroundMCC/                       @roelof-groenewald @RemiLehe
-/Source/Particles/Collision/BinaryCollision/DSMC/                @roelof-groenewald @RemiLehe
-/Source/Particles/Collision/BinaryCollision/LinearBreitWheeler/  @aeriforme @RemiLehe @lucafedeli88
-/Source/Particles/Collision/BinaryCollision/LinearCompton/       @aeriforme @RemiLehe @lucafedeli88
-/Source/Particles/Deposition/                                    @JustinRayAngus @dpgrote @ax3l
-/Source/Particles/Gather/                                        @JustinRayAngus @dpgrote @ax3l
-/Source/Particles/Pusher/                                        @JustinRayAngus @dpgrote @ax3l
-/Source/Particles/ElementaryProcess/QED*.H                       @lucafedeli88 @aeriforme
-/Source/Particles/ElementaryProcess/QED*.cpp                     @lucafedeli88 @aeriforme
-/Source/Particles/ElementaryProcess/QEDInternals/                @lucafedeli88 @aeriforme
-/Tools/QedTablesUtils/                                           @lucafedeli88 @aeriforme
+/Source/Particles/Collision/                                     @atmyers @dpgrote @JustinRayAngus @RemiLehe
+/Source/Particles/Collision/BackgroundMCC/                       @RemiLehe @roelof-groenewald
+/Source/Particles/Collision/BinaryCollision/DSMC/                @RemiLehe @roelof-groenewald
+/Source/Particles/Collision/BinaryCollision/LinearBreitWheeler/  @aeriforme @lucafedeli88 @RemiLehe
+/Source/Particles/Collision/BinaryCollision/LinearCompton/       @aeriforme @lucafedeli88 @RemiLehe
+/Source/Particles/Deposition/                                    @atmyers @ax3l @dpgrote @EZoni @JustinRayAngus
+/Source/Particles/Gather/                                        @atmyers @ax3l @dpgrote @EZoni @JustinRayAngus
+/Source/Particles/Pusher/                                        @atmyers @ax3l @dpgrote @EZoni @JustinRayAngus
+/Source/Particles/ElementaryProcess/QED*.H                       @aeriforme @lucafedeli88
+/Source/Particles/ElementaryProcess/QED*.cpp                     @aeriforme @lucafedeli88
+/Source/Particles/ElementaryProcess/QEDInternals/                @aeriforme @lucafedeli88
+/Tools/QedTablesUtils/                                           @aeriforme @lucafedeli88
 /Source/Particles/ParticleThermalizer/                           @atmyers
 /Source/Particles/Resampling/                                    @roelof-groenewald
-/Source/Particles/Sorting/                                       @RemiLehe @atmyers
+/Source/Particles/Sorting/                                       @atmyers @RemiLehe
 
 # ABLASTR, the library shared with ImpactX. fields/ holds the Poisson solvers
 # that the electrostatic solvers call, so it has their owners.
 /Source/ablastr/                                                 @ax3l
-/Source/ablastr/coarsen/                                         @WeiqunZhang @ax3l @RemiLehe
-/Source/ablastr/fields/                                          @roelof-groenewald @RemiLehe @dpgrote @WeiqunZhang @ax3l @cemitch99 @aeriforme
+/Source/ablastr/coarsen/                                         @ax3l @EZoni @RemiLehe @WeiqunZhang
+/Source/ablastr/fields/                                          @aeriforme @ax3l @cemitch99 @dpgrote @RemiLehe @roelof-groenewald @WeiqunZhang
 /Source/ablastr/fields/MultiFabRegister.*                        @ax3l @dpgrote @lucafedeli88
 /Source/ablastr/math/                                            @ax3l @lucafedeli88
-/Source/ablastr/parallelization/                                 @lucafedeli88 @ax3l @WeiqunZhang @RemiLehe
+/Source/ablastr/parallelization/                                 @ax3l @lucafedeli88 @RemiLehe @WeiqunZhang
 /Source/ablastr/particles/                                       @ax3l @lucafedeli88
-/Source/ablastr/profiler/                                        @WeiqunZhang @ax3l
+/Source/ablastr/profiler/                                        @ax3l @WeiqunZhang
 /Source/ablastr/utils/                                           @ax3l @lucafedeli88
-/Source/ablastr/warn_manager/                                    @lucafedeli88 @ax3l
+/Source/ablastr/warn_manager/                                    @ax3l @lucafedeli88
 
 # Other subsystems
-/Source/AcceleratorLattice/                                      @dpgrote @ax3l
-/Source/Diagnostics/ReducedDiags/                                @dpgrote @aeriforme @ax3l @n01r
+/Source/AcceleratorLattice/                                      @ax3l @dpgrote
+/Source/Diagnostics/ReducedDiags/                                @aeriforme @ax3l @dpgrote @n01r
 /Source/Diagnostics/OpenPMDHelpFunction.*                        @ax3l
 /Source/Diagnostics/WarpXOpenPMD.*                               @ax3l
 /Source/Diagnostics/FlushFormats/FlushFormatOpenPMD.*            @ax3l
-/Source/EmbeddedBoundary/                                        @RemiLehe @WeiqunZhang
-/Source/Laser/                                                   @RemiLehe @lucafedeli88
+/Source/EmbeddedBoundary/                                        @n01r @RemiLehe @WeiqunZhang
+/Source/Evolve/                                                  @ax3l @dpgrote @JustinRayAngus @oshapoval @RemiLehe
+/Source/Laser/                                                   @lucafedeli88 @RemiLehe
+/Source/Parallelization/                                         @atmyers @WeiqunZhang
 
 # Python bindings and PICMI interface
-/Source/Python/                                                  @ax3l @roelof-groenewald @dpgrote @atmyers
-/Python/                                                         @dpgrote @ax3l @roelof-groenewald @atmyers
+/Source/Python/                                                  @atmyers @ax3l @dpgrote @roelof-groenewald
+/Python/                                                         @atmyers @ax3l @dpgrote @roelof-groenewald
 
 # Documentation
-/Docs/source/theory/                                             @RemiLehe @jlvay @JustinRayAngus @roelof-groenewald
+/Docs/source/theory/                                             @jlvay @JustinRayAngus @RemiLehe @roelof-groenewald
 
 # Governance changes are voted on by the SC
-/GOVERNANCE.md                                                   @jlvay @RemiLehe @ax3l
+/GOVERNANCE.md                                                   @ax3l @jlvay @RemiLehe
 
 # Build system, dependencies and developer tooling
 /CMakeLists.txt                                                  @ax3l @EZoni
 /cmake/                                                          @ax3l @EZoni
 /setup.py                                                        @ax3l @EZoni
 /pyproject.toml                                                  @ax3l @EZoni
-/dependencies.json                                               @EZoni @ax3l
+/dependencies.json                                               @ax3l @EZoni
 /Tools/Release/                                                  @ax3l @EZoni
-/.clang-tidy                                                     @lucafedeli88 @ax3l @EZoni
-/Tools/Linter/                                                   @lucafedeli88 @ax3l @EZoni
+/.clang-tidy                                                     @ax3l @EZoni @lucafedeli88
+/Tools/Linter/                                                   @ax3l @EZoni @lucafedeli88
 
 # HPC machine profiles and their install documentation. Owners of a machine
 # have access to it, so they can test changes: they added, updated or tested
@@ -92,51 +95,51 @@
 # have their own entry yet.
 /Tools/machines/                                                 @ax3l @EZoni
 /Docs/source/install/hpc/                                        @ax3l @EZoni
-/Tools/machines/adastra-cines/                                   @lucafedeli88 @grobertdautun @phsikorski-source @ax3l
-/Docs/source/install/hpc/adastra.rst                             @lucafedeli88 @grobertdautun @phsikorski-source @ax3l
-/Tools/machines/aurora-alcf/                                     @zippylab @ax3l @roelof-groenewald @Noerr
-/Docs/source/install/hpc/aurora.rst                              @zippylab @ax3l @roelof-groenewald @Noerr
-/Tools/machines/crusher-olcf/                                    @ax3l @n01r @atmyers
-/Docs/source/install/hpc/crusher.rst                             @ax3l @n01r @atmyers
-/Tools/machines/dane-llnl/                                       @dpgrote @ax3l @JustinRayAngus @debog
-/Docs/source/install/hpc/dane.rst                                @dpgrote @ax3l @JustinRayAngus @debog
+/Tools/machines/adastra-cines/                                   @ax3l @grobertdautun @lucafedeli88 @phsikorski-source
+/Docs/source/install/hpc/adastra.rst                             @ax3l @grobertdautun @lucafedeli88 @phsikorski-source
+/Tools/machines/aurora-alcf/                                     @ax3l @Noerr @roelof-groenewald @zippylab
+/Docs/source/install/hpc/aurora.rst                              @ax3l @Noerr @roelof-groenewald @zippylab
+/Tools/machines/crusher-olcf/                                    @atmyers @ax3l @n01r
+/Docs/source/install/hpc/crusher.rst                             @atmyers @ax3l @n01r
+/Tools/machines/dane-llnl/                                       @ax3l @debog @dpgrote @JustinRayAngus
+/Docs/source/install/hpc/dane.rst                                @ax3l @debog @dpgrote @JustinRayAngus
 /Tools/machines/desktop/                                         @ax3l @EZoni
-/Tools/machines/frontier-olcf/                                   @ax3l @WeiqunZhang @Noerr @aarontran @Pierre-Bartoli
-/Docs/source/install/hpc/frontier.rst                            @ax3l @WeiqunZhang @Noerr @aarontran @Pierre-Bartoli
+/Tools/machines/frontier-olcf/                                   @aarontran @ax3l @Noerr @Pierre-Bartoli @WeiqunZhang
+/Docs/source/install/hpc/frontier.rst                            @aarontran @ax3l @Noerr @Pierre-Bartoli @WeiqunZhang
 /Tools/machines/fugaku-riken/                                    @lucafedeli88
 /Docs/source/install/hpc/fugaku.rst                              @lucafedeli88
-/Tools/machines/greatlakes-umich/                                @ax3l @archermarx @bstassel
-/Docs/source/install/hpc/greatlakes.rst                          @ax3l @archermarx @bstassel
-/Tools/machines/hpc3-uci/                                        @ax3l @floresv299 @Aquios7
-/Docs/source/install/hpc/hpc3.rst                                @ax3l @floresv299 @Aquios7
-/Tools/machines/juwels-jsc/                                      @ax3l @AlexanderSinn @MaxThevenet
-/Docs/source/install/hpc/juwels.rst                              @ax3l @AlexanderSinn @MaxThevenet
+/Tools/machines/greatlakes-umich/                                @archermarx @ax3l @bstassel
+/Docs/source/install/hpc/greatlakes.rst                          @archermarx @ax3l @bstassel
+/Tools/machines/hpc3-uci/                                        @Aquios7 @ax3l @floresv299
+/Docs/source/install/hpc/hpc3.rst                                @Aquios7 @ax3l @floresv299
+/Tools/machines/juwels-jsc/                                      @AlexanderSinn @ax3l @MaxThevenet
+/Docs/source/install/hpc/juwels.rst                              @AlexanderSinn @ax3l @MaxThevenet
 /Tools/machines/karolina-it4i/                                   @ax3l @berceanu @spadova-a
 /Docs/source/install/hpc/karolina.rst                            @ax3l @berceanu @spadova-a
 /Tools/machines/lawrencium-lbnl/                                 @ax3l
 /Docs/source/install/hpc/lawrencium.rst                          @ax3l
-/Tools/machines/leonardo-cineca/                                 @lucafedeli88 @ax3l @MartaGalbi
-/Docs/source/install/hpc/leonardo.rst                            @lucafedeli88 @ax3l @MartaGalbi
+/Tools/machines/leonardo-cineca/                                 @ax3l @lucafedeli88 @MartaGalbi
+/Docs/source/install/hpc/leonardo.rst                            @ax3l @lucafedeli88 @MartaGalbi
 /Tools/machines/lonestar6-tacc/                                  @ax3l @rupenether
 /Docs/source/install/hpc/lonestar6.rst                           @ax3l @rupenether
-/Tools/machines/lumi-csc/                                        @lucafedeli88 @ax3l @huixingjian
-/Docs/source/install/hpc/lumi.rst                                @lucafedeli88 @ax3l @huixingjian
-/Tools/machines/lxplus-cern/                                     @SeverinDiederichs @ax3l @lgiacome
-/Docs/source/install/hpc/lxplus.rst                              @SeverinDiederichs @ax3l @lgiacome
+/Tools/machines/lumi-csc/                                        @ax3l @huixingjian @lucafedeli88
+/Docs/source/install/hpc/lumi.rst                                @ax3l @huixingjian @lucafedeli88
+/Tools/machines/lxplus-cern/                                     @ax3l @lgiacome @SeverinDiederichs
+/Docs/source/install/hpc/lxplus.rst                              @ax3l @lgiacome @SeverinDiederichs
 /Tools/machines/ookami-sbu/                                      @ax3l @lucafedeli88
 /Docs/source/install/hpc/ookami.rst                              @ax3l @lucafedeli88
-/Tools/machines/perlmutter-nersc/                                @ax3l @kngott @EZoni @n01r @RemiLehe @aeriforme
-/Docs/source/install/hpc/perlmutter.rst                          @ax3l @kngott @EZoni @n01r @RemiLehe @aeriforme
-/Tools/machines/pitzer-osc/                                      @Wang-Zhongwei @ax3l
-/Docs/source/install/hpc/pitzer.rst                              @Wang-Zhongwei @ax3l
-/Tools/machines/polaris-alcf/                                    @roelof-groenewald @ax3l @WeiqunZhang @zippylab @ppiot
-/Docs/source/install/hpc/polaris.rst                             @roelof-groenewald @ax3l @WeiqunZhang @zippylab @ppiot
-/Tools/machines/taurus-zih/                                      @ax3l @tmiethlinger @BrianMarre
-/Docs/source/install/hpc/taurus.rst                              @ax3l @tmiethlinger @BrianMarre
-/Tools/machines/tuolumne-llnl/                                   @ax3l @eebasso @JustinRayAngus @debog
-/Docs/source/install/hpc/tuolumne.rst                            @ax3l @eebasso @JustinRayAngus @debog
+/Tools/machines/perlmutter-nersc/                                @aeriforme @ax3l @EZoni @kngott @n01r @RemiLehe
+/Docs/source/install/hpc/perlmutter.rst                          @aeriforme @ax3l @EZoni @kngott @n01r @RemiLehe
+/Tools/machines/pitzer-osc/                                      @ax3l @Wang-Zhongwei
+/Docs/source/install/hpc/pitzer.rst                              @ax3l @Wang-Zhongwei
+/Tools/machines/polaris-alcf/                                    @ax3l @ppiot @roelof-groenewald @WeiqunZhang @zippylab
+/Docs/source/install/hpc/polaris.rst                             @ax3l @ppiot @roelof-groenewald @WeiqunZhang @zippylab
+/Tools/machines/taurus-zih/                                      @ax3l @BrianMarre @tmiethlinger
+/Docs/source/install/hpc/taurus.rst                              @ax3l @BrianMarre @tmiethlinger
+/Tools/machines/tuolumne-llnl/                                   @ax3l @debog @eebasso @JustinRayAngus
+/Docs/source/install/hpc/tuolumne.rst                            @ax3l @debog @eebasso @JustinRayAngus
 
 # CI, issue templates and repository configuration (including this file)
 /.github/                                                        @ax3l @EZoni
-/.azure-pipelines.yml                                            @EZoni @ax3l
-/.gitlab/                                                        @EZoni @ax3l
+/.azure-pipelines.yml                                            @ax3l @EZoni
+/.gitlab/                                                        @ax3l @EZoni
