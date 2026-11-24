@@ -73,6 +73,10 @@ NVIDIA-H200:
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    # Currently, the runner can be shared with other jobs. Log host memory,
+    # GPU memory use and GPU processes before testing.
+    - free -g || true
+    - nvidia-smi || true
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -141,6 +145,10 @@ AMD-MI300:
           -DWarpX_FFT=ON
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    # The MI300A is an APU: GPU memory is the node's system memory and is shared
+    # with other jobs on the runner. Log memory use and GPU processes before testing.
+    - free -g || true
+    - amd-smi process || true
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -207,6 +215,12 @@ Intel-PVC:
           -DWarpX_PARTICLE_PRECISION=DOUBLE
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    # Currently, the runner can be shared with other jobs. Log host memory and
+    # GPU processes before testing. xpu-smi is not in the image, but the Intel
+    # GPU apt repository configured in the image provides it.
+    - apt-get install -y xpu-smi || true
+    - free -g || true
+    - xpu-smi ps || true
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
