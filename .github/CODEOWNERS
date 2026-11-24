@@ -51,7 +51,7 @@
 /Source/ablastr/fields/                                          @aeriforme @ax3l @cemitch99 @dpgrote @RemiLehe @roelof-groenewald @WeiqunZhang
 /Source/ablastr/fields/MultiFabRegister.*                        @ax3l @dpgrote @lucafedeli88
 /Source/ablastr/math/                                            @ax3l @lucafedeli88
-/Source/ablastr/parallelization/                                 @ax3l @lucafedeli88 @RemiLehe @WeiqunZhang
+/Source/ablastr/parallelization/                                 @atmyers @ax3l @lucafedeli88 @RemiLehe @WeiqunZhang
 /Source/ablastr/particles/                                       @ax3l @lucafedeli88
 /Source/ablastr/profiler/                                        @ax3l @WeiqunZhang
 /Source/ablastr/utils/                                           @ax3l @lucafedeli88
