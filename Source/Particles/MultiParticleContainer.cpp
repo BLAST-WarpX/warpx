@@ -1923,13 +1923,19 @@ MultiParticleContainer::doQEDSchwinger ()
     const MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, level_0);
     const MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, level_0);
 
+    // Iterate over the particle tiles, not the field tiles: the new particles
+    // are added to the tile given by mfi, so its box must match the particle tiling.
+    amrex::MFItInfo info;
+    if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+        info.EnableTiling(WarpXParticleContainer::tile_size);
+    }
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(Ex, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for (MFIter mfi = pc_product_ele->MakeMFIter(level_0, info); mfi.isValid(); ++mfi )
     {
-        // Make the box cell centered to avoid creating particles twice on the tile edges
-        amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
+        // Cell-centered box, to avoid creating particles twice on the tile edges
+        amrex::Box box = mfi.tilebox();
 
         // Get the box representing global Schwinger boundaries
         const amrex::Box global_schwinger_box = ComputeSchwingerGlobalBox();
