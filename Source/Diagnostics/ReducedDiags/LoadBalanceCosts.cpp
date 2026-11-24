@@ -46,8 +46,6 @@ namespace
     countBoxMacroParticles (amrex::MFIter const & mfi, int const lev)
     {
         const int gid = mfi.index();
-        const int tid = mfi.LocalTileIndex();
-        auto box_index = std::make_pair(gid, tid);
 
         auto & warpx = WarpX::GetInstance();
         MultiParticleContainer const & mpc = warpx.GetPartContainer();
@@ -59,9 +57,13 @@ namespace
             WarpXParticleContainer const & pc = mpc.GetParticleContainer(i_s);
             auto const & plev  = pc.GetParticles(lev);
 
-            auto const & ptile = plev.at(box_index);
-            auto const np = ptile.numParticles();
-            num_macro_particles += np;
+            // Sum over all the particle tiles of this grid. The particle tiling
+            // differs from the tiling of mfi, which is not tiled.
+            for (auto it = plev.lower_bound(std::make_pair(gid, 0));
+                 it != plev.end() && it->first.first == gid; ++it)
+            {
+                num_macro_particles += it->second.numParticles();
+            }
         }
 
         return num_macro_particles;
