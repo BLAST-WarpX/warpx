@@ -40,6 +40,7 @@
 #include <AMReX_MFIter.H>
 #include <AMReX_Math.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_OpenMP.H>
 #include <AMReX_Particle.H>
 #include <AMReX_ParticleContainerBase.H>
 #include <AMReX_AmrParticles.H>
@@ -747,7 +748,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::MultiFab * const jy,
                                                     amrex::MultiFab * const jz,
                                                     long index_offset,
-                                                    int thread_num,
                                                     int lev, int gather_lev,
                                                     amrex::Real dt,
                                                     bool skip_deposition,
@@ -846,7 +846,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::Array4<const amrex::Real> const & bz_arr = bzfab->array();
 #ifdef AMREX_USE_GPU
     // GPU, no tiling: deposit directly into J
-    amrex::ignore_unused(thread_num);
     amrex::Array4<amrex::Real> const & Jx_arr = jx->array(pti);
     amrex::Array4<amrex::Real> const & Jy_arr = jy->array(pti);
     amrex::Array4<amrex::Real> const & Jz_arr = jz->array(pti);
@@ -859,6 +858,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     const amrex::Box tbx = amrex::grow(amrex::convert(depos_box, jx->ixType()), ng_J);
     const amrex::Box tby = amrex::grow(amrex::convert(depos_box, jy->ixType()), ng_J);
     const amrex::Box tbz = amrex::grow(amrex::convert(depos_box, jz->ixType()), ng_J);
+    const int thread_num = amrex::OpenMP::get_thread_num();
     local_jx[thread_num].resize(tbx, jx->nComp());
     local_jy[thread_num].resize(tby, jy->nComp());
     local_jz[thread_num].resize(tbz, jz->nComp());

@@ -182,7 +182,6 @@ public:
                                   amrex::MultiFab* jy,
                                   amrex::MultiFab* jz,
                                   long offset,
-                                  int thread_num,
                                   int lev, int gather_lev,
                                   amrex::Real dt,
                                   bool skip_deposition,
