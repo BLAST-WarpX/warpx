@@ -27,6 +27,7 @@
 #include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Dim3.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_REAL.H>
 
 namespace warpx::particles::deposition {
@@ -62,30 +63,33 @@ void varianceDepositionSubKernel(
     const auto vyr = static_cast<amrex::Real>(vy);
     const auto vzr = static_cast<amrex::Real>(vz);
 
+    // The arrays cover the whole grid and, on CPU, OpenMP threads deposit the
+    // particles of different tiles of the same grid into them at the same time,
+    // so the atomics must also be atomic on the host.
     if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
     {
         // Update sample count
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &nx_arr(ixv[0], ixv[1], ixv[2], 0), 1);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &ny_arr(iyv[0], iyv[1], iyv[2], 0), 1);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &nz_arr(izv[0], izv[1], izv[2], 0), 1);
 
         // Update w_sum
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &wx_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &wy_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &wz_arr(izv[0], izv[1], izv[2], 0), wpz_var);
 
         // Update wv_sum to be normalized to vbar
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &vxbar_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var*vxr);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &vybar_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var*vyr);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &vzbar_arr(izv[0], izv[1], izv[2], 0), wpz_var*vzr);
     }
 
@@ -118,11 +122,11 @@ void varianceDepositionSubKernel(
         const amrex::Real vzd = vzr - vzb;
 
             // Update wv2_sum
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var*vxd*vxd);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &w2y_arr(iyv[0], iyv[1], iyv[2], 0), wpy_var*vyd*vyd);
-        amrex::Gpu::Atomic::AddNoRet(
+        amrex::HostDevice::Atomic::Add(
             &w2z_arr(izv[0], izv[1], izv[2], 0), wpz_var*vzd*vzd);
     }
 }
