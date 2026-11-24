@@ -145,10 +145,12 @@ namespace
         const amrex::RealBox& real_box = geom.ProbDomain();
         const auto dx = geom.CellSizeArray();
 
+        // Not tiled: the shift below copies the whole fab, reading cells of the
+        // new region that other tiles of the same box would fill.
 #ifdef AMREX_USE_OMP
     #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-        for (amrex::MFIter mfi(tmpmf, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        for (amrex::MFIter mfi(tmpmf, false); mfi.isValid(); ++mfi )
         {
             if (cost)
             {
