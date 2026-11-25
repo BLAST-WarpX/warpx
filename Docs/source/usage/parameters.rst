@@ -2338,7 +2338,7 @@ Particle initialization
     If ``1`` resampling is performed for this species. This means that the number of macroparticles
     will be reduced at specific timesteps while preserving the distribution function as much as
     possible (details depend on the chosen resampling algorithm).
-    This can be useful in situations with continuous creation of particles (e.g. with ionization
+    This can be useful uations with continuous creation of particles (e.g. with ionization
     or with QED effects). At least one resampling trigger (see below) must be specified to actually
     perform resampling.
 
@@ -4707,14 +4707,6 @@ WarpX has five types of diagnostics:
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
 
-.. _running-cpp-parameters-diagnostics-insitu:
-
-In-situ visualization
-^^^^^^^^^^^^^^^^^^^^^
-
-In-situ capabilities, i.e., visualizing/analyzing data directly from the simulation without writing files to disk, are available through Ascent, Catalyst, or Sensei.
-See :ref:`In Situ Capabilities <dataanalysis-insitu>` for setup and usage.
-
 .. pp:param:: warpx.synchronize_velocity_for_diagnostics
     :type: ``0`` or ``1``
     :default: ``1``
@@ -4724,6 +4716,14 @@ See :ref:`In Situ Capabilities <dataanalysis-insitu>` for setup and usage.
     In its normal operation, WarpX is using the leap frog algorithm to advance the particles, and leaves the positions and velocities of the particles unsynchronized at the end of each time step, with the velocities lagging behind a half step.
     When this option is turned on, whenever any diagnostics will be calculated, the velocities will be advanced a half step to
     synchronize with the position before the diagnostics are generated.
+
+.. _running-cpp-parameters-diagnostics-insitu:
+
+In-situ visualization
+^^^^^^^^^^^^^^^^^^^^^
+
+In-situ capabilities, i.e., visualizing/analyzing data directly from the simulation without writing files to disk, are available through Ascent, Catalyst, or Sensei.
+See :ref:`In Situ Capabilities <dataanalysis-insitu>` for setup and usage.
 
 .. _running-cpp-parameters-diagnostics-full:
 
