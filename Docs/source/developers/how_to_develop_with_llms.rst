@@ -6,15 +6,10 @@ LLM-Assisted WarpX Development
 Large Language Models (LLMs) can assist with WarpX development tasks such as navigating the codebase, understanding existing implementations, writing new features, debugging, adding tests, and preparing pull requests.
 This guide documents how the WarpX repository is configured for LLM-based coding assistants and how to get the most out of them.
 
-.. note::
+.. important::
 
-   LLM-generated code should always be reviewed carefully.
-   LLMs can hallucinate APIs, miss physics constraints, or produce code that compiles but is incorrect.
-   The configurations described below help by providing accurate, up-to-date context, but developer judgment remains essential.
-
-   The WarpX community thus urges you to perform a careful, manual review of all LLM-generated code and documentation before asking for a review of your pull-request.
-   This is important, otherwise you risk to waste the valuable time of our most proficient developers that will need to review your LLM-generated code.
-   (Be considerate that WarpX developers can prompt an LLM just as efficiently as you can. Your critical thinking skill to make sense of the LLM-generated code and make it sensible for review and maintainable for the long term is what is needed!)
+   You are responsible for every contribution you make, whether you wrote it yourself or an LLM generated it.
+   Please read the :ref:`AI policy in our contributing guidelines <developers-contributing-ai>` before you open a pull request.
 
 .. note::
 
