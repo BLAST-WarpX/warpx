@@ -3,7 +3,7 @@
 Lawrencium (LBNL)
 =================
 
-The `Lawrencium cluster <http://scs.lbl.gov/Systems>`_ is located at LBNL.
+The `Lawrencium cluster <https://scienceit-docs.lbl.gov/hpc/>`_ is located at LBNL.
 
 
 Introduction

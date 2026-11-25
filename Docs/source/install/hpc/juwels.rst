@@ -17,12 +17,12 @@ Introduction
 If you are new to this system, **please see the following resources**:
 
 See `this page <https://apps.fz-juelich.de/jsc/hps/juwels/quickintro.html>`_ for a quick introduction.
-(Full `user guide <http://www.fz-juelich.de/ias/jsc/EN/Expertise/Supercomputers/JUWELS/UserInfo/UserInfo_node.html>`__).
+(Full `user guide <https://apps.fz-juelich.de/jsc/hps/juwels/index.html>`__).
 
 * Batch system: `Slurm <https://apps.fz-juelich.de/jsc/hps/juwels/quickintro.html#batch-system-on-system-name>`__
 * `Production directories <https://apps.fz-juelich.de/jsc/hps/juwels/environment.html?highlight=scratch#available-filesystems>`__:
 
-  * ``$SCRATCH``: Scratch filesystem for `temporary data <http://www.fz-juelich.de/ias/jsc/EN/Expertise/Supercomputers/JUWELS/FAQ/juwels_FAQ_node.html#faq1495160>`__ (90 day purge)
+  * ``$SCRATCH``: Scratch filesystem for `temporary data <https://apps.fz-juelich.de/jsc/hps/juwels/filesystems.html>`__ (90 day purge)
   * ``$FASTDATA/``: Storage location for large data (backed up)
   * Note that the ``$HOME`` directory is not designed for simulation runs and producing output there will impact performance.
 
