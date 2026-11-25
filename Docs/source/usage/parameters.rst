@@ -2338,7 +2338,7 @@ Particle initialization
     If ``1`` resampling is performed for this species. This means that the number of macroparticles
     will be reduced at specific timesteps while preserving the distribution function as much as
     possible (details depend on the chosen resampling algorithm).
-    This can be useful uations with continuous creation of particles (e.g. with ionization
+    This can be useful in situations with continuous creation of particles (e.g. with ionization
     or with QED effects). At least one resampling trigger (see below) must be specified to actually
     perform resampling.
 
