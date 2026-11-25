@@ -10,4 +10,7 @@ labels: [enhancement]
 <!-- What problem are you trying to solve? -->
 
 ## Proposed feature
-<!-- What would you like WarpX to do? Links to papers or other codes are welcome. -->
+<!--
+What would you like WarpX to do?
+Links to papers or other codes are welcome.
+-->
