@@ -26,7 +26,7 @@ Optional dependencies include:
   - `CUDA Toolkit 12.2+ <https://developer.nvidia.com/cuda-downloads>`__: for Nvidia GPU support (see `matching host-compilers <https://gist.github.com/ax3l/9489132>`__) or
   - `ROCm 6.0+ <https://gpuopen.com/learn/amd-lab-notes/amd-lab-notes-rocm-installation-readme/>`__: for AMD GPU support
   - `oneAPI 2025.2+ <https://www.intel.com/content/www/us/en/developer/tools/oneapi/overview.html>`__: for Intel GPU support
-- `FFTW3 <http://www.fftw.org>`__: for spectral solver (PSATD or IGF) support when running on CPU or SYCL
+- `FFTW3 <https://www.fftw.org>`__: for spectral solver (PSATD or IGF) support when running on CPU or SYCL
 
   - also needs the ``pkg-config`` tool on Unix
 - `BLAS++ <https://github.com/icl-utk-edu/blaspp>`__ and `LAPACK++ <https://github.com/icl-utk-edu/lapackpp>`__: for spectral solver (PSATD) support in RZ geometry
@@ -34,7 +34,8 @@ Optional dependencies include:
 - `openPMD-api 0.17.0+ <https://github.com/openPMD/openPMD-api>`__: we automatically download and compile a copy of openPMD-api for openPMD I/O support
 
   - see `optional I/O backends <https://github.com/openPMD/openPMD-api#dependencies>`__, i.e., ADIOS2 and/or HDF5
-- `Ascent 0.8.0+ <https://ascent.readthedocs.io>`__: for in situ 3D visualization
+- `Ascent 0.9.3+ <https://ascent.readthedocs.io>`__: for in situ 3D visualization
+- `ParaView 6.0+ <https://www.paraview.org>`__ with `Catalyst 2 <https://catalyst-in-situ.readthedocs.io>`__: for in situ visualization with ParaView
 - `CCache <https://ccache.dev>`__: to speed up rebuilds (For CUDA support, needs version 3.7.9+ and 4.2+ is recommended)
 - `Ninja <https://ninja-build.org>`__: for faster parallel compiles
 - `Python 3.11+ <https://www.python.org>`__

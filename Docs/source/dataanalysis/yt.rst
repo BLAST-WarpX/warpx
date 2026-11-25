@@ -4,8 +4,8 @@
 Read AMReX Plotfiles with yt
 ============================
 
-`yt <http://yt-project.org/>`__ is a Python package that can help in analyzing and visualizing WarpX data (among other data formats).
-It is convenient to use yt within a `Jupyter notebook <http://jupyter.org/>`__.
+`yt <https://yt-project.org/>`__ is a Python package that can help in analyzing and visualizing WarpX data (among other data formats).
+It is convenient to use yt within a `Jupyter notebook <https://jupyter.org/>`__.
 
 Data Support
 ------------
@@ -57,7 +57,7 @@ Field data
 ~~~~~~~~~~
 
 Field data can be visualized using ``yt.SlicePlot`` (see the docstring of
-this function `here <http://yt-project.org/doc/reference/api/yt.visualization.plot_window.html#yt.visualization.plot_window.SlicePlot>`__)
+this function `here <https://yt-project.org/doc/reference/api/yt.visualization.plot_window.html#yt.visualization.plot_window.SlicePlot>`__)
 
 For instance, in order to plot the field ``Ex`` in a slice orthogonal to ``y`` (``1``):
 
@@ -77,7 +77,7 @@ For instance, in order to plot the field ``Ex`` in a slice orthogonal to ``y`` (
         yt.SlicePlot( ds, 1, 'Ex', aspect=1./10 )
 
 
-Alternatively, the data can be obtained as a `numpy <http://www.numpy.org/>`__ array.
+Alternatively, the data can be obtained as a `numpy <https://www.numpy.org/>`__ array.
 
 For instance, in order to obtain the field `jz` (on level 0) as a numpy array:
 
@@ -91,7 +91,7 @@ Particle data
 ~~~~~~~~~~~~~
 
 Particle data can be visualized using ``yt.ParticlePhasePlot`` (see the docstring
-`here <http://yt-project.org/doc/reference/api/yt.visualization.particle_plots.html?highlight=particlephaseplot#yt.visualization.particle_plots.ParticlePhasePlot>`__).
+`here <https://yt-project.org/doc/reference/api/yt.visualization.particle_plots.html?highlight=particlephaseplot#yt.visualization.particle_plots.ParticlePhasePlot>`__).
 
 For instance, in order to plot the particles' ``x`` and ``y`` positions:
 
@@ -99,7 +99,7 @@ For instance, in order to plot the particles' ``x`` and ``y`` positions:
 
     yt.ParticlePhasePlot( ds.all_data(), 'particle_position_x', 'particle_position_y', 'particle_weight')
 
-Alternatively, the data can be obtained as a `numpy <http://www.numpy.org/>`__ array.
+Alternatively, the data can be obtained as a `numpy <https://www.numpy.org/>`__ array.
 
 For instance, in order to obtain the array of position `x` as a numpy array:
 
@@ -112,7 +112,7 @@ Further information
 -------------------
 
 A lot more information can be obtained from the yt documentation, and the
-corresponding notebook tutorials `here <http://yt-project.org/doc/>`__.
+corresponding notebook tutorials `here <https://yt-project.org/doc/>`__.
 
 .. toctree::
    :maxdepth: 2

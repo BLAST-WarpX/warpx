@@ -4,6 +4,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "pyWarpX.H"
+#include "GIL.H"
 #include "callbacks.H"
 
 #include <WarpX.H>  // todo: move this out to Python/WarpX.cpp
@@ -102,6 +103,19 @@ PYBIND11_MODULE(PYWARPX_MODULE_NAME, m) {
     // auto numpy = py::module::import("numpy");
     // auto npversion = numpy.attr("__version__");
     // std::cout << "numpy version: " << py::str(npversion) << "\n";
+
+    // The Python global interpreter lock (GIL)
+    //   The bindings that initialize and evolve a simulation release the GIL, see WarpX.cpp.
+    //   This keeps other Python threads running, e.g., the ones that Jupyter uses to show our
+    //   output. All other bindings keep the GIL.
+    //
+    //   The WarpX library does not depend on Python. These functions let it re-acquire the GIL
+    //   for the code that it reaches from the two bindings above and that uses the Python
+    //   interpreter: callbacks and in situ libraries.
+    warpx::python::SetGILHooks(
+        [] () -> void* { return new py::gil_scoped_acquire; },
+        [] (void* state) { delete static_cast<py::gil_scoped_acquire*>(state); }
+    );
 
     m.def("amrex_init",
         [](const py::list args) {

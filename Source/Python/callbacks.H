@@ -24,6 +24,10 @@
  * The keys of the map describe at what point in the simulation the python
  * functions will be called. See ``WarpX/Python/pywarpx/callbacks.py`` for a
  * list of currently supported callback names.
+ *
+ * This map is not synchronized. Our Python bindings release the Python GIL
+ * while the simulation initializes and evolves: install and clear callbacks
+ * before these calls, never from within a callback or another Python thread.
 */
 extern WARPX_EXPORT std::map< std::string, std::function<void()> > warpx_callback_py_map;
 
@@ -39,6 +43,8 @@ bool IsPythonCallbackInstalled ( const std::string& name );
 
 /**
  * \brief Function to look for and execute Python callbacks
+ *
+ * This acquires the Python GIL, if a callback is installed for the given name.
  */
 void ExecutePythonCallback ( const std::string& name );
 

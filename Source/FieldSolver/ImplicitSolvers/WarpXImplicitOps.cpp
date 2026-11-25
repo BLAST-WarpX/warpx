@@ -324,6 +324,12 @@ WarpX::DepositMassMatrices (amrex::Real a_dt, ImplicitOptions const& implicit_op
             "Call InitData before depositing mass matrices.");
     }
 
+    // Mass-matrix deposition gathers Bfield_aux; prepare it independently of
+    // particle pushes, including external particle fields read from file.
+    // The auxiliary-field API currently refreshes both E and B.
+    UpdateAuxiliaryData(implicit_options.field_time);
+    FillBoundaryAux(guard_cells.ng_UpdateAux);
+
     amrex::Real const dt_scale = a_dt/dt[0];
 
     for (int lev = 0; lev <= finest_level; ++lev)

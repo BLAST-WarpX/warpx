@@ -1,0 +1,57 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step          = 0
+amr.n_cell        = 16
+amr.max_grid_size = 8
+amr.max_level     = 0
+geometry.dims     = RSPHERE
+geometry.prob_lo  = 0.0
+geometry.prob_hi  = 1.0
+
+#################################
+####### Boundary Condition ######
+#################################
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 1
+warpx.cfl = 1.0e-8
+warpx.use_filter = 0
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 4 4 4
+electrons.radial_numpercell_power = 0
+electrons.xmin = 0.0
+electrons.xmax = 1.0
+electrons.profile = constant
+electrons.density = 1.0e21
+electrons.momentum_distribution_type = "maxwellian"
+electrons.maxwellian_u_mean_distribution_type = "constant"
+electrons.ux_mean = 0
+electrons.uy_mean = 0
+electrons.uz_mean = 0
+electrons.maxwellian_temperature_in_eV_distribution_type = "read_from_file"
+electrons.read_temperature_in_eV_from_path = "../test_rsphere_initial_distribution_prepare/example-temperature-in-eV.h5"
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.format = openpmd
+diag1.electrons.variables = ux uy uz r

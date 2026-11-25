@@ -1,3 +1,4 @@
 CEXE_sources += callbacks.cpp
+CEXE_sources += GIL.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Python

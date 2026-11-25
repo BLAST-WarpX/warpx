@@ -15,18 +15,26 @@
 # Possible errors: 6.235230443866285e-9
 # tolerance: 1.0e-8
 # Possible running time: 0.327827743 s
+#
+# An optional second argument overrides the tolerance, for variants that use
+# different solvers. The theta-implicit variant differs from the explicit
+# reference at second order in dt; possible errors: 5.3e-4.
 
 import sys
 
 import numpy as np
 import yt
 
-tolerance = 1.0e-8
+tolerance = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0e-8
 r0 = 0.12402005
 z0 = 4.3632492
 
 filename = sys.argv[1]
 ds = yt.load(filename)
+# The proton will leave the simulation if no external field is applied
+n_protons = ds.particle_type_counts.get("proton", 0)
+assert n_protons == 1, f"expected 1 proton, found {n_protons}"
+
 ad = ds.all_data()
 r = ad["proton", "particle_position_x"].to_ndarray()
 z = ad["proton", "particle_position_y"].to_ndarray()
