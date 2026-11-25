@@ -188,7 +188,7 @@ Instructions are given in the [testing section](#developers-testing) of our [dev
 #### Include documentation about your PR
 
 Now, let users know about your new feature by describing its usage in the [WarpX documentation](https://warpx.readthedocs.io).
-Our documentation uses [Sphinx](http://www.sphinx-doc.org/en/master/usage/quickstart.html), and it is located in `Docs/source/`.
+Our documentation uses [Sphinx](https://www.sphinx-doc.org/en/master/usage/quickstart.html), and it is located in `Docs/source/`.
 For instance, if you introduce a new runtime parameter in the input file, you can add it to [`Docs/source/running_cpp/parameters.rst`](#running-cpp-parameters).
 If Sphinx is installed on your computer, you should be able to generate the html documentation with
 
