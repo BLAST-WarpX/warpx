@@ -71,6 +71,17 @@ jobs:
   timeoutInMinutes: 240
 
   steps:
+  # The hosted Ubuntu image ships large toolchains that we do not use;
+  # remove them so the build and test outputs do not fill up the disk.
+  # The paths follow the install scripts in actions/runner-images and may
+  # change with new image versions; `rm -rf` skips missing paths silently.
+  - bash: |
+      df -h /
+      sudo rm -rf /usr/share/dotnet /usr/local/lib/android /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+      sudo docker image prune -af || true
+      df -h /
+    displayName: 'Free Disk Space'
+
   # Ccache caching:
   # - once stored under a key, they become immutable (even if cache content changes)
   # - for a refresh the key has to change, e.g., hash of a tracked file in the key
