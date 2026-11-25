@@ -15,7 +15,7 @@ import numpy as np
 import openpmd_api as io
 from mpi4py import MPI as mpi
 
-from pywarpx import picmi
+from pywarpx import callbacks, picmi
 
 constants = picmi.constants
 
@@ -341,6 +341,17 @@ class PlasmaCylinderCompression(object):
         # Add diagnostics                                                     #
         #######################################################################
 
+        field_data_list = [
+            "B",
+            "E",
+            "rho",
+            "Tx_ions",
+            "Ty_ions",
+            "Tz_ions",
+            # User-registered field, see the allocdata callback below
+            "magnetic_pressure_Bz",
+        ]
+
         if self.test:
             particle_diag = picmi.ParticleDiagnostic(
                 name="diag1",
@@ -355,7 +366,7 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=field_data_list,
                 write_dir="diags",
                 warpx_format="plotfile",
             )
@@ -364,7 +375,7 @@ class PlasmaCylinderCompression(object):
                 name="diag1",
                 grid=self.grid,
                 period=self.diag_steps,
-                data_list=["B", "E", "rho", "Tx_ions", "Ty_ions", "Tz_ions"],
+                data_list=field_data_list,
                 write_dir="diags",
                 warpx_format="openpmd",
                 warpx_file_prefix="field_diags",
@@ -380,6 +391,51 @@ class PlasmaCylinderCompression(object):
             if Path.exists(Path("diags")):
                 shutil.rmtree("diags")
             Path("diags").mkdir(parents=True, exist_ok=True)
+
+        # Magnetic pressure Bz^2 / (2 mu0), registered from Python and written to
+        # the diagnostic by its registered name. B is almost purely axial here, so
+        # this is the radial pressure confining the plasma column.
+        # It is allocated like Bz.
+        @callbacks.callfromallocdata
+        def allocate_magnetic_pressure_Bz():
+            Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)
+            simulation.fields.alloc_init(
+                name="magnetic_pressure_Bz",
+                level=0,
+                ba=Bz.box_array(),
+                dm=Bz.dm(),
+                ncomp=1,
+                ngrow=Bz.n_grow_vect,
+                initial_value=0.0,
+                redistribute=True,
+                redistribute_on_remake=True,
+            )
+
+        def compute_magnetic_pressure_Bz(add_external_field=False):
+            Bz = simulation.fields.get("Bfield_fp", dir="z", level=0)
+            if add_external_field:
+                Bz_ext = simulation.fields.get("Bfield_fp_external", dir="z", level=0)
+                Bz = Bz.copy()
+                Bz.add(Bz_ext, 0, 0, 1, Bz_ext.n_grow_vect)
+            p_B = simulation.fields.get("magnetic_pressure_Bz", level=0)
+            # p_B = Bz * Bz / (2 mu0), guard cells included
+            p_B.set_val(1.0 / (2.0 * constants.mu0))
+            p_B.multiply(Bz, 0, 0, 1, p_B.n_grow_vect)
+            p_B.multiply(Bz, 0, 0, 1, p_B.n_grow_vect)
+
+        # Step-0 dump: at "afterInitEsolve", the loaded equilibrium field is still
+        # separate (Bfield_fp_external); it is added to Bfield_fp only afterwards.
+        @callbacks.callfromafterInitEsolve
+        def initialize_magnetic_pressure_Bz():
+            compute_magnetic_pressure_Bz(add_external_field=True)
+
+        # Later dumps: Bfield_fp holds the total field. "afterstep" runs right
+        # before the diagnostics, with the step counter already advanced, so the
+        # field is computed only on dump steps.
+        @callbacks.callfromafterstep
+        def update_magnetic_pressure_Bz():
+            if simulation.extension.warpx.getistep(lev=0) % self.diag_steps == 0:
+                compute_magnetic_pressure_Bz()
 
         # Initialize inputs and WarpX instance
         simulation.initialize_inputs()
