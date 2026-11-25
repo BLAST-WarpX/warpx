@@ -42,7 +42,7 @@ To contact the developers, feel free to open an issue on this repo, or visit our
 [![openPMD-api](https://img.shields.io/static/v1?label="runs%20on"&message="openPMD-api"&color="blueviolet")](https://openpmd-api.readthedocs.io)
 [![ADIOS](https://img.shields.io/static/v1?label="runs%20on"&message="ADIOS"&color="blueviolet")](https://csmd.ornl.gov/adios)
 [![HDF5](https://img.shields.io/static/v1?label="runs%20on"&message="HDF5"&color="blueviolet")](https://www.hdfgroup.org/)
-[![Ascent](https://img.shields.io/static/v1?label="runs%20on"&message="Ascent"&color="blueviolet")](http://www.ascent-dav.org)
+[![Ascent](https://img.shields.io/static/v1?label="runs%20on"&message="Ascent"&color="blueviolet")](https://www.ascent-dav.org)
 [![SENSEI](https://img.shields.io/static/v1?label="runs%20on"&message="SENSEI"&color="blueviolet")](https://sensei-insitu.org)
 
 Our workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md).

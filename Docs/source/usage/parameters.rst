@@ -473,6 +473,7 @@ Overall simulation parameters
           and momentum-conserving field gathering (:pp:param:`algo.field_gathering` ``= momentum-conserving``)
           are not yet supported, and the code aborts if either is used
           (see `issue #7543 <https://github.com/BLAST-WarpX/warpx/issues/7543>`__).
+        - Mesh refinement is not supported, i.e. ``amr.max_level`` must be 0.
 
       - **Particle shapes:**
         The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
@@ -483,6 +484,15 @@ Overall simulation parameters
           magnetostatic part: the current and mass matrices deposition, the field gather in the
           inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
           It must not be larger than :pp:param:`algo.particle_shape`.
+
+      - **Grad-div stabilization:**
+        ``implicit_evolve.graddiv_factor`` (``float``, default: ``0``) adds the grad-div (Coulomb-gauge penalty)
+        term :math:`-\nabla(\alpha \nabla\cdot Z)` to the field operator of the magnetoinductive solve, where :math:`Z`
+        is the auxiliary field solved for (with :math:`\delta A = \nabla\times Z`) and :math:`\alpha` is this factor
+        times the domain-mean plasma susceptibility. This lifts the otherwise nearly singular curl-free modes of :math:`Z`
+        to the eigenvalue scale of the solenoidal modes, which can speed up the convergence of the linear solve,
+        without changing the exact solution of the linear system beyond the solver tolerance (Cartesian geometries
+        only; ``0`` disables the term).
 
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the
@@ -4702,11 +4712,6 @@ Additional parameters
 Diagnostics and output
 ----------------------
 
-.. _running-cpp-parameters-diagnostics-insitu:
-
-In-situ visualization
-^^^^^^^^^^^^^^^^^^^^^
-
 WarpX has five types of diagnostics:
 ``Full`` diagnostics consist in dumps of fields and particles at given iterations,
 ``TimeAveraged`` diagnostics only allow field data, which they output after averaging over a period of time,
@@ -4726,6 +4731,14 @@ This currently applies to standard diagnostics, but should be extended to back-t
     When this option is turned on, whenever any diagnostics will be calculated, the velocities will be advanced a half step to
     synchronize with the position before the diagnostics are generated.
 
+.. _running-cpp-parameters-diagnostics-insitu:
+
+In-situ visualization
+^^^^^^^^^^^^^^^^^^^^^
+
+In-situ capabilities, i.e., visualizing/analyzing data directly from the simulation without writing files to disk, are available through Ascent, Catalyst, or Sensei.
+See :ref:`In Situ Capabilities <dataanalysis-insitu>` for setup and usage.
+
 .. _running-cpp-parameters-diagnostics-full:
 
 Full Diagnostics
@@ -4736,7 +4749,7 @@ Similar to what is done for physical species, WarpX has a class Diagnostics that
 The user specifies the number of diagnostics and the name of each of them, and then specifies options for each of them separately.
 Note that some parameter (those that do not start with a ``<diag_name>.`` prefix) apply to all diagnostics.
 This should be changed in the future.
-In-situ capabilities can be used by turning on Sensei or Ascent (provided they are installed) through the output format, see below.
+In-situ capabilities can be used by turning on Sensei or Ascent (provided they are installed) through the output format, see below, or using Catalyst (see :ref:`In Situ Capabilities <dataanalysis-insitu>`).
 
 .. pp:param:: diagnostics.enable
     :type: ``0`` or ``1``
@@ -4789,9 +4802,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     * ``openpmd`` for OpenPMD format `openPMD <https://www.openPMD.org>`_.
       Requires to build WarpX with ``USE_OPENPMD=TRUE`` (see :ref:`instructions <building-openpmd>`).
 
-    * ``ascent`` for in-situ visualization using Ascent.
+    * ``ascent`` for in-situ visualization using :ref:`Ascent <visualization-ascent>`.
 
-    * ``sensei`` for in-situ visualization using Sensei.
+    * ``sensei`` for in-situ visualization using Sensei (see :ref:`In Situ Capabilities <dataanalysis-insitu>`).
 
     example: ``diag1.format = openpmd``.
 
@@ -4898,7 +4911,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, and ``part_per_cell_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
-    ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
+    ``T_<species_name>`` is the temperature in eV (valid for relativistic velocities, consistent with the Maxwell-Juttner distribution).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     With :pp:param:`<species_name>.do_temperature_deposition`, the per-direction temperatures ``Tx_<species_name>``, ``Ty_<species_name>`` and ``Tz_<species_name>`` (``Tr_``, ``Tt_`` and ``Tz_`` in RZ and RCYLINDER, ``Tr_``, ``Tt_`` and ``Tp_`` in RSPHERE) are also available, in K.
     In openPMD output, all of these temperatures carry the temperature unit dimension. ``T_<species_name>`` is still written in eV, but with ``unitSI`` = :math:`q_e/k_B`, so readers that apply ``unitSI`` (e.g., openPMD-viewer) return it in K. Plotfile readers (e.g., yt) return ``T_<species_name>`` in eV.

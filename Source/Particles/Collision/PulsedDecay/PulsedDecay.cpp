@@ -174,7 +174,9 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 
         // Enable tiling
         amrex::MFItInfo info;
-        if (amrex::Gpu::notInLaunchRegion()) { info.EnableTiling(WarpXParticleContainer::tile_size); }
+        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
+            info.EnableTiling(WarpXParticleContainer::tile_size);
+        }
 
 #ifdef AMREX_USE_OMP
         info.SetDynamic(true);

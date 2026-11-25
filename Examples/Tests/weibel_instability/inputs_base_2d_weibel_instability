@@ -1,0 +1,103 @@
+# Base input of the 2D Weibel instability tests: two electron beams streaming in opposite
+# directions along y (out of the x-z plane) over an immobile ion background.
+# The solver-specific parameters (time step, number of steps, output interval) are set in
+# inputs_test_2d_weibel_instability_darwin and inputs_test_2d_weibel_instability_explicit.
+# Both runs end at the same time and share output times, so their snapshots can be compared.
+# The analysis script measures the growth rate of a single seeded mode (see "Seed mode") and
+# compares it with Weibel's cold-beam theory.
+
+# ===== Seed mode =====
+# The two beam densities are modulated in opposite directions, n_beam * (1 +/- eps * cos(k x)),
+# with k = 2 pi seed_mode / Lx. The total charge stays uniform, but the net current
+# j_y ~ cos(k x) seeds B_z ~ sin(k x) well above the particle noise. seed_mode is low enough
+# that the grid resolves the mode well and barely slows its growth.
+# The seed mode does not vary along z, so the domain is kept short along z to save runtime.
+# This only removes some of the noise modes that vary along z (which produce B_x).
+my_constants.Lx = 34.5e-6                                # domain length along x [m]; must match geometry.prob_lo/hi
+my_constants.n_beam = 1e25                               # number density of each beam [m^-3]
+my_constants.seed_amplitude = 0.003                      # relative density modulation eps
+my_constants.seed_mode = 6                               # number of seed wavelengths in Lx
+
+# ===== Numerics / grid (shared by all field solvers) =====
+algo.particle_shape = 2                                  # quadratic particle shape
+amr.blocking_factor_x = 32                               # box sizes along x are multiples of this
+amr.blocking_factor_y = 16                               # same along z (named y: 2nd dimension in 2D)
+amr.max_grid_size_x = 32                                 # max cells per box along x
+amr.max_grid_size_y = 16                                 # max cells per box along z
+amr.max_level = 0                                        # no mesh refinement
+amr.n_cell = 64 16                                       # cells in x, z (dx < dz)
+warpx.use_filter = 0                                     # a current filter would damp the fastest-growing short wavelengths
+
+# ===== Boundary conditions: periodic in x and z =====
+boundary.field_hi = periodic periodic
+boundary.field_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+
+# ===== Diagnostics =====
+diag1.diag_type = TimeAveraged
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho_electrons_1 rho_electrons_2 rho_ions jx jy jz divE rho
+diag1.format = openpmd
+diag1.openpmd_backend = h5
+diag1.time_average_mode = dynamic_start                  # averaging window ends at each output step
+diagnostics.diags_names = diag1
+
+# ===== Reduced diagnostics =====
+EF.intervals = 1                                         # every step
+EF.type = FieldEnergy                                    # total, electric, and magnetic field energy
+
+# ===== Electron beam 1 (drifting along +y) =====
+electrons_1.charge = -q_e
+electrons_1.density_function(x,y,z) = "n_beam * (1 + seed_amplitude * cos(2 * pi * seed_mode * x / Lx))"
+electrons_1.injection_style = NUniformPerCell            # particles evenly spaced within each cell
+electrons_1.mass = m_e
+electrons_1.maxwellian_u_mean_distribution_type = constant
+electrons_1.maxwellian_u_std_distribution_type = constant
+electrons_1.momentum_distribution_type = maxwellian      # drifting Maxwellian
+electrons_1.num_particles_per_cell_each_dim = 4 4        # macroparticles per cell in x, z
+electrons_1.profile = parse_density_function             # uniform density plus seed modulation (+eps)
+electrons_1.ux_mean = 0
+electrons_1.ux_std = 0.0001414213562373095               # thermal spread, same in all directions
+electrons_1.uy_mean = 0.010000500037503125               # drift along +y, as u = gamma * beta
+electrons_1.uy_std = 0.0001414213562373095
+electrons_1.uz_mean = 0
+electrons_1.uz_std = 0.0001414213562373095
+
+# ===== Electron beam 2 (mirror of beam 1, drifting along -y) =====
+electrons_2.charge = -q_e
+electrons_2.density_function(x,y,z) = "n_beam * (1 - seed_amplitude * cos(2 * pi * seed_mode * x / Lx))"
+electrons_2.injection_style = NUniformPerCell
+electrons_2.mass = m_e
+electrons_2.maxwellian_u_mean_distribution_type = constant
+electrons_2.maxwellian_u_std_distribution_type = constant
+electrons_2.momentum_distribution_type = maxwellian
+electrons_2.num_particles_per_cell_each_dim = 4 4
+electrons_2.profile = parse_density_function             # uniform density plus seed modulation (-eps)
+electrons_2.ux_mean = 0
+electrons_2.ux_std = 0.0001414213562373095
+electrons_2.uy_mean = -0.010000500037503125              # drift along -y
+electrons_2.uy_std = 0.0001414213562373095
+electrons_2.uz_mean = 0
+electrons_2.uz_std = 0.0001414213562373095
+
+# ===== Ion background =====
+# Immobile ions cancel the electron charge. The Darwin solver needs a neutral plasma; the
+# explicit test keeps the ions so that both tests simulate the same plasma.
+ions.charge = q_e
+ions.density = 2e25                                      # sum of both beam densities [m^-3]
+ions.do_not_push = 1                                     # immobile
+ions.injection_style = NUniformPerCell
+ions.mass = m_p
+ions.momentum_distribution_type = at_rest
+ions.num_particles_per_cell_each_dim = 4 4
+ions.profile = constant
+
+# ===== Geometry =====
+geometry.dims = 2                                        # x-z plane
+geometry.prob_hi =  17.25e-6 23.0e-6                     # upper bounds in x, z [m]; z kept short (see "Seed mode")
+geometry.prob_lo = -17.25e-6  0.0e-6                     # lower bounds in x, z [m]
+
+# ===== Run control =====
+particles.species_names = electrons_1 electrons_2 ions
+warpx.reduced_diags_names = EF
+warpx.verbose = 1
