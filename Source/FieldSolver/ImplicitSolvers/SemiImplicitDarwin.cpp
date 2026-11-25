@@ -63,8 +63,38 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         "gather a magnetic field that is not updated during the Darwin step. "
         "See WarpX issue #7543 (https://github.com/BLAST-WarpX/warpx/issues/7543).");
 
-    // Define dA MultiFabs
+    // Catch any other configuration (beyond the ones rejected above) where the aux fields
+    // are not aliases of the fp fields, by comparing the underlying data directly.
     using ablastr::fields::Direction;
+    {
+        auto const shares_data = [] (amrex::MultiFab const* aux, amrex::MultiFab const* fp)
+        {
+            if (aux->local_size() != fp->local_size()) { return false; }
+            for (int i = 0; i < fp->local_size(); ++i) {
+                int const idx = fp->IndexArray()[i];
+                if (aux->IndexArray()[i] != idx ||
+                    aux->get(idx).dataPtr() != fp->get(idx).dataPtr()) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            for (int dir = 0; dir < 3; ++dir) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    shares_data(m_WarpX->m_fields.get(FieldType::Efield_aux, Direction{dir}, lev),
+                                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{dir}, lev)) &&
+                    shares_data(m_WarpX->m_fields.get(FieldType::Bfield_aux, Direction{dir}, lev),
+                                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{dir}, lev)),
+                    "The semi-implicit Darwin solver requires the aux fields to alias the fp "
+                    "fields, since it gathers from the fp fields and never calls "
+                    "UpdateAuxiliaryData. See WarpX issue #7543 "
+                    "(https://github.com/BLAST-WarpX/warpx/issues/7543).");
+            }
+        }
+    }
+
+    // Define dA MultiFabs
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();

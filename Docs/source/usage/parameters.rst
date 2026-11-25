@@ -469,7 +469,7 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
-        - External particle fields read from file (:pp:param:`particles.E/B_ext_particle_init_style` ``= read_from_file``)
+        - External particle fields read from file (``particles.E/B_ext_particle_init_style = read_from_file``)
           and momentum-conserving field gathering (:pp:param:`algo.field_gathering` ``= momentum-conserving``)
           are not yet supported, and the code aborts if either is used
           (see `issue #7543 <https://github.com/BLAST-WarpX/warpx/issues/7543>`__).
