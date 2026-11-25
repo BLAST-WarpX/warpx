@@ -254,6 +254,9 @@ protected:
      */
     mutable amrex::Real m_dt = 0.0;
 
+    // Field-evaluation time for the current nonlinear solve.
+    amrex::Real m_field_time = 0.0;
+
     /**
      * \brief Number of substeps
      */

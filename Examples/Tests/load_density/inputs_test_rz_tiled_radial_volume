@@ -1,0 +1,37 @@
+# Constant axial drift in a single FAB with several radial and axial CPU tiles.
+max_step = 1
+geometry.dims = RZ
+geometry.prob_lo = 0 -0.5
+geometry.prob_hi = 1 0.5
+amr.n_cell = 32 32
+amr.max_grid_size = 32
+amr.blocking_factor = 8
+amr.max_level = 0
+fabarray.mfiter_tile_size = 8 8
+
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+warpx.n_rz_azimuthal_modes = 1
+warpx.cfl = 0.2
+warpx.use_filter = 0
+warpx.do_initial_div_cleaning = 0
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = esirkepov
+particles.species_names = electrons
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2 2
+electrons.profile = constant
+electrons.density = 1.e9
+electrons.momentum_distribution_type = constant
+electrons.uz = 0.125
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.fields_to_plot = jz rho_electrons
+diag1.write_species = 0

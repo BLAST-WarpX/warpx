@@ -83,6 +83,7 @@ int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
     m_Eold.Copy(FieldType::Efield_fp); // Copy Efield_fp into m_Eold
 
     amrex::Real const half_time = start_time + 0.5_rt*m_dt;
+    m_field_time = half_time;
 
     // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}

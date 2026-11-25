@@ -244,11 +244,6 @@ x_vec = Bx.mesh("x")
 y_vec = Bx.mesh("y")
 z_vec = Bx.mesh("z")
 
-dx = x_vec[1] - x_vec[0]
-dy = y_vec[1] - y_vec[0]
-x_vec = x_vec + dx / 2.0
-y_vec = y_vec + dy / 2.0
-
 
 @np.vectorize
 def Bt_an(r):
@@ -271,12 +266,10 @@ By_dat = By[...]
 Bx_mean = Bx_dat[:, :, z_idx].mean(axis=2).T
 By_mean = By_dat[:, :, z_idx].mean(axis=2).T
 
-# Interpolate B mesh to nodal points excluding last mesh point
-Bx_nodal = (Bx_mean[:-1, 1:] + Bx_mean[:-1, :-1]) / 2.0
-By_nodal = (By_mean[:-1, :-1] + By_mean[1:, :-1]) / 2.0
-
-x_vec = x_vec[:-1]
-y_vec = y_vec[:-1]
+# With momentum-conserving gathering, Bfield_aux is already on the nodal grid
+# (as for Efield_aux above), so compare it at its own nodes.
+Bx_nodal = Bx_mean
+By_nodal = By_mean
 
 
 XM, YM = np.meshgrid(x_vec, y_vec, indexing="xy")

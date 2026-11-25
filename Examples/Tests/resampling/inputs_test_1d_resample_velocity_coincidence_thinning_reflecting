@@ -1,0 +1,15 @@
+# Same as test_1d_resample_velocity_coincidence_thinning, with moving particles and
+# reflecting boundaries: resampling must not delete the particles that cross a boundary.
+FILE = inputs_test_1d_resample_velocity_coincidence_thinning
+
+max_step = 8
+boundary.field_lo = pec
+boundary.field_hi = pec
+boundary.particle_lo = reflecting
+boundary.particle_hi = reflecting
+hydrogen.do_not_push = 0
+hydrogen.uz_th = 0.0065
+
+warpx.reduced_diags_names = particle_number
+particle_number.type = ParticleNumber
+particle_number.intervals = 1

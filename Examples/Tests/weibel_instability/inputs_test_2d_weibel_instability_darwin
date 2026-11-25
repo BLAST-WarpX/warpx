@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_2d_weibel_instability
+
+# test input parameters
+algo.evolve_scheme = semi_implicit_darwin
+amrex_gmres.pc_type = pc_darwin_mlmg                     # multigrid preconditioner for GMRES
+amrex_gmres.relative_tolerance = 1.0e-2                  # looser than the default, for fewer GMRES iterations
+diag1.average_period_steps = 2                           # average an even and an odd step to remove the even/odd oscillation of B
+diag1.intervals = 4::2                                   # the first averaging window must start after step 0
+implicit_evolve.magnetostatic_particle_shape = 1         # linear shape for the magnetostatic part only
+max_step = 352                                           # same end time as the explicit test; an output step, so the last average is complete
+warpx.const_dt = 4.0e-15                                 # omega_p * dt ~ 1 (Darwin has no light-wave CFL limit)
+warpx.do_electrostatic = labframe                        # required by the Darwin scheme
