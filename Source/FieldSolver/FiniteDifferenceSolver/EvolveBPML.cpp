@@ -47,11 +47,14 @@ void FiniteDifferenceSolver::EvolveBPML (
     const bool dive_cleaning
 )
 {
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(fields, patch_type, level, dt, dive_cleaning);
+#else
     using warpx::fields::FieldType;
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     amrex::ignore_unused(fields, patch_type, level, dt, dive_cleaning);
     WARPX_ABORT_WITH_MESSAGE(
         "PML only implemented in Cartesian geometry.");
@@ -77,6 +80,7 @@ void FiniteDifferenceSolver::EvolveBPML (
         WARPX_ABORT_WITH_MESSAGE(
             "EvolveBPML: Unknown algorithm");
     }
+#endif
 #endif
 }
 

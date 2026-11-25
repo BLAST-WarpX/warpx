@@ -1,0 +1,60 @@
+# A uniform stationary plasma isolates the adaptive controller from particle
+# noise. RKF45 can grow its step, so the warm-start count decreases from 40.
+max_step = 6
+warpx.const_dt = 2e-9
+warpx.verbose = 1
+warpx.write_diagnostics_on_restart = 1
+
+amr.n_cell = 16 16
+amr.max_grid_size = 16
+amr.blocking_factor = 8
+amr.max_level = 0
+
+geometry.dims = 2
+geometry.prob_lo = -0.5 -0.5
+geometry.prob_hi = 0.5 0.5
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = 10
+hybrid_pic_model.n0_ref = 1e19
+hybrid_pic_model.gamma = 1
+hybrid_pic_model.n_floor = 5e17
+hybrid_pic_model.substeps = 40
+hybrid_pic_model.use_rkf45 = 1
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0 0 0.1
+
+particles.species_names = ions
+ions.charge = q_e
+ions.mass = 4*m_p
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 2 2
+ions.profile = constant
+ions.density = 1e19
+ions.momentum_distribution_type = constant
+ions.ux = 0
+ions.uy = 0
+ions.uz = 0
+
+diagnostics.diags_names = chk diag1
+chk.diag_type = Full
+chk.format = checkpoint
+chk.file_prefix = diags/chk
+chk.intervals = 3
+
+# Keep particle plotfiles in this test: yt parses their WarpXHeader differently
+# from field-only output, and checkpoint metadata must not change that format.
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.file_prefix = diags/fields
+diag1.intervals = 6
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.write_species = 1

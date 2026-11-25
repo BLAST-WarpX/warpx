@@ -268,9 +268,10 @@ void VelocityCoincidenceThinning::operator() (
                         auto vy = v_perp * std::sin(phi);
 
                         // calculate rotation angles to parallel coord. frame
-                        auto cos_theta = (cluster_u_mag > 0._prt) ? cluster_uz / cluster_u_mag : 0._prt;
+                        // (no rotation, i.e. angle 0, if the angle is undefined)
+                        auto cos_theta = (cluster_u_mag > 0._prt) ? cluster_uz / cluster_u_mag : 1._prt;
                         auto sin_theta = (cluster_u_mag > 0._prt) ? u_perp / cluster_u_mag : 0._prt;
-                        auto cos_phi = (u_perp > 0._prt) ? cluster_ux / u_perp : 0._prt;
+                        auto cos_phi = (u_perp > 0._prt) ? cluster_ux / u_perp : 1._prt;
                         auto sin_phi = (u_perp > 0._prt) ? cluster_uy / u_perp : 0._prt;
 
                         // rotate new velocity vector to labframe

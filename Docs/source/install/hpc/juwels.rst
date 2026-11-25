@@ -8,7 +8,7 @@ Juwels (JSC)
    For the moment, WarpX doesn't run on Juwels with MPI_THREAD_MULTIPLE.
    Please compile with this compilation flag: ``MPI_THREAD_MULTIPLE=FALSE``.
 
-The `Juwels supercomputer <https://www.fz-juelich.de/ias/jsc/EN/Expertise/Supercomputers/JUWELS/JUWELS_node.html>`_ is located at JSC.
+The `Juwels supercomputer <https://www.fz-juelich.de/en/jsc/systems/supercomputers/juwels>`_ is located at JSC.
 
 
 Introduction
@@ -16,14 +16,12 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-See `this page <https://apps.fz-juelich.de/jsc/hps/juwels/quickintro.html>`_ for a quick introduction.
-(Full `user guide <http://www.fz-juelich.de/ias/jsc/EN/Expertise/Supercomputers/JUWELS/UserInfo/UserInfo_node.html>`__).
+* `JUWELS user documentation <https://apps.fz-juelich.de/jsc/hps/juwels/index.html>`__
+* Batch system: `Slurm <https://apps.fz-juelich.de/jsc/hps/juwels/batchsystem.html>`__
+* `Production directories <https://apps.fz-juelich.de/jsc/hps/juwels/environment.html#available-file-systems>`__:
 
-* Batch system: `Slurm <https://apps.fz-juelich.de/jsc/hps/juwels/quickintro.html#batch-system-on-system-name>`__
-* `Production directories <https://apps.fz-juelich.de/jsc/hps/juwels/environment.html?highlight=scratch#available-filesystems>`__:
-
-  * ``$SCRATCH``: Scratch filesystem for `temporary data <http://www.fz-juelich.de/ias/jsc/EN/Expertise/Supercomputers/JUWELS/FAQ/juwels_FAQ_node.html#faq1495160>`__ (90 day purge)
-  * ``$FASTDATA/``: Storage location for large data (backed up)
+  * ``$SCRATCH``: Scratch filesystem for `temporary data <https://apps.fz-juelich.de/jsc/hps/juwels/filesystems.html>`__ (90 day purge)
+  * ``$DATA/``: Storage location for large data of a `data project <https://apps.fz-juelich.de/jsc/hps/juwels/environment.html#file-systems-for-data-projects>`__ (backed up)
   * Note that the ``$HOME`` directory is not designed for simulation runs and producing output there will impact performance.
 
 

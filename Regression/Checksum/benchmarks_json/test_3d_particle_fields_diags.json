@@ -1,4 +1,13 @@
 {
+  "electrons": {
+    "particle_momentum_x": 2.433513098651126e-19,
+    "particle_momentum_y": 2.4633148524664556e-19,
+    "particle_momentum_z": 2.445296748080444e-19,
+    "particle_position_x": 16386.79272673335,
+    "particle_position_y": 16383.137717230607,
+    "particle_position_z": 16385.77101343551,
+    "particle_weight": 800000000000000.0
+  },
   "lev=0": {
     "Bx": 0.08405082836141896,
     "By": 0.08395442334372932,
@@ -27,15 +36,6 @@
     "zuz_electrons": 251.42139943940128,
     "zuz_photons": 1423.0530482617983,
     "zuz_protons": 0.13812948559564353
-  },
-  "electrons": {
-    "particle_momentum_x": 2.433513098651126e-19,
-    "particle_momentum_y": 2.4633148524664556e-19,
-    "particle_momentum_z": 2.445296748080444e-19,
-    "particle_position_x": 16386.79272673335,
-    "particle_position_y": 16383.137717230607,
-    "particle_position_z": 16385.77101343551,
-    "particle_weight": 800000000000000.0
   },
   "photons": {
     "particle_momentum_x": 1.4326458753476158e-18,

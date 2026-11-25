@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_rz
+
+# test input parameters
+algo.current_deposition = direct
+# jt is not plotted: it is zero up to round-off in this setup
+diag1.fields_to_plot = jr jz rho Er Ez Bt

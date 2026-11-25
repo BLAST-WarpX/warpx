@@ -15,6 +15,8 @@
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
 
+#include <optional>
+
 
 /** \brief Functor class that assigns external
  *         field values (E and B) to particles.
@@ -25,7 +27,9 @@ struct GetExternalEBField
 
     GetExternalEBField () = default;
 
-    explicit GetExternalEBField (const WarpXParIter& a_pti, long a_offset = 0) noexcept;
+    // Override the evaluation time of parsed fields for implicit stages.
+    explicit GetExternalEBField (const WarpXParIter& a_pti, long a_offset = 0,
+                                 std::optional<amrex::Real> a_field_time = std::nullopt) noexcept;
 
     ExternalFieldInitType m_Etype;
     ExternalFieldInitType m_Btype;
@@ -42,6 +46,7 @@ struct GetExternalEBField
 
     GetParticlePosition<PIdx> m_get_position;
     amrex::Real m_time;
+    amrex::Real m_parser_time;
 
     amrex::ParticleReal m_repeated_plasma_lens_period;
     const amrex::ParticleReal* AMREX_RESTRICT m_repeated_plasma_lens_starts = nullptr;
@@ -90,10 +95,10 @@ struct GetExternalEBField
         {
             amrex::ParticleReal x, y, z;
             m_get_position(i, x, y, z);
-            amrex::Real lab_time = m_time;
+            amrex::Real lab_time = m_parser_time;
             if (m_gamma_boost > 1._prt) {
-                lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
-                z = m_gamma_boost*z + m_uz_boost*m_time;
+                lab_time = m_gamma_boost*m_parser_time + m_uz_boost*z*inv_c2;
+                z = m_gamma_boost*z + m_uz_boost*m_parser_time;
             }
             Ex = m_Exfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
             Ey = m_Eyfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
@@ -104,10 +109,10 @@ struct GetExternalEBField
         {
             amrex::ParticleReal x, y, z;
             m_get_position(i, x, y, z);
-            amrex::Real lab_time = m_time;
+            amrex::Real lab_time = m_parser_time;
             if (m_gamma_boost > 1._prt) {
-                lab_time = m_gamma_boost*m_time + m_uz_boost*z*inv_c2;
-                z = m_gamma_boost*z + m_uz_boost*m_time;
+                lab_time = m_gamma_boost*m_parser_time + m_uz_boost*z*inv_c2;
+                z = m_gamma_boost*z + m_uz_boost*m_parser_time;
             }
             Bx = m_Bxfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
             By = m_Byfield_partparser((amrex::ParticleReal) x, (amrex::ParticleReal) y, (amrex::ParticleReal) z, lab_time);
@@ -179,10 +184,13 @@ struct GetExternalEBField
         field_Ex += Ex;
         field_Ey += Ey;
         field_Ez += Ez;
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(Bx, By, Bz);
+#else
         field_Bx += Bx;
         field_By += By;
         field_Bz += Bz;
-
+#endif
     }
 };
 

@@ -40,6 +40,7 @@ Models & Algorithms
    models_algorithms/electromagnetic_pic
    models_algorithms/electrostatic_pic
    models_algorithms/kinetic_fluid_hybrid_model
+   models_algorithms/darwin_solver
 
 .. _theory-grid:
 

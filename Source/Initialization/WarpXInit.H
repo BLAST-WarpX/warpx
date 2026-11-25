@@ -28,6 +28,16 @@ namespace warpx::initialization
      */
     void finalize_external_libraries ();
 
+    /** \brief Finalize and re-initialize PETSc, keeping its command line.
+     *
+     * This is process-wide although one solver triggers it: every PETSc object must have
+     * been destroyed before the call and be recreated after it by its owner. Today the only
+     * owners are KSP_impl and SNES_impl, through ReinitializePETSc(). A new owner of PETSc
+     * objects has to join that, or its objects become invalid after
+     * implicit_evolve.petsc_reinit_interval steps. No-op without PETSc.
+     */
+    void reinitialize_petsc ();
+
     /**
      * Initializes the Warning manager in ablastr
      */

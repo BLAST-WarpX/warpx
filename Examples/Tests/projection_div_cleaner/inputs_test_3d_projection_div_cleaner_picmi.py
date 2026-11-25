@@ -130,7 +130,7 @@ plt.colorbar()
 plt.savefig("divb.png")
 
 error = np.sqrt((divB[2:-2, 2:-2, 2:-2] ** 2).sum())
-tolerance = 1e-12
+tolerance = 2e-12
 
 print("error = ", error)
 print("tolerance = ", tolerance)

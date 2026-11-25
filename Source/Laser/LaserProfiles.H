@@ -178,6 +178,7 @@ private:
     } m_params;
 
     amrex::Parser m_parser;
+    amrex::ParserExecutor<3> m_parser_exe;
 };
 
 /**

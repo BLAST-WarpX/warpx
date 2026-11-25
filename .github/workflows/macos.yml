@@ -27,11 +27,14 @@ jobs:
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v7
-    - uses: actions/setup-python@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       name: Install Python
       with:
-        python-version: '3.x'
+        # TODO: temporary pin, revert to '3.x' once h5py ships cp315 macOS arm64
+        # wheels on PyPI. Without wheels, the h5py source build picks up
+        # Homebrew's parallel hdf5-mpi and fails on a missing mpi.h.
+        python-version: '3.14'
     - name: install brew dependencies
       run: |
         set +e
@@ -55,7 +58,7 @@ jobs:
         python3 -m pip install --upgrade mpi4py
         python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/Library/Caches/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

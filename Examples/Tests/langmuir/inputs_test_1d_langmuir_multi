@@ -24,6 +24,7 @@ warpx.serialize_initial_conditions = 1
 
 # Verbosity
 warpx.verbose = 1
+warpx.tiny_profiler_flush_interval = 10
 
 # Algorithms
 algo.field_gathering = energy-conserving

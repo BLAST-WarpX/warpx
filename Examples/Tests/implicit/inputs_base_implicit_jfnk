@@ -38,7 +38,7 @@ newton.max_iterations = 20
 newton.relative_tolerance = 1.0e-12
 newton.absolute_tolerance = 0.0
 newton.require_convergence = false
-newton.diagnostic_file = "diags/newton_solver.txt"
+newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
@@ -81,4 +81,6 @@ diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
 warpx.reduced_diags_names = particle_energy field_energy
 reduced_diags.intervals = 1
 particle_energy.type = ParticleEnergy
+particle_energy.path = diags/reduced_files/
 field_energy.type = FieldEnergy
+field_energy.path = diags/reduced_files/

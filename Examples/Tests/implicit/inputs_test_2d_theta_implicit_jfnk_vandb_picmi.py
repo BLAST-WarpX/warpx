@@ -122,11 +122,17 @@ part_diag1 = picmi.ParticleDiagnostic(
 )
 
 particle_energy_diag = picmi.ReducedDiagnostic(
-    diag_type="ParticleEnergy", name="particle_energy", period=1
+    diag_type="ParticleEnergy",
+    name="particle_energy",
+    period=1,
+    path="diags/reduced_files/",
 )
 
 field_energy_diag = picmi.ReducedDiagnostic(
-    diag_type="FieldEnergy", name="field_energy", period=1
+    diag_type="FieldEnergy",
+    name="field_energy",
+    period=1,
+    path="diags/reduced_files/",
 )
 
 ##########################

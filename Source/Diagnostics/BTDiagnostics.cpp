@@ -1530,19 +1530,14 @@ BTDiagnostics::PrepareParticleDataForOutput()
 }
 
 void
-BTDiagnostics::ResetTotalParticlesInBuffer(int i_buffer)
+BTDiagnostics::ResetTotalParticlesInBuffer(const int i_buffer)
 {
-    std::fill(
-        m_totalParticles_in_buffer[i_buffer].begin(),
-        m_totalParticles_in_buffer[i_buffer].end(),
-        0);
+    std::ranges::fill(m_totalParticles_in_buffer[i_buffer], 0);
 }
 
 void
-BTDiagnostics::ClearParticleBuffer(int i_buffer)
+BTDiagnostics::ClearParticleBuffer(const int i_buffer)
 {
-    std::for_each(
-        m_particles_buffer[i_buffer].begin(),
-        m_particles_buffer[i_buffer].end(),
+    std::ranges::for_each(m_particles_buffer[i_buffer],
         [](auto& pb){pb->clearParticles();});
 }

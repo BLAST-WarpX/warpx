@@ -5,7 +5,8 @@ channels:
   - nodefaults
 
 dependencies:
-  - python
+  # Python<3.14 because Sphinx<7.2 (see requirements.txt) uses `ast.Str`, which Python 3.14 removed
+  - python<3.14
   - doxygen
   - pip
   - pip:

@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_theta_implicit_planar_pinch
+
+# test input parameters
+implicit_evolve.nonlinear_solver = "petsc_snes"

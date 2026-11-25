@@ -25,7 +25,17 @@
 
 
 #include <optional>
+#include <sstream>
 #include <string>
+#include <vector>
+
+#ifdef AMREX_USE_PETSC
+namespace
+{
+    // Whether WarpX, rather than AMReX, initialized PETSc and has to finalize it
+    bool petsc_initialized_by_warpx = false;
+}
+#endif
 
 void warpx::initialization::initialize_external_libraries(int argc, char* argv[])
 {
@@ -33,17 +43,65 @@ void warpx::initialization::initialize_external_libraries(int argc, char* argv[]
     warpx::initialization::amrex_init(argc, argv);
     ablastr::math::anyfft::setup();
 #ifdef AMREX_USE_PETSC
-    PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
-    PetscInitialize(&argc, &argv, nullptr, "WarpX with PETSc");
+    PetscBool petsc_is_initialized = PETSC_FALSE;
+    PetscInitialized(&petsc_is_initialized);
+    if (!petsc_is_initialized) {
+        PETSC_COMM_WORLD = amrex::ParallelContext::CommunicatorSub();
+        PetscInitialize(&argc, &argv, nullptr, "WarpX with PETSc");
+        petsc_initialized_by_warpx = true;
+    }
     amrex::Print() << "Initialized PETSc.\n";
+#endif
+}
+
+void warpx::initialization::reinitialize_petsc ()
+{
+#ifdef AMREX_USE_PETSC
+    // PetscFinalize clears the options database (command line, PETSC_OPTIONS and the
+    // options WarpX set), so pass its content to the new PetscInitialize as a command line.
+    // PETSc keeps a pointer to that command line, hence the static storage.
+    static std::vector<std::string> args;
+    static std::vector<char*> argv;
+
+    std::vector<std::string> new_args = {"warpx"};
+    {
+        char* all_options = nullptr;
+        if (PetscOptionsGetAll(nullptr, &all_options) != PETSC_SUCCESS) {
+            WARPX_ABORT_WITH_MESSAGE("reinitialize_petsc: PetscOptionsGetAll failed");
+        }
+        std::istringstream iss(all_options);
+        std::string token;
+        while (iss >> token) { new_args.push_back(token); }
+        PetscFree(all_options);
+    }
+    const MPI_Comm comm = PETSC_COMM_WORLD;
+
+    // The options database is rebuilt below; do not report unused options now
+    PetscOptionsSetValue(nullptr, "-options_left", "no");
+    if (PetscFinalize() != PETSC_SUCCESS) {
+        WARPX_ABORT_WITH_MESSAGE("reinitialize_petsc: PetscFinalize failed");
+    }
+
+    args = std::move(new_args);
+    argv.clear();
+    for (auto& arg : args) { argv.push_back(arg.data()); }
+    argv.push_back(nullptr);
+    int argc = static_cast<int>(args.size());
+    char** argv_ptr = argv.data();
+    PETSC_COMM_WORLD = comm;
+    if (PetscInitialize(&argc, &argv_ptr, nullptr, "WarpX with PETSc") != PETSC_SUCCESS) {
+        WARPX_ABORT_WITH_MESSAGE("reinitialize_petsc: PetscInitialize failed");
+    }
 #endif
 }
 
 void warpx::initialization::finalize_external_libraries ()
 {
 #ifdef AMREX_USE_PETSC
-    PetscFinalize();
-    amrex::Print() << "Finalized PETSc.\n";
+    if (petsc_initialized_by_warpx) {
+        PetscFinalize();
+        amrex::Print() << "Finalized PETSc.\n";
+    }
 #endif
     ablastr::math::anyfft::cleanup();
     amrex::Finalize();

@@ -13,16 +13,37 @@
 #include <AMReX_VisMF.H>
 
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 
 namespace ablastr::fields
 {
+    // Direction: implicit conversion from strings, e.g., in MultiFabRegister::get(name, "x", level)
+    static_assert(std::is_convertible_v<char const *, Direction>);
+    static_assert(std::is_convertible_v<std::string, Direction>);
+    static_assert(std::is_convertible_v<std::string_view, Direction>);
+    // Direction: a char must not promote silently to Direction (int), e.g., 'x' -> 120
+    static_assert(!std::is_constructible_v<Direction, char>);
+    // Direction: a literal nullptr must fail at compile time
+    static_assert(!std::is_constructible_v<Direction, std::nullptr_t>);
+    // Direction: string constructors are constexpr, so these also fail to compile if they recurse
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    static_assert(int{Direction{"r"}} == int{Direction::r});
+    static_assert(int{Direction{std::string_view{"theta"}}} == int{Direction::theta});
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    static_assert(int{Direction{"x"}} == int{Direction::x});
+    static_assert(int{Direction{std::string_view{"y"}}} == int{Direction::y});
+#endif
+
     amrex::MultiFab*
     MultiFabRegister::internal_alloc_init (
         std::string const & name,

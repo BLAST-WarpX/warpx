@@ -31,17 +31,16 @@ amr.max_grid_size = 8
 amr.blocking_factor = 8
 amr.max_level = 0
 geometry.dims = RZ
-geometry.prob_lo = 0.0 0.0
+geometry.prob_lo = 0.54e-2 0.0
 geometry.prob_hi = 1.54e-2 0.22e-2
 
 #################################
 ####### Boundary condition ######
 #################################
-boundary.field_lo = none periodic
+boundary.field_lo = pec periodic
 boundary.field_hi = pec_insulator periodic
-boundary.particle_lo = none periodic
+boundary.particle_lo = absorbing periodic
 boundary.particle_hi = absorbing periodic
-boundary.verboncoeur_axis_correction = false
 
 insulator.area_x_hi(y,z) = (-1.0 <= z and z <= 1.0)
 insulator.Bz_x_hi(y,z,t) = min(t/rise_time,1)*B0
@@ -69,19 +68,22 @@ implicit_evolve.nonlinear_solver = "newton"
 newton.linear_solver = petsc_ksp
 newton.verbose = true
 newton.max_iterations = 10
-newton.relative_tolerance = 1.0e-8
+newton.relative_tolerance = 1.0e-12
 newton.absolute_tolerance = 0.0
-newton.require_convergence = false
+newton.require_convergence = true
 newton.diagnostic_file = "diags/reduced_files/newton_solver.txt"
-newton.diagnostic_interval = 100
+newton.diagnostic_interval = 10
+newton.pc_update_newton_interval = 0
+newton.pc_update_time_step_interval = 100
 
 gmres.verbose_int = 2
 gmres.max_iterations = 1000
-gmres.relative_tolerance = 1.0e-4
+gmres.relative_tolerance = 1.0e-6
 gmres.absolute_tolerance = 0.0
 
 jacobian.pc_type = pc_petsc
-pc_petsc.verbose = true
+jacobian.epsJFNK = 1.0  # Use an order-one perturbation factor for linear systems.
+precon_mat.verbose = true
 pc_petsc.type = lu
 
 ###   Diagnostics
@@ -94,11 +96,11 @@ diag1.fields_to_plot = Er Et Ez Br Bt Bz
 warpx.reduced_diags_names = field_energy poynting_flux
 
 field_energy.type = FieldEnergy
-field_energy.intervals = 100
+field_energy.intervals = 10
 field_energy.precision = 18
 field_energy.path = diags/reduced_files/
 
 poynting_flux.type = FieldPoyntingFlux
-poynting_flux.intervals = 100
+poynting_flux.intervals = 10
 poynting_flux.precision = 18
 poynting_flux.path = diags/reduced_files/

@@ -32,7 +32,7 @@ the ion thermal velocity about the ion bulk, not relax the ion bulk toward the
 electron flow. The deposited ion current projected onto the force-free mode
 must therefore remain at its initial shot-noise level.
 
-This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) from the
+This script reads domain-mean T_e(t) and T_i(t) (Kelvin->eV) from the
 post-step dumps -- the iteration-0 dump is skipped, since it is written before
 the first field solve while T_e still holds its zero allocation value (T_e is
 filled from the closure at the first step) -- so (Te0, Ti0) is the first
@@ -51,6 +51,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import openpmd_api as io
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import mu_0
 
@@ -62,6 +63,31 @@ K_PER_EV = Q_E / K_B  # T[eV] * this = T[K];  T[K] / this = T[eV]
 def post_step_iterations(ts):
     """Iterations to analyse: all dumps except iteration 0 (T_e = 0 there)."""
     return [it for it in ts.iterations if it > 0]
+
+
+def check_unit_metadata(diag_dir, iteration):
+    """Check the openPMD unit metadata of the temperature and pressure outputs:
+    T_ions is stored in eV (unitSI converts to K), Te in K and Pe in Pa."""
+    # unitDimension: powers of (L, M, T, I, theta, N, J)
+    expected = {
+        "T_ions": ([0, 0, 0, 0, 1, 0, 0], K_PER_EV),
+        "Te": ([0, 0, 0, 0, 1, 0, 0], 1.0),
+        "Pe": ([-1, 1, -2, 0, 0, 0, 0], 1.0),
+    }
+    series = io.Series(f"{diag_dir}/openpmd_%T.h5", io.Access.read_only)
+    meshes = series.iterations[iteration].meshes
+    ok = True
+    for name, (unit_dimension, unit_si) in expected.items():
+        got_dimension = list(meshes[name].unit_dimension)
+        got_si = meshes[name][io.Mesh_Record_Component.SCALAR].unit_SI
+        match = got_dimension == unit_dimension and np.isclose(got_si, unit_si)
+        print(
+            f"  openPMD units of {name:6s}: unitDimension={got_dimension}, "
+            f"unitSI={got_si:.6g} -> {'ok' if match else 'MISMATCH'}"
+        )
+        ok = ok and match
+    series.close()
+    return ok
 
 
 def domain_means(ts, its):
@@ -77,7 +103,7 @@ def domain_means(ts, its):
         w = np.asarray(rho, dtype=float) / Q_E
         wsum = float(np.sum(w))
         Te_m.append(float(np.sum(np.asarray(Te, float) * w) / wsum) / K_PER_EV)
-        Ti_m.append(float(np.sum(np.asarray(Ti, float) * w) / wsum))  # already eV
+        Ti_m.append(float(np.sum(np.asarray(Ti, float) * w) / wsum) / K_PER_EV)
     return t, np.array(Te_m), np.array(Ti_m)
 
 
@@ -186,6 +212,7 @@ def main(argv=None):
     print(f"  max |projected J_i|/J0    = {current_fraction_max:.4f}")
     print(f"  momentum tolerance        = {args.momentum_tol:.4f}")
     print(f"  bulk-relaxing bug predicts ~ {broken_prediction:.4f}")
+    units_ok = check_unit_metadata(args.diag_dir, ts.iterations[0])
     print("=" * 66)
 
     tus = t * 1e6
@@ -236,6 +263,7 @@ def main(argv=None):
         (rel_err <= args.rtol)
         and (e_max <= args.etol)
         and (current_fraction_max <= args.momentum_tol)
+        and units_ok
     )
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
