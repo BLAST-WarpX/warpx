@@ -7,12 +7,15 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "LabFrameExplicitES.H"
-#include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
+#include "Fluids/MultiFluidContainer_fwd.H"
 #include "Fields.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Python/callbacks.H"
 #include "WarpX.H"
+
+#include <ablastr/warn_manager/WarnManager.H>
 
 using namespace amrex;
 
@@ -67,6 +70,15 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     // Compute the potential phi, by solving the Poisson equation
     if (IsPythonCallbackInstalled("poissonsolver")) {
 
+        if (warpx.HasDielectricMaterials()) {
+            ablastr::warn_manager::WMRecordWarning(
+                "Dielectrics",
+                "A Python poissonsolver callback is installed, so the built-in Poisson "
+                "solver is not used and the permittivity of dielectrics.names is not "
+                "applied. The callback must account for dielectric_epsilon itself.",
+                ablastr::warn_manager::WarnPriority::high);
+        }
+
         // Use the Python level solver (user specified)
         ExecutePythonCallback("poissonsolver");
 
@@ -77,11 +89,19 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         amrex::ignore_unused(verbose_step);
         computePhiTriDiagonal(rho_fp, phi_fp);
 #else
+        std::optional<ablastr::fields::ConstMultiLevelScalarField> dielectric_epsilon;
+        if (warpx.HasDielectricMaterials()) {
+            ablastr::fields::ConstMultiLevelScalarField epsilon;
+            for (int lev = 0; lev <= max_level; ++lev) {
+                epsilon.push_back(fields.get(FieldType::dielectric_epsilon, lev));
+            }
+            dielectric_epsilon = std::move(epsilon);
+        }
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
         ablastr::fields::MLMGOptions mlmg_options = m_mlmg_options;
         mlmg_options.verbosity = verbose_step ? m_mlmg_options.verbosity : 0;
         computePhi(rho_fp, phi_fp, beta, mlmg_options, is_igf_2d_slices,
-                   Efield_fp);
+                   Efield_fp, dielectric_epsilon);
 #endif
 
     }
