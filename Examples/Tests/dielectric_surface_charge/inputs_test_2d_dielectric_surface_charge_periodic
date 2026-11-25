@@ -1,0 +1,59 @@
+# Electrons move in +x towards a dielectric layer that straddles the periodic x boundary.
+# Part of them enter the layer at x = 1.171875 mm (1 cell before the boundary) and cross
+# the periodic boundary in the same step: their charge must be deposited where they entered
+# the layer, not where they end.
+
+max_step = 12
+warpx.verbose = 0
+warpx.const_dt = 1.98e-11
+warpx.abort_on_warning_threshold = medium
+
+amr.n_cell = 16 128
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 32
+
+geometry.dims = 2
+geometry.prob_lo = 0.      0.
+geometry.prob_hi = 1.25e-3 1.e-2
+
+boundary.field_lo = periodic pec
+boundary.field_hi = periodic pec
+boundary.particle_lo = periodic absorbing
+boundary.particle_hi = periodic absorbing
+boundary.potential_lo_z = 0.
+boundary.potential_hi_z = 0.
+
+warpx.do_electrostatic = labframe
+warpx.self_fields_required_precision = 1.e-10
+warpx.self_fields_absolute_tolerance = 1.e-12
+
+algo.particle_shape = 1
+
+# Dielectric layer covering x in [1.171875, 1.25] mm and [0, 0.35] mm
+dielectrics.names = layer
+layer.implicit_function = "max((x - 1.171875e-3)*(1.4e-3 - x), (x + 0.078125e-3)*(0.35e-3 - x))"
+layer.permittivity = 4.
+
+# 160 eV electrons, moving by about 1.9 cells per step
+particles.species_names = electrons
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 4 2
+electrons.profile = constant
+electrons.density = 6.2415091e12
+electrons.xmin = 0.4e-3
+electrons.xmax = 0.9e-3
+electrons.zmin = 2.e-3
+electrons.zmax = 8.e-3
+electrons.momentum_distribution_type = constant
+electrons.ux = 0.02503
+
+diagnostics.diags_names = diag1
+diag1.intervals = 12
+diag1.diag_type = Full
+diag1.fields_to_plot = phi dielectric_surface_charge
+
+warpx.reduced_diags_names = particle_number
+particle_number.type = ParticleNumber
+particle_number.intervals = 1

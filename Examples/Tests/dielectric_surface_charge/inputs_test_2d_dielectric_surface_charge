@@ -1,0 +1,73 @@
+# A sheet of electrons, uniform in x, moves in +z towards a dielectric slab
+# and is absorbed on its surface. The absorbed charge is kept as a surface
+# charge, which is included in the subsequent electrostatic solves.
+# A proton species is initialized inside the slab: these protons must be
+# removed at injection, without contributing to the surface charge.
+
+max_step = 120
+warpx.verbose = 0
+warpx.const_dt = 5.e-12
+warpx.abort_on_warning_threshold = medium
+
+amr.n_cell = 16 128
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 32
+
+geometry.dims = 2
+geometry.prob_lo = 0.      0.
+geometry.prob_hi = 1.25e-3 1.e-2
+
+boundary.field_lo = periodic pec
+boundary.field_hi = periodic pec
+boundary.particle_lo = periodic absorbing
+boundary.particle_hi = periodic absorbing
+boundary.potential_lo_z = 0.
+boundary.potential_hi_z = 0.
+
+warpx.do_electrostatic = labframe
+warpx.self_fields_required_precision = 1.e-10
+warpx.self_fields_absolute_tolerance = 1.e-12
+
+algo.particle_shape = 1
+
+# Dielectric slab between z = 5 mm and z = 7 mm
+dielectrics.names = slab
+slab.implicit_function = "(z - 5.e-3)*(7.e-3 - z)"
+slab.permittivity = 4.
+
+particles.species_names = electrons protons
+
+# 100 eV electrons, with a total areal charge density of -1e-9 C/m^2
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2
+electrons.profile = constant
+electrons.density = 6.2415091e12
+electrons.zmin = 2.e-3
+electrons.zmax = 3.e-3
+electrons.momentum_distribution_type = constant
+electrons.uz = 0.01978
+
+protons.species_type = proton
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 2
+protons.profile = constant
+protons.density = 1.e13
+protons.zmin = 5.5e-3
+protons.zmax = 6.5e-3
+protons.momentum_distribution_type = at_rest
+
+diagnostics.diags_names = diag1 chk
+diag1.intervals = 120
+diag1.diag_type = Full
+diag1.fields_to_plot = phi Ez dielectric_epsilon dielectric_surface_charge
+
+# Checkpoint while part of the electrons are absorbed, and part are still moving
+chk.intervals = 80
+chk.diag_type = Full
+chk.format = checkpoint
+
+warpx.reduced_diags_names = particle_number
+particle_number.type = ParticleNumber
+particle_number.intervals = 1

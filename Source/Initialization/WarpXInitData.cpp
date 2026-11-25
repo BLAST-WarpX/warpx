@@ -21,6 +21,7 @@
 #   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #include "Fields.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
@@ -839,6 +840,10 @@ WarpX::InitData ()
     else
     {
         InitFromCheckpoint();
+        // When starting from scratch, this is done in MakeNewLevelFromScratch
+        if (HasDielectricMaterials()) {
+            m_dielectric_materials->InitData(*this);
+        }
         ::PrintDtDxDyDz(max_level, geom, dt);
         PostRestart();
         reduced_diags->InitData();

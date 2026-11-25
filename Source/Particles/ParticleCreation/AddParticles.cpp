@@ -21,6 +21,7 @@
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #ifdef AMREX_USE_EB
 #   include "EmbeddedBoundary/ParticleBoundaryProcess.H"
 #   include "EmbeddedBoundary/ParticleScraper.H"
@@ -1221,6 +1222,19 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
             ParticleBoundaryProcess::Absorb());
     }
+
+    // Remove particles that are inside dielectric materials
+    // TODO: avoid creating these particles in the first place
+    if (WarpX::GetInstance().HasDielectricMaterials() &&
+        WarpX::GetInstance().GetDielectricMaterials().absorbsParticles())
+    {
+        using warpx::fields::FieldType;
+        auto & warpx = WarpX::GetInstance();
+        scrapeParticlesAtEB(
+            *this,
+            warpx.m_fields.get_mr_levels(FieldType::dielectric_signed_distance, warpx.finestLevel()),
+            ParticleBoundaryProcess::Absorb());
+    }
 #endif
 
     // The function that calls this is responsible for redistributing particles.
@@ -1738,6 +1752,19 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         scrapeParticlesAtEB(
             tmp_pc,
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+            ParticleBoundaryProcess::Absorb());
+    }
+
+    // Remove particles that are inside dielectric materials
+    // TODO: avoid creating these particles in the first place
+    if (WarpX::GetInstance().HasDielectricMaterials() &&
+        WarpX::GetInstance().GetDielectricMaterials().absorbsParticles())
+    {
+        using warpx::fields::FieldType;
+        auto & warpx = WarpX::GetInstance();
+        scrapeParticlesAtEB(
+            tmp_pc,
+            warpx.m_fields.get_mr_levels(FieldType::dielectric_signed_distance, warpx.finestLevel()),
             ParticleBoundaryProcess::Absorb());
     }
 #endif

@@ -2,6 +2,7 @@
 
 #include "ComputeDiagFunctors/CellCenterFunctor.H"
 #include "ComputeDiagFunctors/DarwinEfieldFunctor.H"
+#include "ComputeDiagFunctors/DielectricMaskFunctor.H"
 #include "ComputeDiagFunctors/DivBFunctor.H"
 #include "ComputeDiagFunctors/DivEFunctor.H"
 #include "ComputeDiagFunctors/EBCoveredFunctor.H"
@@ -588,6 +589,43 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 // Use 1 instead of ncomp here because eb_covered is only computed/stored for mode m=0
                 AddRZModesToOutputNames(std::string("eb_covered"), 1);
             }
+        } else if ( m_varnames_fields[comp] == "dielectric_epsilon" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_epsilon diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_epsilon, lev), lev, m_crse_ratio, false, 1);
+            if (update_varnames) {
+                m_varnames.push_back(std::string("dielectric_epsilon"));
+            }
+        } else if ( m_varnames_fields[comp] == "dielectric_signed_distance" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_signed_distance diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_signed_distance, lev), lev, m_crse_ratio, false, 1);
+            if (update_varnames) {
+                m_varnames.push_back(std::string("dielectric_signed_distance"));
+            }
+        } else if ( m_varnames_fields[comp] == "dielectric_mask" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_mask diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<DielectricMaskFunctor>(lev, m_crse_ratio);
+            if (update_varnames) {
+                m_varnames.push_back(std::string("dielectric_mask"));
+            }
+        } else if ( m_varnames_fields[comp] == "dielectric_surface_charge" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.m_fields.has(FieldType::dielectric_surface_charge, lev),
+                "The dielectric_surface_charge diagnostic requires dielectrics.names, "
+                "with dielectrics.absorb_particles and dielectrics.accumulate_surface_charge on.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_surface_charge, lev), lev, m_crse_ratio,
+                false, ncomp);
+            if (update_varnames) {
+                AddRZModesToOutputNames(std::string("dielectric_surface_charge"), ncomp);
+            }
         } else if ( warpx.m_fields.has(m_varnames_fields[comp], lev) ) {
             amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
             const int mf_ncomp = mf->nComp();
@@ -1049,6 +1087,30 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "dielectric_epsilon" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_epsilon diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_epsilon, lev), lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "dielectric_signed_distance" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_signed_distance diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_signed_distance, lev), lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "dielectric_mask" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.HasDielectricMaterials(),
+                "The dielectric_mask diagnostic requires dielectrics.names.");
+            m_all_field_functors[lev][comp] = std::make_unique<DielectricMaskFunctor>(lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "dielectric_surface_charge" ){
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                warpx.m_fields.has(FieldType::dielectric_surface_charge, lev),
+                "The dielectric_surface_charge diagnostic requires dielectrics.names, "
+                "with dielectrics.absorb_particles and dielectrics.accumulate_surface_charge on.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::dielectric_surface_charge, lev), lev, m_crse_ratio);
         } else if ( warpx.m_fields.has(m_varnames[comp], lev) ) {
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], lev), lev, m_crse_ratio);
         } else {

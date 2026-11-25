@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_dielectric_surface_charge
+
+# test input parameters
+amr.restart = "../test_2d_dielectric_surface_charge/diags/chk000080"

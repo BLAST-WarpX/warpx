@@ -18,6 +18,7 @@
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "Pusher/GetAndSetPosition.H"
 #include "Pusher/UpdatePosition.H"
 #include "ParticleBoundaries_K.H"
@@ -401,6 +402,20 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
         scrapeParticlesAtEB(
             *this,
             warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+            ParticleBoundaryProcess::Absorb());
+        deleteInvalidParticles();
+    }
+
+    // Remove particles that are inside dielectric materials
+    // TODO: avoid creating these particles in the first place
+    auto & warpx_instance = WarpX::GetInstance();
+    if (warpx_instance.HasDielectricMaterials() &&
+        warpx_instance.GetDielectricMaterials().absorbsParticles())
+    {
+        scrapeParticlesAtEB(
+            *this,
+            warpx_instance.m_fields.get_mr_levels(
+                FieldType::dielectric_signed_distance, warpx_instance.finestLevel()),
             ParticleBoundaryProcess::Absorb());
         deleteInvalidParticles();
     }

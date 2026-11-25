@@ -1,0 +1,16 @@
+# base input parameters
+FILE = inputs_test_2d_dielectric_surface_charge
+
+# test input parameters
+# The electrons move by about 4 cells per step. When they are moved back to the point
+# where they crossed the dielectric surface, they leave the particle tile that owns them.
+max_step = 24
+warpx.const_dt = 5.e-11
+particles.do_tiling = 1
+particles.tile_size = 8 8
+
+# The surface of the slab is inside a grid, next to a tile boundary
+slab.implicit_function = "(z - 5.5e-3)*(7.e-3 - z)"
+
+diag1.intervals = 24
+chk.intervals = 1000

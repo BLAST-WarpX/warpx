@@ -15,6 +15,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #ifdef WARPX_USE_FFT
 #   ifdef WARPX_DIM_RZ
@@ -844,6 +845,12 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
             // particles can move to a different sub-domain, so we need a full Redistribute
             mypc->Redistribute();
         }
+    }
+
+    // absorb the particles that entered dielectric materials (if present),
+    // and accumulate their charge on the dielectric surface
+    if (HasDielectricMaterials()) {
+        m_dielectric_materials->ScrapeParticles(*mypc, *this);
     }
 
     if (sort_intervals.contains(step+1)) {
