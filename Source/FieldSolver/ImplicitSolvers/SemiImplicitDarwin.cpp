@@ -15,8 +15,7 @@
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_ParallelContext.H>
-#include <AMReX_ParallelDescriptor.H>
-#include <AMReX_Reduce.H>
+#include <AMReX_ParallelReduce.H>
 
 using warpx::fields::FieldType;
 using namespace amrex::literals;
@@ -740,9 +739,12 @@ amrex::Real SemiImplicitDarwin::ComputeMeanScaledMassMatrix () const
 
     for (int d = 0; d < 3; ++d) {
         const int ncomp = nc[d];
-        for (amrex::MFIter mfi(m_divZ); mfi.isValid(); ++mfi)
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(m_divZ, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            const amrex::Box& bx = mfi.validbox();
+            const amrex::Box& bx = mfi.tilebox();
             amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
             reduce_op.eval(bx, reduce_data,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
