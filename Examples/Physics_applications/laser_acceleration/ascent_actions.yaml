@@ -1,5 +1,4 @@
--
-  action: "add_pipelines"
+- action: "add_pipelines"
   pipelines:
     clipped_volume:
       f0:
@@ -69,8 +68,7 @@
 #        path: "./conduit_blueprint"
 #        protocol: "blueprint/mesh/hdf5"
 
--
-  action: "add_scenes"
+- action: "add_scenes"
   scenes:
     scene1:
       plots:

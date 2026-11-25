@@ -2,9 +2,9 @@ name: 🔍 CodeQL
 
 on:
   push:
-    branches: [ "development" ]
+    branches: ["development"]
   pull_request:
-    branches: [ "development" ]
+    branches: ["development"]
     types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ python, cpp ]
+        language: [python, cpp]
 
     steps:
       - name: Checkout
@@ -54,7 +54,7 @@ jobs:
           path: ~/.cache/ccache
           key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
           restore-keys: |
-               ccache-${{ github.workflow }}-${{ github.job }}-git-
+            ccache-${{ github.workflow }}-${{ github.job }}-git-
 
       - name: Configure (C++)
         if: ${{ matrix.language == 'cpp' }}
