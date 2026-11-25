@@ -469,6 +469,7 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
+        - Mesh refinement is not supported, i.e. ``amr.max_level`` must be 0.
 
       - **Particle shapes:**
         The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
@@ -479,6 +480,15 @@ Overall simulation parameters
           magnetostatic part: the current and mass matrices deposition, the field gather in the
           inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
           It must not be larger than :pp:param:`algo.particle_shape`.
+
+      - **Grad-div stabilization:**
+        ``implicit_evolve.graddiv_factor`` (``float``, default: ``0``) adds the grad-div (Coulomb-gauge penalty)
+        term :math:`-\nabla(\alpha \nabla\cdot Z)` to the field operator of the magnetoinductive solve, where :math:`Z`
+        is the auxiliary field solved for (with :math:`\delta A = \nabla\times Z`) and :math:`\alpha` is this factor
+        times the domain-mean plasma susceptibility. This lifts the otherwise nearly singular curl-free modes of :math:`Z`
+        to the eigenvalue scale of the solenoidal modes, which can speed up the convergence of the linear solve,
+        without changing the exact solution of the linear system beyond the solver tolerance (Cartesian geometries
+        only; ``0`` disables the term).
 
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the

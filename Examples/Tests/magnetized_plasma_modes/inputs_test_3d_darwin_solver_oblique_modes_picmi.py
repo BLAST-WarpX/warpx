@@ -3,7 +3,8 @@
 # --- 3D Darwin solver test: noise-seeded low-frequency EM waves in a periodic
 # --- box with B0 along (1,1,1)/sqrt(3), oblique to every grid axis, so all nine
 # --- 3D mass-matrix blocks carry a full stencil. Runs with ES off, using global
-# --- particle shape 3 but particle shape 1 for the MS part of the solve.
+# --- particle shape 3 but particle shape 1 for the MS part of the solve, and
+# --- with the grad-div penalty term in the Darwin field operator.
 # ---
 # --- Each step, the dB = B - B0 Fourier amplitudes are recorded at two groups of
 # --- wave vectors that are physically equivalent under axis permutation:
@@ -17,7 +18,6 @@
 # --- analysis_oblique_modes.py for what is checked and why.
 
 import os
-import sys
 
 import numpy as np
 from mpi4py import MPI as mpi
@@ -72,13 +72,13 @@ class ObliqueModes(object):
     NPPC = 4  # seed macroparticles/cell/species before symmetrization (x3 after)
     ES_SHAPE = 3  # particle shape for the electrostatic part of the solve
     MS_SHAPE = 1  # particle shape for the magnetostatic part of the solve
+    GRADDIV_FACTOR = 1.0  # grad-div penalty factor of the Darwin field operator
     GMRES_TOL = 1e-4
     DT_WCI = 0.04  # dt * Omega_ci
     TOTAL_STEPS = 130
+    SEED = 1  # fixed, keeps the checksum comparison reproducible
 
-    def __init__(self, test, seed):
-        self.test = test
-        self.seed = seed
+    def __init__(self):
         self.nprocs = comm.size
 
         b = np.array([1.0, 1.0, 1.0])
@@ -126,10 +126,8 @@ class ObliqueModes(object):
         self.v_te = np.sqrt(self.T_plasma * constants.q_e / constants.m_e)
 
     def setup_run(self):
-        if self.seed:
-            # picked up by Simulation.initialize_inputs() below; a fixed,
-            # explicit seed keeps the checksum comparison reproducible
-            simulation.random_seed = self.seed
+        # picked up by Simulation.initialize_inputs() below
+        simulation.random_seed = self.SEED
 
         # the cost is dominated by the GMRES/MLMG field solve, so the box
         # decomposition barely matters
@@ -146,15 +144,16 @@ class ObliqueModes(object):
         simulation.max_steps = self.total_steps
         simulation.particle_shape = self.ES_SHAPE
         simulation.use_filter = False
-        simulation.verbose = self.test
+        simulation.verbose = 1
         simulation.current_deposition_algo = "direct"
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
             magnetostatic_particle_shape=self.MS_SHAPE,
+            graddiv_factor=self.GRADDIV_FACTOR,
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=self.GMRES_TOL,
                 max_iterations=2048,
                 restart_length=512,
-                verbose_int=(2 if self.test else 0),
+                verbose_int=2,
                 pc_type=picmi.DarwinMLMGPreconditioner(),
             ),
         )
@@ -248,7 +247,7 @@ class ObliqueModes(object):
             w = w / 3.0
             pc.add_particles(x=y, y=z, z=x, ux=uy, uy=uz, uz=ux, w=w)
             pc.add_particles(x=z, y=x, z=y, ux=uz, uy=ux, uz=uy, w=w)
-        if comm.rank == 0 and self.test:
+        if comm.rank == 0:
             print("symmetrize_particles: added 2 cyclic-permuted copies per species")
 
     def _record_modes(self):
@@ -284,12 +283,5 @@ class ObliqueModes(object):
         )
 
 
-test = "--test" in sys.argv or "-t" in sys.argv
-seed = 1
-for i, a in enumerate(sys.argv):
-    if a == "--seed" and i + 1 < len(sys.argv):
-        seed = int(sys.argv[i + 1])
-sys.argv = [sys.argv[0]]
-
-run = ObliqueModes(test=test, seed=seed)
+run = ObliqueModes()
 simulation.step()
