@@ -49,8 +49,63 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
             "conditions in all directions.");
     }
 
-    // Define dA MultiFabs
+    // The Darwin step gathers fields from Efield_fp/Bfield_fp in the particle pushes
+    // and from Bfield_aux in the mass matrices, and never calls UpdateAuxiliaryData.
+    // This is only correct when the aux fields alias the fp fields, which is not
+    // the case for external particle fields read from file (the file map is only
+    // added to aux) or for momentum-conserving gathering (aux is a separate nodal
+    // copy). Reject both until this is fixed, rather than silently giving wrong
+    // results. See https://github.com/BLAST-WarpX/warpx/issues/7543
+    {
+        auto const& mypc = m_WarpX->GetPartContainer();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            mypc.m_E_ext_particle_s != "read_from_file" &&
+            mypc.m_B_ext_particle_s != "read_from_file",
+            "The semi-implicit Darwin solver does not yet support external particle "
+            "fields read from file (particles.E_ext_particle_init_style or "
+            "particles.B_ext_particle_init_style = read_from_file): the particle push "
+            "would ignore them. See WarpX issue #7543 "
+            "(https://github.com/BLAST-WarpX/warpx/issues/7543).");
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving,
+        "The semi-implicit Darwin solver does not yet support "
+        "algo.field_gathering = momentum-conserving: the mass matrices would "
+        "gather a magnetic field that is not updated during the Darwin step. "
+        "See WarpX issue #7543 (https://github.com/BLAST-WarpX/warpx/issues/7543).");
+
+    // Catch any other configuration (beyond the ones rejected above) where the aux fields
+    // are not aliases of the fp fields, by comparing the underlying data directly.
     using ablastr::fields::Direction;
+    {
+        auto const shares_data = [] (amrex::MultiFab const* aux, amrex::MultiFab const* fp)
+        {
+            if (aux->local_size() != fp->local_size()) { return false; }
+            for (int i = 0; i < fp->local_size(); ++i) {
+                int const idx = fp->IndexArray()[i];
+                if (aux->IndexArray()[i] != idx ||
+                    aux->get(idx).dataPtr() != fp->get(idx).dataPtr()) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            for (int dir = 0; dir < 3; ++dir) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    shares_data(m_WarpX->m_fields.get(FieldType::Efield_aux, Direction{dir}, lev),
+                                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{dir}, lev)) &&
+                    shares_data(m_WarpX->m_fields.get(FieldType::Bfield_aux, Direction{dir}, lev),
+                                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{dir}, lev)),
+                    "The semi-implicit Darwin solver requires the aux fields to alias the fp "
+                    "fields, since it gathers from the fp fields and never calls "
+                    "UpdateAuxiliaryData. See WarpX issue #7543 "
+                    "(https://github.com/BLAST-WarpX/warpx/issues/7543).");
+            }
+        }
+    }
+
+    // Define dA MultiFabs
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();
@@ -141,16 +196,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
     // The predictor velocity push gathers the electrostatic E-field with the
-    // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
-    // momentum-conserving gathering.
+    // Galerkin scheme, except with momentum-conserving gathering (currently
+    // rejected above, see issue #7543).
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
-    if (!m_predictor_use_galerkin) {
-        ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
-            "algo.field_gathering = momentum_conserving is set; the predictor "
-            "velocity push will keep using momentum-conserving gathering "
-            "rather than switching to the Galerkin scheme.",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
 
     m_is_defined = true;
 }
