@@ -3,7 +3,7 @@
 Lawrencium (LBNL)
 =================
 
-The `Lawrencium cluster <http://scs.lbl.gov/Systems>`_ is located at LBNL.
+The `Lawrencium cluster <https://scienceit-docs.lbl.gov/hpc/>`_ is located at LBNL.
 
 
 Introduction
@@ -11,13 +11,13 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `Lawrencium user guide <https://sites.google.com/a/lbl.gov/high-performance-computing-services-group/lbnl-supercluster/lawrencium>`_
-* Batch system: `Slurm <https://sites.google.com/a/lbl.gov/high-performance-computing-services-group/scheduler/slurm-usage-instructions>`_
-* `Production directories <https://sites.google.com/a/lbl.gov/high-performance-computing-services-group/lbnl-supercluster/lawrencium#backup>`_:
+* `Lawrencium user guide <https://scienceit-docs.lbl.gov/hpc/getting-started/>`_
+* Batch system: `Slurm <https://scienceit-docs.lbl.gov/hpc/running/slurm-overview/>`_
+* `Production directories <https://scienceit-docs.lbl.gov/hpc/#storage-and-backup>`_:
 
   * ``/global/scratch/users/$USER/``: production directory
   * ``/global/home/groups/$GROUP/``: group production directory
-  * ``/global/home/users/$USER``: home directory (10 GB)
+  * ``/global/home/users/$USER``: home directory (30 GB)
 
 
 Installation
