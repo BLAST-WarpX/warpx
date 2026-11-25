@@ -4,6 +4,8 @@ about: Suggest a new feature or enhancement.
 labels: [enhancement]
 ---
 
+<!-- Keep the request brief. -->
+
 ## Motivation
 <!-- What problem are you trying to solve? -->
 
