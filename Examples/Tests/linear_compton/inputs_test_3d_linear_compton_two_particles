@@ -63,7 +63,7 @@ lc.probability_target_value = 0.02
 
 # Full diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 1
+diag1.intervals = 100
 diag1.diag_type = Full
 diag1.fields_to_plot = rho
 diag1.write_species = 1
