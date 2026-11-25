@@ -40,7 +40,7 @@ lasy_laser.e_max        = 1.e14        # Maximum amplitude of the laser field (i
 lasy_laser.wavelength = 1.0e-6         # The wavelength of the laser (in meters)
 lasy_laser.profile      = from_file
 lasy_laser.time_chunk_size = 50
-lasy_laser.lasy_file_name = "../test_1d_laser_injection_from_lasy_file_prepare/diags/gaussian_laser_3d_00000.h5"
+lasy_laser.lasy_file_name = "diags/gaussian_laser_3d_00000.h5"
 lasy_laser.delay = 0.0
 
 # Diagnostics
