@@ -240,6 +240,20 @@ class Species(picmistandard.PICMI_Species):
         description="Whether to save particles lost at the embedded boundary",
     )
 
+    # Secondary emission settings
+    secondary_emission_product_species: str | None = Field(
+        default=None,
+        description="Name of the species emitted when particles of this species are absorbed at a boundary",
+    )
+    secondary_emission_coefficient: float | None = Field(
+        default=None,
+        description="Probability that one secondary macroparticle is emitted per absorbed source macroparticle",
+    )
+    secondary_emission_energy_eV: float | None = Field(
+        default=None,
+        description="Energy in eV used to set the thermal velocity spread of emitted secondary particles",
+    )
+
     # Resampling settings
     do_resampling: bool | None = Field(
         default=None, description="Whether particles will be resampled"
@@ -405,6 +419,9 @@ class Species(picmistandard.PICMI_Species):
             save_particles_at_zlo=self.save_particles_at_zlo,
             save_particles_at_zhi=self.save_particles_at_zhi,
             save_particles_at_eb=self.save_particles_at_eb,
+            secondary_emission_product_species=self.secondary_emission_product_species,
+            secondary_emission_coefficient=self.secondary_emission_coefficient,
+            secondary_emission_energy_eV=self.secondary_emission_energy_eV,
             save_previous_position=self.save_previous_position,
             do_not_deposit=self.do_not_deposit,
             do_not_push=self.do_not_push,

@@ -357,6 +357,14 @@ void ParticleBoundaryBuffer::clearParticles (int const i) {
     }
 }
 
+void ParticleBoundaryBuffer::enableForSpecies (int const ispecies)
+{
+    for (int ibuffer = 0; ibuffer < numBoundaries(); ++ibuffer) {
+        m_do_boundary_buffer[ibuffer][ispecies] = 1;
+        m_do_any_boundary[ibuffer] = 1;
+    }
+}
+
 void ParticleBoundaryBuffer::gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time)
 {
     ABLASTR_PROFILE("ParticleBoundaryBuffer::gatherParticles");
