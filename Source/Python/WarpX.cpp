@@ -128,9 +128,11 @@ void init_WarpX (py::module& m)
         )
 
         .def("initialize_data", &WarpX::InitData,
+            py::call_guard<py::gil_scoped_release>(),
             "Initializes the WarpX simulation"
         )
         .def("evolve", &WarpX::Evolve,
+            py::call_guard<py::gil_scoped_release>(),
             "Evolve the simulation the specified number of steps"
         )
 
@@ -204,7 +206,9 @@ void init_WarpX (py::module& m)
             [](WarpX& wx, amrex::Real a_dt){
                 auto const* solver = wx.get_pointer_ImplicitSolver();
                 if (!solver) { throw py::value_error("deposit_mass_matrices requires an implicit solver"); }
-                wx.DepositMassMatrices(a_dt, solver->GetImplicitOptions());
+                auto options = solver->GetImplicitOptions();
+                options.field_time = wx.gett_new(0);
+                wx.DepositMassMatrices(a_dt, options);
             },
             R"pbdoc(Zero and deposit the mass matrices from all species)pbdoc"
         )

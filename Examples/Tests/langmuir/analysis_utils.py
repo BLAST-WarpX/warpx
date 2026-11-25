@@ -20,17 +20,20 @@ def check_charge_conservation(data):
     current_deposition_esirkepov = input_has_value(
         input_dict, "algo.current_deposition", "esirkepov"
     )
+    current_deposition_villasenor = input_has_value(
+        input_dict, "algo.current_deposition", "villasenor"
+    )
     maxwell_solver_psatd = input_has_value(input_dict, "algo.maxwell_solver", "psatd")
 
     # Decide whether to perform the charge conservation check. We check with
-    # current correction, Vay current deposition, and Esirkepov current deposition.
+    # current correction, Vay current deposition, and Esirkepov and Villasenor current deposition.
     # We do not check with Esirkepov deposition in RZ geometry, since that combination
     # currently produces larger numerical errors that need to be investigated further.
     # We also do not check with Esirkepov deposition combined with the PSATD solver,
     # since that combination does not conserve charge except for spectral order 2.
     check_charge_conservation = (
         (
-            current_deposition_esirkepov
+            (current_deposition_esirkepov or current_deposition_villasenor)
             and not (geometry_dims_rz or maxwell_solver_psatd)
         )
         or current_correction

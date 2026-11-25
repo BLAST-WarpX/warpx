@@ -70,6 +70,10 @@ private:
      * \param[in] ncomp number of components (modes, real and imag)
      */
     void AddRZModesToOutputNames (const std::string& field, int ncomp);
+
+    /** Append diagnostic names for all requested cylindrical modes. */
+    void AddRZModeNamesToDiags ();
+
     /** Define the cell-centered multifab m_mf_output depending on user-defined
       * lo and hi and coarsening ratio. This MultiFab may have a different BoxArray and
       * DistributionMap than field MultiFabs in the simulation.
@@ -83,8 +87,8 @@ private:
      * \param[in] lev level on which the vector of unique_ptrs to field functors is initialized.
      */
     void InitializeFieldFunctorsRZopenPMD (int lev) override;
-    /** Append m_all_field_functors[lev] with all modes of all components of E B and j
-     * and add name to varnames.
+    /** Append m_all_field_functors[lev] with all modes of all components of E B and j.
+     * The matching names are added to m_varnames once, by AddRZModeNamesToDiags.
      * \param[in] lev level on which source multifabs are defined.
      */
     void AddRZModesToDiags (int lev);

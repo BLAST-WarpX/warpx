@@ -20,7 +20,7 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
         m_temperature_parser = temp.m_ptr_temperature_parser->compile<3>();
     }
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    !defined(WARPX_DIM_RCYLINDER)
     else if (m_type == TempFromFileValue) {
         m_temperature_in_eV_from_file = temp.m_temperature_in_eV_reader->getView();
     }

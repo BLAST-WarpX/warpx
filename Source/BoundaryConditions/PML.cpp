@@ -54,6 +54,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <ranges>
 #include <utility>
 #ifdef AMREX_USE_EB
 #   include "AMReX_EBFabFactory.H"
@@ -394,42 +395,42 @@ void SigmaBox::define_multiple (const Box& box, const BoxArray& grids, const Int
 #endif
 
         Vector<int> direct_faces, side_faces, direct_side_edges, side_side_edges, corners;
-        for (const auto& kv : isects)
+        for (const auto& idx : isects | std::views::keys)
         {
-            const Box& grid_box = grids[kv.first];
+            const Box& grid_box = grids[idx];
 
             if (amrex::grow(grid_box, idim, ncell[idim]).intersects(box))
             {
-                direct_faces.push_back(kv.first);
+                direct_faces.push_back(idx);
             }
 #if (AMREX_SPACEDIM == 2)
             else if (amrex::grow(grid_box, jdim, ncell[jdim]).intersects(box))
             {
-                side_faces.push_back(kv.first);
+                side_faces.push_back(idx);
             }
             else
             {
-                corners.push_back(kv.first);
+                corners.push_back(idx);
             }
 #elif defined(WARPX_DIM_3D)
             else if ((amrex::grow(grid_box, jdim, ncell[jdim]).intersects(box)) ||
                 amrex::grow(grid_box, kdim, ncell[kdim]).intersects(box))
             {
-                side_faces.push_back(kv.first);
+                side_faces.push_back(idx);
             }
             else if (amrex::grow(amrex::grow(grid_box,idim,ncell[idim]),jdim,ncell[jdim]).intersects(box) ||
                      amrex::grow(amrex::grow(grid_box,idim,ncell[idim]),kdim,ncell[kdim]).intersects(box) )
             {
-                direct_side_edges.push_back(kv.first);
+                direct_side_edges.push_back(idx);
             }
             else if (amrex::grow(amrex::grow(grid_box,jdim,ncell[jdim]),
                                  kdim,ncell[kdim]).intersects(box))
             {
-                side_side_edges.push_back(kv.first);
+                side_side_edges.push_back(idx);
             }
             else
             {
-                corners.push_back(kv.first);
+                corners.push_back(idx);
             }
 #endif
         }
@@ -1024,9 +1025,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 // The coarse-patch fields live on a coarsened grid, so they need their own
-                // EB factory, at the resolution of the coarse patch.
+                // EB factory, at the resolution of the coarse patch (i.e., of level lev-1).
+                auto const* cp_eb_index_space = WarpX::GetInstance().GetEBIndexSpace(lev-1);
                 auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    *cgeom, cba, cdm,
+                    cp_eb_index_space, *cgeom, cba, cdm,
                     {max_guard_EB, max_guard_EB, max_guard_EB},
                     amrex::EBSupport::full
                 );

@@ -15,6 +15,9 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_ParallelContext.H>
+#include <AMReX_ParallelReduce.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -29,6 +32,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
+
+    // The solver only operates on level 0
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_WarpX->maxLevel() == 0,
+        "The semi-implicit Darwin solver does not support mesh refinement "
+        "(amr.max_level must be 0).");
 
 #if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
     // Each field boundary can be periodic or a conducting (PEC) wall. The wall
@@ -136,7 +145,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         // that its gradient can be taken without a boundary fill.
         const auto& Zx = *m_Z.getArrayVec()[0][0];
         m_divZ.define(amrex::convert(Zx.boxArray(), amrex::IndexType::TheCellType()),
-                      Zx.DistributionMap(), 1, amrex::IntVect(1));
+                      Zx.DistributionMap(), /*nvar=*/1, /*ngrow=*/amrex::IntVect(1));
     }
 
     // Set parameters used by `InitializeMassMatrices`
@@ -217,7 +226,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
+int SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
                                                    amrex::Real  a_dt,
                                                    int          a_step,
                                                    bool verbose_step)
@@ -228,6 +237,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Set the member time step
     m_dt = a_dt;
+    // The velocity advance is centered at t^n; evaluate external maps at that time.
+    m_field_time = start_time;
 
     const int finest_level = 0;
 
@@ -449,7 +460,9 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
     // here with the magnetostatic particle shape (set in m_implicit_options).
-    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+    ImplicitOptions options = m_implicit_options;
+    options.field_time = m_field_time;
+    m_WarpX->DepositMassMatrices(m_dt, options);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete
@@ -492,22 +505,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // The coefficient must be uniform, since a varying alpha would couple the
     // curl-free and solenoidal modes, and change dA.
     if (m_graddiv_factor > 0.0_rt) {
-        using ablastr::fields::Direction;
-        const amrex::MultiFab* Sdiag[3] = {
-            m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
-        amrex::Real chi_mean = 0.0_rt;
-        for (const auto* S : Sdiag) {
-            amrex::Real S_sum = 0.0_rt;
-            for (int c = 0; c < S->nComp(); ++c) {
-                S_sum += S->sum(c, true);
-            }
-            amrex::ParallelDescriptor::ReduceRealSum(S_sum);
-            chi_mean += S_sum / static_cast<amrex::Real>(S->boxArray().numPts());
-        }
-        m_graddiv_alpha =
-            m_graddiv_factor * 2.0_rt * PhysConst::mu0 / m_dt * chi_mean / 3.0_rt;
+        m_graddiv_alpha = m_graddiv_factor * ComputeMeanScaledMassMatrix();
     }
 }
 
@@ -909,6 +907,54 @@ void SemiImplicitDarwin::FoldGuardCellsAtPEC ( const ablastr::fields::VectorFiel
         m_WarpX->Geom(lev), lev, PatchType::fine, m_WarpX->refRatio());
 }
 
+amrex::Real SemiImplicitDarwin::ComputeMeanScaledMassMatrix () const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeMeanScaledMassMatrix()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    const int nc[3] = {Sdiag[0]->nComp(), Sdiag[1]->nComp(), Sdiag[2]->nComp()};
+
+    // Same row sums and index identification as ComputeScaledMassMatrixCC,
+    // reduced over the cell-centered boxes without storing them.
+    amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+    amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    for (int d = 0; d < 3; ++d) {
+        const int ncomp = nc[d];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(m_divZ, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& bx = mfi.tilebox();
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            reduce_op.eval(bx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                amrex::Real s = 0.0;
+                for (int c = 0; c < ncomp; ++c) {
+                    s += S(i,j,k,c);
+                }
+                return {s};
+            });
+        }
+    }
+
+    amrex::Real sum = amrex::get<0>(reduce_data.value(reduce_op));
+    amrex::ParallelAllReduce::Sum(sum, amrex::ParallelContext::CommunicatorSub());
+
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
+    return fac * sum / (3.0_rt * static_cast<amrex::Real>(m_divZ.boxArray().numPts()));
+}
+
+// NOLINTNEXTLINE(readability-make-member-function-const): writes m_divZ except in RZ
 void SemiImplicitDarwin::AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
                                            const ablastr::fields::VectorField& a_Z,
                                            int lev )

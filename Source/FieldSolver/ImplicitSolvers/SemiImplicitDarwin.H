@@ -114,6 +114,13 @@ public:
                                      amrex::MultiFab& a_chi_yy_cc,
                                      amrex::MultiFab& a_chi_zz_cc ) const;
 
+    /**
+     * \brief Domain mean of the (2 mu0/dt)-scaled row sums of the diagonal
+     *  mass-matrix blocks (see ComputeScaledMassMatrixCC), averaged over the
+     *  three blocks, computed in a single reduction without storing them
+     */
+    [[nodiscard]] amrex::Real ComputeMeanScaledMassMatrix () const;
+
     void PrepareVelocitiesForCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();
     void CalculateSourceVector ();

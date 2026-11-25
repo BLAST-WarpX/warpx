@@ -42,7 +42,7 @@ To contact the developers, feel free to open an issue on this repo, or visit our
 [![openPMD-api](https://img.shields.io/static/v1?label="runs%20on"&message="openPMD-api"&color="blueviolet")](https://openpmd-api.readthedocs.io)
 [![ADIOS](https://img.shields.io/static/v1?label="runs%20on"&message="ADIOS"&color="blueviolet")](https://csmd.ornl.gov/adios)
 [![HDF5](https://img.shields.io/static/v1?label="runs%20on"&message="HDF5"&color="blueviolet")](https://www.hdfgroup.org/)
-[![Ascent](https://img.shields.io/static/v1?label="runs%20on"&message="Ascent"&color="blueviolet")](http://www.ascent-dav.org)
+[![Ascent](https://img.shields.io/static/v1?label="runs%20on"&message="Ascent"&color="blueviolet")](https://www.ascent-dav.org)
 [![SENSEI](https://img.shields.io/static/v1?label="runs%20on"&message="SENSEI"&color="blueviolet")](https://sensei-insitu.org)
 
 Our workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -50,8 +50,13 @@ We invite you to contribute to WarpX in any form following our [Code of Conduct]
 
 ## Governance
 
-WarpX is hosted by the High Performance Software Foundation (HPSF).
-If your organization wants to help steer the evolution of the HPC software ecosystem, visit [hpsf.io](https://hpsf.io) and consider joining!
+WarpX is hosted by the High Performance Software Foundation (HPSF), at the [established project](https://hpsf.io/projects) level.
+
+<div align="center">
+<a href="https://hpsf.io/">
+<img src="https://github.com/amrex-codes/amrex-codes.github.io/blob/main/images/HPSF_Project_Badge_Established.png" alt="HPSF Badge" style="width:96px;height:96px;">
+</a>
+</div>
 
 The WarpX open governance model is described in [GOVERNANCE.md](GOVERNANCE.md).
 

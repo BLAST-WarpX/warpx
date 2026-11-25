@@ -41,7 +41,7 @@ boundary.field_hi = pec_insulator periodic
 boundary.particle_lo = reflecting periodic
 boundary.particle_hi = absorbing periodic
 
-insulator.area_x_hi(y,z) = (-1.0 <= z and z <= 1.0)
+insulator.area_x_hi(y,z) = (0.025e-2 <= z and z <= 0.075e-2)
 insulator.By_x_hi(y,z,t) = min(t/rise_time,1)*B0
 
 #################################
@@ -83,6 +83,8 @@ jacobian.pc_type = "pc_petsc"
 jacobian.epsJFNK = 1.0  # Use an order-one perturbation factor for linear systems.
 precon_mat.verbose = true
 pc_petsc.type = "lu"
+
+algo.current_deposition = "direct"
 
 ###   Diagnostics
 diagnostics.diags_names = diag1
