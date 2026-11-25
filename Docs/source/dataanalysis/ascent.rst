@@ -183,7 +183,7 @@ Replay
 
 With Ascent/Conduit, one can store the intermediate data files before the rendering step is applied to custom files.
 These so-called *Conduit Blueprint HDF5* files can be "replayed", i.e. rendered without running the simulation again.
-VisIt 3.0+ also supports those files.
+VisIt 3.3.0+ also supports those files.
 
 `Replay <https://ascent.readthedocs.io/en/latest/Utilities.html#getting-data-for-replay>`_ is a utility that allows the user to replay a simulation from aforementioned files and rendering them with Ascent.
 Replay enables the user or developer to pick specific time steps and load them for Ascent visualization, without running the simulation again.
