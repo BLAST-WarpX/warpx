@@ -4,11 +4,7 @@ about: Ask us a question
 labels: [question]
 ---
 
-Are you here because you have something to report that is neither a bug, a new feature, nor an installation problem?
-
-Before opening this issue, consider opening a [discussion](https://github.com/BLAST-WarpX/warpx/discussions) instead!
-
-Issues are used to report bugs, installation problems or to request new features.
-Discussions are used to ask more open-ended questions, brainstorm, ask our feedback, etc.
-
-You can find more details on how to use issues and discussions [here](https://github.com/BLAST-WarpX/warpx/blob/development/CONTRIBUTING.md).
+<!--
+For open-ended questions, consider opening a discussion instead: https://github.com/BLAST-WarpX/warpx/discussions
+See https://github.com/BLAST-WarpX/warpx/blob/development/CONTRIBUTING.md for when to use issues vs. discussions.
+-->
