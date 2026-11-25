@@ -4698,11 +4698,6 @@ Additional parameters
 Diagnostics and output
 ----------------------
 
-.. _running-cpp-parameters-diagnostics-insitu:
-
-In-situ visualization
-^^^^^^^^^^^^^^^^^^^^^
-
 WarpX has five types of diagnostics:
 ``Full`` diagnostics consist in dumps of fields and particles at given iterations,
 ``TimeAveraged`` diagnostics only allow field data, which they output after averaging over a period of time,
@@ -4711,6 +4706,14 @@ WarpX has five types of diagnostics:
 ``ReducedDiags`` enable users to compute specific reduced quantities, such as particle temperature, energy histograms, or maximum field values, and efficiently save this in-situ analyzed data to files.
 Similar to what is done for physical species, WarpX has a class Diagnostics that allows users to initialize different diagnostics, each of them with different fields, resolution and period.
 This currently applies to standard diagnostics, but should be extended to back-transformed diagnostics and reduced diagnostics (and others) in a near future.
+
+.. _running-cpp-parameters-diagnostics-insitu:
+
+In-situ visualization
+^^^^^^^^^^^^^^^^^^^^^
+
+In-situ capabilities, i.e., visualizing/analyzing data directly from the simulation without writing files to disk, are available through Ascent, Catalyst, or Sensei.
+See :ref:`In Situ Capabilities <dataanalysis-insitu>` for setup and usage.
 
 .. pp:param:: warpx.synchronize_velocity_for_diagnostics
     :type: ``0`` or ``1``
@@ -4732,7 +4735,7 @@ Similar to what is done for physical species, WarpX has a class Diagnostics that
 The user specifies the number of diagnostics and the name of each of them, and then specifies options for each of them separately.
 Note that some parameter (those that do not start with a ``<diag_name>.`` prefix) apply to all diagnostics.
 This should be changed in the future.
-In-situ capabilities can be used by turning on Sensei or Ascent (provided they are installed) through the output format, see below.
+In-situ capabilities can be used by turning on Sensei or Ascent (provided they are installed) through the output format, see below, or using Catalyst (see :ref:`In Situ Capabilities <dataanalysis-insitu>`).
 
 .. pp:param:: diagnostics.enable
     :type: ``0`` or ``1``
@@ -4785,9 +4788,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     * ``openpmd`` for OpenPMD format `openPMD <https://www.openPMD.org>`_.
       Requires to build WarpX with ``USE_OPENPMD=TRUE`` (see :ref:`instructions <building-openpmd>`).
 
-    * ``ascent`` for in-situ visualization using Ascent.
+    * ``ascent`` for in-situ visualization using :ref:`Ascent <visualization-ascent>`.
 
-    * ``sensei`` for in-situ visualization using Sensei.
+    * ``sensei`` for in-situ visualization using Sensei (see :ref:`In Situ Capabilities <dataanalysis-insitu>`).
 
     example: ``diag1.format = openpmd``.
 
