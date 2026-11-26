@@ -60,6 +60,8 @@ public:
                                             WarpXParticleContainer& photons,
                                             WarpXParticleContainer& electrons) const;
 
+    [[nodiscard]] bool uses_global_debye_length () const override { return true; }
+
 private:
 
     amrex::ParticleReal m_energy_fraction = 0.05;

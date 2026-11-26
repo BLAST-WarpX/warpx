@@ -29,6 +29,7 @@
 #endif
 #include <AMReX_ParmParse.H>
 
+#include <algorithm>
 #include <vector>
 
 CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
@@ -59,7 +60,6 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                std::make_unique<BinaryCollision<PairWiseCoulombCollisionFunc>>(
                     collision_names[i], mypc
                 );
-            m_use_global_debye_length |= allcollisions[i]->use_global_debye_length();
         }
         else if (type == "background_mcc") {
             allcollisions[i] = std::make_unique<BackgroundMCCCollision>(collision_names[i]);
@@ -93,7 +93,6 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         }
         else if (type == "inverse_bremsstrahlung") {
             allcollisions[i] = std::make_unique<InverseBremsstrahlung>(collision_names[i], mypc);
-            m_use_global_debye_length = true;
         }
         else if (type == "linear_breit_wheeler") {
             allcollisions[i] =
@@ -156,7 +155,13 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
     }
 #endif
 
-    if (m_use_global_debye_length) {
+    const bool need_global_debye_length = std::any_of(
+        allcollisions.begin(), allcollisions.end(),
+        [](auto const& collision) {
+            return collision->uses_global_debye_length();
+        });
+
+    if (need_global_debye_length) {
         // This will calculate the temperature, Vbar, and particle number that are needed by
         // the various collision algorithms
         mypc->GenerateGlobalDebyeLength();
