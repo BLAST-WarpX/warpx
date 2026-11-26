@@ -58,7 +58,7 @@ deuterium.zmin = -1e-3
 # diag
 diag1.diag_type = Full
 diag1.fields_to_plot = rho rho_deuterium rho_helium3
-diag1.intervals = 1
+diag1.intervals = 10
 
 # diagnostics
 diagnostics.diags_names = diag1

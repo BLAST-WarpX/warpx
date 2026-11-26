@@ -33,7 +33,7 @@ electron.save_particles_at_eb = 1
 
 diagnostics.diags_names = diag1 diag2
 
-diag1.intervals = 1
+diag1.intervals = 3
 diag1.diag_type = Full
 diag1.fields_to_plot = Ex
 diag1.format = openpmd
