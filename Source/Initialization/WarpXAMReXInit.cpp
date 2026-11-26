@@ -60,6 +60,14 @@ namespace {
         pp_amrex.queryAdd("omp_threads", omp_threads);
     }
 
+    void override_default_throw_exception ()
+    {
+        // https://amrex-codes.github.io/amrex/docs_html/RuntimeParameters.html#amrex.throw_exception
+        auto pp_amrex = amrex::ParmParse{"amrex"};
+        bool throw_exception = true; // AMReX's default: false
+        pp_amrex.queryAdd("throw_exception", throw_exception);
+    }
+
     void set_device_synchronization ()
     {
         //See https://github.com/AMReX-Codes/amrex/pull/3763
@@ -181,6 +189,7 @@ namespace {
         override_default_abort_on_out_of_gpu_memory();
         override_default_the_arena_is_managed();
         override_default_omp_threads();
+        override_default_throw_exception();
         apply_workaround_for_warpx_numprocs();
         set_device_synchronization();
         override_default_tiling_option_for_particles();
