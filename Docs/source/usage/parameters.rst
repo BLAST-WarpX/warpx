@@ -218,6 +218,19 @@ Overall simulation parameters
     one should not expect to obtain the same random numbers,
     even if a fixed :pp:param:`warpx.random_seed` is provided.
 
+.. pp:param:: warpx.checkpoint_host_random_state
+    :type: ``bool``
+    :default: ``0``
+
+    Save the AMReX host random generators in each native checkpoint and restore them on
+    restart. This lets a CPU run continue its random draws for processes such as Coulomb
+    collisions. Set this option in both the original and restarted inputs. Restoring the
+    streams requires the same number of MPI ranks and host threads on each rank.
+    A legacy checkpoint or a changed process layout uses the streams from initialization
+    and records a warning. Particle order, mesh decomposition and thread scheduling also
+    affect which particle receives each draw. GPU device generators and Python random
+    generators have their own state.
+
 .. pp:param:: algo.evolve_scheme
     :type: ``string``
     :default: ``explicit``
