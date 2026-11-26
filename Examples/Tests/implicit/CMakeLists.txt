@@ -196,6 +196,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_semi_implicit_esirkepov_gyro  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_semi_implicit_esirkepov_gyro  # inputs
+    "analysis_esirkepov_gyro.py"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_theta_implicit_jfnk_direct  # name
     3  # dims
     2  # nprocs

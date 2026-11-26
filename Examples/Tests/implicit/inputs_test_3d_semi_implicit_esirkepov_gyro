@@ -1,0 +1,90 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+
+max_step = 32
+amr.n_cell = 8 8 8
+amr.max_grid_size = 4
+amr.max_level = 0
+
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 8.0 8.0 8.0
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+
+warpx.const_dt = 0.0625/clight
+warpx.verbose = 0
+warpx.use_filter = 0
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 0.0 0.75*m_e*clight/q_e
+
+algo.evolve_scheme = semi_implicit_em
+implicit_evolve.nonlinear_solver = picard
+picard.relative_tolerance = 1.e-6
+picard.absolute_tolerance = 1.e-5
+picard.max_iterations = 80
+picard.require_convergence = true
+picard.verbose = false
+
+algo.current_deposition = esirkepov
+algo.field_gathering = energy-conserving
+algo.particle_shape = 2
+
+#################################
+############ PLASMA #############
+#################################
+
+particles.species_names = plus minus ions
+
+plus.species_type = electron
+plus.injection_style = NUniformPerCell
+plus.num_particles_per_cell_each_dim = 1 1 1
+plus.profile = constant
+plus.density = 0.5*epsilon0*m_e*clight*clight/(q_e*q_e)
+plus.momentum_distribution_type = constant
+plus.ux = 0.375
+plus.uy = 0.0
+plus.uz = 0.0
+
+minus.species_type = electron
+minus.injection_style = NUniformPerCell
+minus.num_particles_per_cell_each_dim = 1 1 1
+minus.profile = constant
+minus.density = 0.5*epsilon0*m_e*clight*clight/(q_e*q_e)
+minus.momentum_distribution_type = constant
+minus.ux = -0.375
+minus.uy = 0.0
+minus.uz = 0.0
+
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 1 1 1
+ions.profile = constant
+ions.density = 1.0*epsilon0*m_e*clight*clight/(q_e*q_e)
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+ions.do_not_push = 1
+
+#################################
+########## DIAGNOSTICS ##########
+#################################
+
+warpx.reduced_diags_names = particle_momentum field_energy particle_energy
+reduced_diags.intervals = 1
+reduced_diags.precision = 17
+particle_momentum.type = ParticleMomentum
+particle_momentum.path = diags/reduced_files/
+field_energy.type = FieldEnergy
+field_energy.path = diags/reduced_files/
+particle_energy.type = ParticleEnergy
+particle_energy.path = diags/reduced_files/

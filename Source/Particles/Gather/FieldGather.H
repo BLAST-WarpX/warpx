@@ -15,6 +15,9 @@
 #include "Utils/ParticleUtils.H"
 
 #include <AMReX.H>
+#include <AMReX_Algorithm.H>
+
+#include <cmath>
 
 /**
  * \brief Gather vector field F for a single particle
@@ -895,6 +898,113 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 #endif
 }
 
+namespace warpx::particles::gather::detail
+{
+    /**
+     * \brief Evaluate the centered cardinal B-spline of given degree at separation r (cell units).
+     */
+    template <int degree>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    double centered_cardinal_bspline (double r)
+    {
+        if constexpr (degree == 0) {
+            return (-0.5 <= r && r < 0.5) ? 1.0 : 0.0;
+        } else if constexpr (degree == 1) {
+            return amrex::max(0.0, 1.0 - std::abs(r));
+        } else if constexpr (degree == 2) {
+            double const a = std::abs(r);
+            if (a <= 0.5) {
+                return 0.75 - a * a;
+            } else if (a < 1.5) {
+                double const t = 1.5 - a;
+                return 0.5 * t * t;
+            } else {
+                return 0.0;
+            }
+        } else if constexpr (degree == 3) {
+            double const a = std::abs(r);
+            if (a <= 1.0) {
+                return (2.0 / 3.0) - a * a * (1.0 - 0.5 * a);
+            } else if (a < 2.0) {
+                double const t = 2.0 - a;
+                return (1.0 / 6.0) * t * t * t;
+            } else {
+                return 0.0;
+            }
+        } else {
+            static_assert(degree >= 0 && degree <= 3,
+                "centered_cardinal_bspline only supports degrees 0 through 3");
+            return 0.0;
+        }
+    }
+
+    /**
+     * \brief Exact path average of the staggered degree-(depos_order-1) cardinal B-spline
+     *        over [x_old, x_new] for a staggered node at node_center.
+     *
+     * Analytically equals sum_{j<=i} (S_d(x_old - j) - S_d(x_new - j)) / (x_new - x_old),
+     * while remaining exact at zero displacement (where it reduces to the point gather
+     * S_{d-1}(x_old - node_center)) and avoiding catastrophic cancellation for small steps.
+     */
+    template <int depos_order>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    double path_averaged_shape_factor (double x_old, double x_new, double node_center)
+    {
+        static_assert(depos_order >= 1 && depos_order <= 4,
+            "path_averaged_shape_factor only supports depos_order 1 through 4");
+        constexpr int degree = depos_order - 1;
+        double const left = amrex::min(x_old, x_new) - node_center;
+        double const right = amrex::max(x_old, x_new) - node_center;
+        double const length = right - left;
+        if (length == 0.0) {
+            return centered_cardinal_bspline<degree>(left);
+        }
+        constexpr double radius = 0.5 * depos_order;
+        double average = 0.0;
+        for (int piece = 0; piece < depos_order; ++piece) {
+            double const a = amrex::max(left, static_cast<double>(piece) - radius);
+            double const b = amrex::min(right, static_cast<double>(piece + 1) - radius);
+            if (b <= a) { continue; }
+            double const fraction = (b - a) / length;
+            if constexpr (degree == 0) {
+                average += fraction;
+            } else if constexpr (degree == 1) {
+                double const mid = a + 0.5 * (b - a);
+                average += fraction * centered_cardinal_bspline<1>(mid);
+            } else {
+                // Two-point Gauss-Legendre quadrature is exact for quadratic and cubic pieces.
+                constexpr double inv_sqrt3 = 0.57735026918962576451;
+                double const mid = a + 0.5 * (b - a);
+                double const shift = 0.5 * (b - a) * inv_sqrt3;
+                average += (0.5 * fraction) * (
+                    centered_cardinal_bspline<degree>(mid - shift) +
+                    centered_cardinal_bspline<degree>(mid + shift));
+            }
+        }
+        return average;
+    }
+
+    /**
+     * \brief Precompute 1D path-averaged Esirkepov gather weights along one axis.
+     */
+    template <int depos_order>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void fill_esirkepov_path_weights (
+        amrex::Real* const weights,
+        int const first,
+        int const last,
+        int const left_grid,
+        double const x_old,
+        double const x_new)
+    {
+        for (int i = first; i <= last; ++i) {
+            double const center = static_cast<double>(left_grid - 1 + i) + 0.5;
+            weights[i] = static_cast<amrex::Real>(
+                path_averaged_shape_factor<depos_order>(x_old, x_new, center));
+        }
+    }
+}
+
 /**
  * \brief Energy conserving field gather for thread thread_num for the implicit scheme
  *        This uses the same stencil for the gather that is used for Esirkepov current deposition.
@@ -1140,15 +1250,32 @@ void doGatherShapeNEsirkepovStencilImplicit (
 
 #if defined(WARPX_DIM_3D)
 
+    amrex::Real path_x_E[depos_order + 2] = {0._rt};
+    amrex::Real path_y_E[depos_order + 2] = {0._rt};
+    amrex::Real path_z_E[depos_order + 2] = {0._rt};
+    amrex::Real path_x_B[depos_order + 2] = {0._rt};
+    amrex::Real path_y_B[depos_order + 2] = {0._rt};
+    amrex::Real path_z_B[depos_order + 2] = {0._rt};
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_x_E, dil_E, depos_order + 1 - diu_E, i_E_new, x_old, x_new);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_y_E, djl_E, depos_order + 1 - dju_E, j_E_new, y_old, y_new);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_z_E, dkl_E, depos_order + 1 - dku_E, k_E_new, z_old, z_new);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_x_B, dil_B, depos_order + 1 - diu_B, i_B_new, x_old - 0.5, x_new - 0.5);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_y_B, djl_B, depos_order + 1 - dju_B, j_B_new, y_old - 0.5, y_new - 0.5);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_z_B, dkl_B, depos_order + 1 - dku_B, k_B_new, z_old - 0.5, z_new - 0.5);
+
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
         for (int j=djl_E; j<=depos_order+2-dju_E; j++) {
             const amrex::Real sdzjk = one_third*(sy_E_new[j]*sz_E_new[k] + sy_E_old[j]*sz_E_old[k])
                                +one_sixth*(sy_E_new[j]*sz_E_old[k] + sy_E_old[j]*sz_E_new[k]);
-            amrex::Real sdxi = 0._rt;
             for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
-                sdxi += (sx_E_old[i] - sx_E_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
-                Exp += Ex_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdxiov*sdzjk;
+                Exp += Ex_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)
+                    * path_x_E[i]*sdzjk;
             }
         }
     }
@@ -1156,11 +1283,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
         for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
             const amrex::Real sdyik = one_third*(sx_E_new[i]*sz_E_new[k] + sx_E_old[i]*sz_E_old[k])
                                +one_sixth*(sx_E_new[i]*sz_E_old[k] + sx_E_old[i]*sz_E_new[k]);
-            amrex::Real sdyj = 0._rt;
             for (int j=djl_E; j<=depos_order+1-dju_E; j++) {
-                sdyj += (sy_E_old[j] - sy_E_new[j]);
-                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj/(y_new - y_old));
-                Eyp += Ey_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdyjov*sdyik;
+                Eyp += Ey_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)
+                    * path_y_E[j]*sdyik;
             }
         }
     }
@@ -1168,11 +1293,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
         for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
             const amrex::Real sdzij = one_third*(sx_E_new[i]*sy_E_new[j] + sx_E_old[i]*sy_E_old[j])
                                +one_sixth*(sx_E_new[i]*sy_E_old[j] + sx_E_old[i]*sy_E_new[j]);
-            amrex::Real sdzk = 0._rt;
             for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
-                sdzk += (sz_E_old[k] - sz_E_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-                Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)*sdzkov*sdzij;
+                Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+j_E_new-1+j, lo.z+k_E_new-1+k)
+                    * path_z_E[k]*sdzij;
             }
         }
     }
@@ -1180,11 +1303,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
         for (int j=djl_B; j<=depos_order+2-dju_B; j++) {
             const amrex::Real sdzjk = one_third*(sy_B_new[j]*sz_B_new[k] + sy_B_old[j]*sz_B_old[k])
                                +one_sixth*(sy_B_new[j]*sz_B_old[k] + sy_B_old[j]*sz_B_new[k]);
-            amrex::Real sdxi = 0._rt;
             for (int i=dil_B; i<=depos_order+1-diu_B; i++) {
-                sdxi += (sx_B_old[i] - sx_B_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
-                Bxp += Bx_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdxiov*sdzjk;
+                Bxp += Bx_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)
+                    * path_x_B[i]*sdzjk;
             }
         }
     }
@@ -1192,11 +1313,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
         for (int i=dil_B; i<=depos_order+2-diu_B; i++) {
             const amrex::Real sdyik = one_third*(sx_B_new[i]*sz_B_new[k] + sx_B_old[i]*sz_B_old[k])
                                +one_sixth*(sx_B_new[i]*sz_B_old[k] + sx_B_old[i]*sz_B_new[k]);
-            amrex::Real sdyj = 0._rt;
             for (int j=djl_B; j<=depos_order+1-dju_B; j++) {
-                sdyj += (sy_B_old[j] - sy_B_new[j]);
-                auto sdyjov = static_cast<amrex::Real>((y_new - y_old) == 0. ? 1. : sdyj/(y_new - y_old));
-                Byp += By_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdyjov*sdyik;
+                Byp += By_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)
+                    * path_y_B[j]*sdyik;
             }
         }
     }
@@ -1204,16 +1323,21 @@ void doGatherShapeNEsirkepovStencilImplicit (
         for (int i=dil_B; i<=depos_order+2-diu_B; i++) {
             const amrex::Real sdzij = one_third*(sx_B_new[i]*sy_B_new[j] + sx_B_old[i]*sy_B_old[j])
                                +one_sixth*(sx_B_new[i]*sy_B_old[j] + sx_B_old[i]*sy_B_new[j]);
-            amrex::Real sdzk = 0._rt;
             for (int k=dkl_B; k<=depos_order+1-dku_B; k++) {
-                sdzk += (sz_B_old[k] - sz_B_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)*sdzkov*sdzij;
+                Bzp += Bz_arr(lo.x+i_B_new-1+i, lo.y+j_B_new-1+j, lo.z+k_B_new-1+k)
+                    * path_z_B[k]*sdzij;
             }
         }
     }
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+
+    amrex::Real path_x_E[depos_order + 2] = {0._rt};
+    amrex::Real path_z_E[depos_order + 2] = {0._rt};
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_x_E, dil_E, depos_order + 1 - diu_E, i_E_new, x_old, x_new);
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_z_E, dkl_E, depos_order + 1 - dku_E, k_E_new, z_old, z_new);
 
     amrex::ParticleReal E1p = 0._prt;
     amrex::ParticleReal E2p = 0._prt;
@@ -1222,12 +1346,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
 
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
         const amrex::Real sdzk = 0.5_rt*(sz_E_new[k] + sz_E_old[k]);
-        amrex::Real sdxi = 0._rt;
         for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
-            sdxi += (sx_E_old[i] - sx_E_new[i]);
-            auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
-            E1p += Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdxiov*sdzk;
-            Bzp += Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdxiov*sdzk;
+            E1p += Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*path_x_E[i]*sdzk;
+            Bzp += Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*path_x_E[i]*sdzk;
         }
     }
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
@@ -1240,12 +1361,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
     }
     for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
         const amrex::Real sdxi = 0.5_rt*(sx_E_new[i] + sx_E_old[i]);
-        amrex::Real sdzk = 0._rt;
         for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
-            sdzk += (sz_E_old[k] - sz_E_new[k]);
-            auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-            Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdzkov*sdxi;
-            B1p += Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdzkov*sdxi;
+            Ezp += Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*path_z_E[k]*sdxi;
+            B1p += Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*path_z_E[k]*sdxi;
         }
     }
     for (int k=dkl_By; k<=depos_order+1-dku_By; k++) {
@@ -1272,16 +1390,13 @@ void doGatherShapeNEsirkepovStencilImplicit (
         // Gather field on particle Bzp from field on grid bz_arr
         for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
             const amrex::Real sdzk = 0.5_rt*(sz_E_new[k] + sz_E_old[k]);
-            amrex::Real sdxi = 0._rt;
             for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
-                sdxi += (sx_E_old[i] - sx_E_new[i]);
-                auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
                 const amrex::Real dEx = (+ Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Ex_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
                 const amrex::Real dBz = (+ Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
-                E1p += dEx*sdxiov*sdzk;
-                Bzp += dBz*sdxiov*sdzk;
+                E1p += dEx*path_x_E[i]*sdzk;
+                Bzp += dBz*path_x_E[i]*sdzk;
             }
         }
         // Gather field on particle E2p from field on grid ey_arr
@@ -1299,16 +1414,13 @@ void doGatherShapeNEsirkepovStencilImplicit (
         // Gather field on particle B1p from field on grid bx_arr
         for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
             const amrex::Real sdxi = 0.5_rt*(sx_E_new[i] + sx_E_old[i]);
-            amrex::Real sdzk = 0._rt;
             for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
-                sdzk += (sz_E_old[k] - sz_E_new[k]);
-                auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
                 const amrex::Real dEz = (+ Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Ez_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
                 const amrex::Real dBx = (+ Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode-1)*xy_mid.real()
                                          - Bx_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 2*imode)*xy_mid.imag());
-                Ezp += dEz*sdzkov*sdxi;
-                B1p += dBx*sdzkov*sdxi;
+                Ezp += dEz*path_z_E[k]*sdxi;
+                B1p += dBx*path_z_E[k]*sdxi;
             }
         }
         // Gather field on particle B2p from field on grid by_arr
@@ -1342,22 +1454,27 @@ void doGatherShapeNEsirkepovStencilImplicit (
 
 #elif defined(WARPX_DIM_1D_Z)
 
+    amrex::Real path_z_E[depos_order + 2] = {0._rt};
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_z_E, dkl_E, depos_order + 1 - dku_E, k_E_new, z_old, z_new);
+
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
         amrex::Real const sdzk = 0.5_rt*(sz_E_old[k] + sz_E_new[k]);
         Exp += Ex_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
         Eyp += Ey_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
         Bzp += Bz_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
     }
-    amrex::Real sdzk = 0._rt;
     for (int k=dkl_E; k<=depos_order+1-dku_E; k++) {
-        sdzk += (sz_E_old[k] - sz_E_new[k]);
-        auto sdzkov = static_cast<amrex::Real>((z_new - z_old) == 0. ? 1. : sdzk/(z_new - z_old));
-        Bxp += Bx_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
-        Byp += By_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
-        Ezp += Ez_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzkov;
+        Bxp += Bx_arr(lo.x+k_E_new-1+k, 0, 0, 0)*path_z_E[k];
+        Byp += By_arr(lo.x+k_E_new-1+k, 0, 0, 0)*path_z_E[k];
+        Ezp += Ez_arr(lo.x+k_E_new-1+k, 0, 0, 0)*path_z_E[k];
     }
 
 #elif defined(WARPX_DIM_RCYLINDER)
+
+    amrex::Real path_x_E[depos_order + 2] = {0._rt};
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_x_E, dil_E, depos_order + 1 - diu_E, i_E_new, x_old, x_new);
 
     const amrex::Real xp_mid = xp_nph;
     const amrex::Real yp_mid = yp_nph;
@@ -1376,13 +1493,10 @@ void doGatherShapeNEsirkepovStencilImplicit (
         Ethetap += Ey_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
         Ezp += Ez_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
     }
-    amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
-        sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
-        Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
-        Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
-        Bzp += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
+        Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*path_x_E[i];
+        Bthetap += By_arr(lo.x+i_E_new-1+i, 0, 0, 0)*path_x_E[i];
+        Bzp += Bz_arr(lo.x+i_E_new-1+i, 0, 0, 0)*path_x_E[i];
     }
 
     // Convert Erp, Ethetap, Brp, Bthetap to Exp, Eyp, Bxp, Byp
@@ -1392,6 +1506,10 @@ void doGatherShapeNEsirkepovStencilImplicit (
     Byp += costheta_mid*Bthetap + sintheta_mid*Brp;
 
 #elif defined(WARPX_DIM_RSPHERE)
+
+    amrex::Real path_x_E[depos_order + 2] = {0._rt};
+    warpx::particles::gather::detail::fill_esirkepov_path_weights<depos_order>(
+        path_x_E, dil_E, depos_order + 1 - diu_E, i_E_new, x_old, x_new);
 
     amrex::Real const xp_mid = xp_nph;
     amrex::Real const yp_mid = yp_nph;
@@ -1405,11 +1523,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
 
     amrex::ParticleReal Erp = 0._prt;
 
-    amrex::Real sdxi = 0._rt;
     for (int i=dil_E; i<=depos_order+1-diu_E; i++) {
-        sdxi += (sx_E_old[i] - sx_E_new[i]);
-        auto sdxiov = static_cast<amrex::Real>((x_new - x_old) == 0. ? 1. : sdxi/(x_new - x_old));
-        Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxiov;
+        Erp += Ex_arr(lo.x+i_E_new-1+i, 0, 0, 0)*path_x_E[i];
     }
 
     // Convert Erp to Exp, Eyp, Ezp
