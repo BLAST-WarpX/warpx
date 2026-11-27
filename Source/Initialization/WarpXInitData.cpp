@@ -28,6 +28,7 @@
 #include "Filter/BilinearFilter.H"
 #include "Filter/NCIGodfreyFilter.H"
 #include "Initialization/ExternalField.H"
+#include "Radiation/RadiationTransport.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -937,7 +938,46 @@ WarpX::InitData ()
         ExecutePythonCallback("afterInitatRestart");
     }
 
+    bool const prepare_material_opacity =
+        restart_chkfile.empty() && (m_radiation_transport->usesResolvedMaterialOpacity() ||
+                                    m_radiation_transport->usesResolvedThermalExchange());
+    bool const prepare_rz_adaptive_restart =
+#if defined(WARPX_DIM_RZ)
+        !restart_chkfile.empty() && m_radiation_transport->usesAdaptivePacketRepresentation();
+#else
+        false;
+#endif
+    bool const prepare_group_restart =
+        !restart_chkfile.empty() &&
+        (m_radiation_transport->usesMovingMultigroupTransport() ||
+         m_radiation_transport->usesResolvedThermalExchange() || prepare_rz_adaptive_restart);
+    if (prepare_group_restart) {
+        if (m_hybrid_pic_model->m_restored_moment_history_pending) {
+            // The saved moving-density rho/J history is native ownership.
+            // Re-deposition after particle IO can change its sum even on the
+            // same ranks. Rebuild only derived Pe; normal first bootstrap
+            // consumes the exact restored history before real material drift.
+            HybridPICInitializeElectronPressure();
+        } else {
+            // Legacy checkpoints without saved history reconstruct deposits.
+            // Prepare only after hybrid/native restart initialization, even
+            // without initial diagnostics; retain Te, current staggering,
+            // group moments and particle-owned carries.
+            HybridPICPrepareElectronStateForDiagnostics();
+        }
+    }
+    if (prepare_material_opacity) {
+        // Allocation precedes particle loading. Prepare the real native state
+        // before sampling material opacity, independently of diagnostic cadence.
+        HybridPICPrepareElectronStateForDiagnostics();
+        m_radiation_transport->InitializeResolvedMaterialOpacity(m_fields);
+    }
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC &&
+            m_hybrid_pic_model->m_solve_electron_energy_equation &&
+            !prepare_material_opacity && !prepare_group_restart) {
+            HybridPICPrepareElectronStateForDiagnostics();
+        }
         // Write full diagnostics before the first iteration.
         multi_diags->FilterComputePackFlush(istep[0] - 1);
 

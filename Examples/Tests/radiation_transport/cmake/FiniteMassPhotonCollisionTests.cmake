@@ -1,0 +1,17 @@
+if(WarpX_LIB AND WarpX_PRECISION STREQUAL "DOUBLE")
+    list(GET WarpX_DIMS 0 collision_dimension)
+    warpx_set_suffix_dims(collision_suffix ${collision_dimension})
+    add_executable(test_finite_mass_photon_collision test_finite_mass_photon_collision.cpp)
+    target_link_libraries(test_finite_mass_photon_collision PRIVATE lib_${collision_suffix})
+    if(WarpX_COMPUTE STREQUAL "CUDA")
+        setup_target_for_cuda_compilation(test_finite_mass_photon_collision)
+        target_compile_features(test_finite_mass_photon_collision PRIVATE cuda_std_20)
+    else()
+        target_compile_features(test_finite_mass_photon_collision PRIVATE cxx_std_20)
+    endif()
+    warpx_set_compile_warnings(test_finite_mass_photon_collision)
+    add_test(NAME test_finite_mass_photon_collision COMMAND test_finite_mass_photon_collision
+        amrex.the_arena_init_size=0)
+    set_tests_properties(test_finite_mass_photon_collision PROPERTIES
+        ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 30)
+endif()

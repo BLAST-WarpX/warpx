@@ -1,0 +1,7 @@
+# The same material transient on a finite-radius annulus (no axis).
+FILE = inputs_rz_registered_material_axis
+my_constants.radial_origin = 0.25
+geometry.prob_lo = 0.25 0.0
+geometry.prob_hi = 0.75 1.0
+boundary.field_lo = pec periodic
+boundary.particle_lo = reflecting periodic

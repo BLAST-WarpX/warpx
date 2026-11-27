@@ -1,0 +1,32 @@
+# Four-group hohlraum-like transport with QDSMC hybrid electrons.
+
+FILE = inputs_rz_hybrid
+
+my_constants.group_0_hi = 100.0*q_e
+my_constants.group_1_hi = grey_photon_energy
+my_constants.group_2_hi = 1000.0*q_e
+
+radiation_transport.energy_group_boundaries = group_0_hi group_1_hi group_2_hi
+radiation_transport.group_photon_energies = \
+    50.0*q_e 180.0*q_e 550.0*q_e 1500.0*q_e
+
+# Illustrative energy dependence only; replace with material opacity data.
+radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill) * \
+    if(photon_energy < group_0_hi, 0.5, \
+        if(photon_energy < group_1_hi, 1.0, \
+            if(photon_energy < group_2_hi, 2.0, 4.0)))
+radiation_transport.planck_absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill) * \
+    if(photon_energy < group_0_hi, 0.5, \
+        if(photon_energy < group_1_hi, 1.0, \
+            if(photon_energy < group_2_hi, 2.0, 4.0)))
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill) * \
+    if(photon_energy < group_0_hi, 0.5, \
+        if(photon_energy < group_1_hi, 1.0, \
+            if(photon_energy < group_2_hi, 2.0, 4.0)))
+
+diag1.fields_to_plot = rho Te radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1 \
+    radiation_diffusion_energy_g2 radiation_diffusion_energy_g3

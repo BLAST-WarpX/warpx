@@ -1,0 +1,87 @@
+# Deterministic hybrid He+ -> He2+ ionization in RCYLINDER.
+#
+# The stationary ions fill whole radial cells 2 through 9.  Each macro-weight
+# is the exact annular volume per unit axial length times n0.  The source is
+# separated from the axis and outer boundary, so nodal-to-cell remapping
+# preserves its cylindrical volume integral exactly.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 200.0
+my_constants.dr = 1.0e-3
+my_constants.dt = 1.0e-12
+
+max_step = 2
+amr.n_cell = 12
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 12
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 12.0*dr
+
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+warpx.random_seed = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 1.0e-3*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+particles.species_names = ions
+
+ions.mass = 6.646476989051294e-27
+ions.charge = q_e
+ions.injection_style = MultipleParticles
+ions.multiple_particles_pos_x = \
+    2.5*dr 3.5*dr 4.5*dr 5.5*dr 6.5*dr 7.5*dr 8.5*dr 9.5*dr
+ions.multiple_particles_pos_y = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_pos_z = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_ux = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_uy = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_uz = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_weight = \
+    5.0*n0*pi*dr^2 7.0*n0*pi*dr^2 \
+    9.0*n0*pi*dr^2 11.0*n0*pi*dr^2 \
+    13.0*n0*pi*dr^2 15.0*n0*pi*dr^2 \
+    17.0*n0*pi*dr^2 19.0*n0*pi*dr^2
+ions.do_not_push = 1
+
+ions.addIntegerAttributes = sentinel
+ions.attribute.sentinel(x,y,z,ux,uy,uz,t) = 37
+ions.do_hybrid_ionization = 1
+ions.physical_element = He
+ions.ionization_initial_level = 1
+ions.hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z) = \
+    if(t>1.5*dt,if(t<2.5*dt,128.0/(ne*dt),0.0),0.0)
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.species = ions
+diag.fields_to_plot = rho rho_ions Te Pe \
+    hybrid_ionization_electron_source_fp \
+    hybrid_ionization_binding_energy_fp \
+    Er Et Ez Br Bt Bz
+
+amrex.abort_on_unused_inputs = 1

@@ -47,6 +47,14 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
     m_dr = cell_size[0];
     m_nmodes = WarpX::n_rz_azimuthal_modes;
     m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
+#if defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        fdtd_algo != ElectromagneticSolverAlgo::HybridPIC ||
+            grid_type != ablastr::utils::enums::GridType::Collocated ||
+            m_nmodes == 1,
+        "Collocated RZ HybridPIC derivatives currently require one azimuthal "
+        "mode (m=0).");
+#endif
     if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
         CylindricalYeeAlgorithm::InitializeStencilCoefficients( cell_size,

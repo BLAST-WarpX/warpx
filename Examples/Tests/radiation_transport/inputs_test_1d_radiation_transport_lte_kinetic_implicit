@@ -1,0 +1,8 @@
+FILE = inputs_test_1d_radiation_transport_lte_kinetic
+
+# Stiff grey LTE exchange must leave kinetic electrons with non-negative energy.
+my_constants.alpha_planck = 1.0e5
+radiation_transport.lte_exchange_solver = implicit_temperature
+
+diag1.fields_to_plot = T_electrons radiation_material_energy \
+    radiation_diffusion_energy

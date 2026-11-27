@@ -10,6 +10,9 @@
 #include "Fields.H"
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#if defined(WARPX_DIM_RZ)
+#   include "FiniteDifferenceAlgorithms/CylindricalNodalAlgorithm.H"
+#endif
 #elif !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
@@ -73,7 +76,15 @@ void FiniteDifferenceSolver::EvolveB (
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee)||
         (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)){
-        EvolveBCylindrical <CylindricalYeeAlgorithm> ( Bfield, Efield, lev, dt );
+#if defined(WARPX_DIM_RZ)
+        if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated) {
+            EvolveBCylindrical<CylindricalNodalAlgorithm>(Bfield, Efield, lev, dt);
+        } else
+#endif
+        {
+            EvolveBCylindrical<CylindricalYeeAlgorithm>(Bfield, Efield, lev, dt);
+        }
 #else
     amrex::MultiFab const * Gfield = nullptr;
     if (fields.has(FieldType::G_fp, lev)) {
@@ -429,6 +440,13 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
         Real const dr = m_dr;
         int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
+        bool const collocated =
+#if defined(WARPX_DIM_RZ)
+            m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated;
+#else
+            false;
+#endif
 
         // Extract tileboxes for which to loop
         Box const& tbr  = mfi.tilebox(Bfield[0]->ixType().toIntVect());
@@ -436,9 +454,10 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
         Box const& tbz  = mfi.tilebox(Bfield[2]->ixType().toIntVect());
 
         // Loop over the cells and update the fields
-        amrex::ParallelFor(tbr, tbt, tbz,
+        amrex::ParallelFor(
+            tbr, tbt, tbz,
 
-            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+            [=] AMREX_GPU_DEVICE(int i, int j, int /*k*/) {
                 Real const r = rmin + i*dr; // r on nodal point (Br is nodal in r)
                 if (r != 0) { // Off-axis, regular Maxwell equations
                     Br(i, j, 0, 0) += dt * T_Algo::UpwardDz(Etheta, coefs_z, n_coefs_z, i, j, 0, 0); // Mode m=0
@@ -471,7 +490,12 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
                 }
             },
 
-            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+            [=] AMREX_GPU_DEVICE(int i, int j, int /*k*/) {
+                if (collocated && rmin + i * dr == 0) {
+                    // Regular mode-0 toroidal fields vanish on the nodal axis.
+                    Btheta(i, j, 0, 0) = 0;
+                    return;
+                }
                 Btheta(i, j, 0, 0) += dt*(
                     T_Algo::UpwardDr(Ez, coefs_r, n_coefs_r, i, j, 0, 0)
                     - T_Algo::UpwardDz(Er, coefs_z, n_coefs_z, i, j, 0, 0)); // Mode m=0
@@ -485,8 +509,8 @@ void FiniteDifferenceSolver::EvolveBCylindrical (
                 }
             },
 
-            [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
+            [=] AMREX_GPU_DEVICE(int i, int j, int /*k*/) {
+                Real const r = rmin + (i + (collocated ? 0.0_rt : 0.5_rt)) * dr;
                 Bz(i, j, 0, 0) += dt*( - T_Algo::UpwardDrr_over_r(Etheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0));
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bz(i, j, 0, 2*m-1) += dt*( m * Er(i, j, 0, 2*m  )/r

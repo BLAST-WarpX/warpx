@@ -1,0 +1,3 @@
+FILE = inputs_test_1d_radiation_transport_kinetic
+
+amr.max_grid_size = 8

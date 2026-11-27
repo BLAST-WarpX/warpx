@@ -1,0 +1,115 @@
+# Additive species-aware streaming opacity with fully kinetic electrons in
+# RCYLINDER.
+#
+# The foam and tungsten tracers overlap in one whole radial cell. A photon
+# travels only in the suppressed axial direction, so it remains in that cell
+# for the complete step and sees alpha = alpha_foam + alpha_tungsten exactly.
+
+my_constants.n0 = 1.0e20
+my_constants.alpha_foam = 1.0e3
+my_constants.alpha_tungsten = 4.0*alpha_foam
+my_constants.dr = 1.0e-3
+my_constants.dt = 1.0e-12
+
+max_step = 1
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 4
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 4.0*dr
+
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons foam tungsten photons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 8 1
+electrons.radial_numpercell_power = 1.0
+electrons.profile = constant
+electrons.density = n0
+electrons.momentum_distribution_type = constant
+electrons.ux = 0.0
+electrons.uy = 0.0
+electrons.uz = 0.0
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+foam.species_type = proton
+foam.injection_style = SingleParticle
+foam.single_particle_pos = 2.5*dr 0.0 0.0
+foam.single_particle_u = 0.0 0.0 0.0
+foam.single_particle_weight = 5.0*n0*pi*dr^2
+foam.do_not_deposit = 1
+foam.do_not_push = 1
+
+tungsten.species_type = proton
+tungsten.injection_style = SingleParticle
+tungsten.single_particle_pos = 2.5*dr 0.0 0.0
+tungsten.single_particle_u = 0.0 0.0 0.0
+tungsten.single_particle_weight = 5.0*n0*pi*dr^2
+tungsten.do_not_deposit = 1
+tungsten.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 2.5*dr 0.0 0.0
+# Axial motion has no spatial coordinate in RCYLINDER, keeping the packet in
+# the mixed-material radial cell while still accumulating a path c*dt.
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 1.0e12
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.opacity_species = foam tungsten
+radiation_transport.absorption_coefficient_foam(x,y,z,t,photon_energy,ni,ne,Te) = \
+    alpha_foam*ni/n0
+radiation_transport.absorption_coefficient_tungsten(x,y,z,t,photon_energy,ni,ne,Te) = \
+    alpha_tungsten*ni/n0
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 0
+diag1.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = radiation_energy particle_energy
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17

@@ -1,0 +1,3 @@
+FILE = inputs_test_1d_radiation_transport_momentum_carry
+
+warpx.write_diagnostics_on_restart = 1

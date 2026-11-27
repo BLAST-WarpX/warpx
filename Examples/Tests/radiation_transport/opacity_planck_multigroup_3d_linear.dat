@@ -1,0 +1,11 @@
+# Structured spectral Planck opacity table:
+# n_ne n_temperature n_photon_energy
+2 2 2
+# electron density [m^-3]
+1.0e19 1.0e21
+# electron temperature [K]
+1.0e3 1.0e6
+# representative photon energies [J]
+8.01088317e-20 3.204353268e-19
+# alpha_P [m^-1], density-major / temperature / photon-energy-fastest.
+10.0 30.0 10.0 30.0 10.0 30.0 10.0 30.0

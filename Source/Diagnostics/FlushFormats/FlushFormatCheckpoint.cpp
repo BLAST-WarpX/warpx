@@ -7,7 +7,10 @@
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Fields.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Radiation/RadiationTransport.H"
+#include "Utils/MaterialTableIdentity.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -71,8 +74,11 @@ FlushFormatCheckpoint::WriteToFile (
             "Writing checkpoint " + checkpointname);
     }
 
+    warpx::materials::MaterialTableIdentity::ValidateCurrentAcrossRanks();
+
     // const int nlevels = finestLevel()+1;
     amrex::PreBuildDirectorHierarchy(checkpointname, default_level_prefix, nlev, true);
+    warpx::materials::MaterialTableIdentity::WriteCheckpoint(checkpointname);
 
     WriteWarpXHeader(checkpointname, geom, /*is_checkpoint=*/true);
 
@@ -190,6 +196,9 @@ FlushFormatCheckpoint::WriteToFile (
 
     }
 
+    if (auto* hybrid = warpx.get_pointer_HybridPICModel()) {
+        hybrid->WriteMomentHistory(checkpointname);
+    }
     CheckpointParticles(checkpointname, particle_diags);
 
     WriteDMaps(checkpointname, nlev);
@@ -294,6 +303,7 @@ FlushFormatCheckpoint::WriteReducedDiagsData (std::string const & dir) const
 {
     if (ParallelDescriptor::IOProcessor()) {
         auto & warpx = WarpX::GetInstance();
+        warpx.GetRadiationTransport().WriteCheckpointData(dir);
         warpx.reduced_diags->WriteCheckpointData(dir);
     }
 }

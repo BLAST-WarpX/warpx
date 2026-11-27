@@ -1,0 +1,20 @@
+FILE = inputs_base_1d_radiation_transport_coupled_implicit
+max_step = 0
+diagnostics.enable = 0
+my_constants.n0 = 1.e25
+geometry.prob_hi = 1.e-3
+hybrid_pic_model.elec_temp = 100
+hybrid_pic_model.initial_elec_temp(x,y,z) = 100
+hybrid_pic_model.electron_thermodynamics = fixed_charge_latent_energy
+hybrid_pic_model.electron_latent_transition_temperature_eV = 100
+hybrid_pic_model.electron_latent_energy_eV = 1000
+hybrid_pic_model.electron_latent_sharpness = 4
+radiation_transport.initial_diffusion_energy_density(x,y,z) = "2.e9*(1+0.3*cos(2*pi*z/1.e-3))"
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te) = "1.e5*(Te/1.e6)^2"
+radiation_transport.planck_absorption_coefficient = 1000
+radiation_transport.group_photon_energies = 1.e-17
+radiation_transport.coupled_max_subdivisions = 4
+# Resolve per-stage error below the unchanged 1.e-10, 100-stage trajectory gate.
+radiation_transport.lte_exchange_tolerance = 1.e-12
+radiation_transport.diffusion_implicit_tolerance = 1.e-12
+radiation_transport.diffusion_linear_tolerance = 1.e-14

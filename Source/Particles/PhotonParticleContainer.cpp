@@ -7,6 +7,8 @@
  */
 #include "PhotonParticleContainer.H"
 
+#include "Particles/ParticleBoundaries.H"
+
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
 #endif
@@ -77,6 +79,26 @@ void PhotonParticleContainer::InitData()
 
     Redistribute();  // We then redistribute
 
+}
+
+void
+PhotonParticleContainer::SetRadiationParticleBoundaries (
+    amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM> const& lo,
+    amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM> const& hi)
+{
+#ifndef WARPX_DIM_1D_Z
+    m_boundary_conditions.SetBoundsX(lo[0], hi[0]);
+#endif
+#ifdef WARPX_DIM_3D
+    m_boundary_conditions.SetBoundsY(lo[1], hi[1]);
+    m_boundary_conditions.SetBoundsZ(lo[2], hi[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    m_boundary_conditions.SetBoundsZ(lo[1], hi[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    m_boundary_conditions.SetBoundsZ(lo[0], hi[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    m_boundary_conditions.SetBoundsX(lo[0], hi[0]);
+#endif
 }
 
 void
@@ -190,6 +212,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 
     // local copy for device lambda capture
     amrex::ParticleReal const mass = m_mass;
+    bool const radiation_transport_managed = m_radiation_transport_managed;
 
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
@@ -238,7 +261,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             amrex::ignore_unused(qed_control);
 #endif
 
-            if (position_push_type == PositionPushType::Full) {
+            if (position_push_type == PositionPushType::Full
+                && !radiation_transport_managed)
+            {
                 UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
                 SetPosition(i, x, y, z);
             }

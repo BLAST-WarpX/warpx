@@ -1,0 +1,9 @@
+# Oblique cubic support crossing: endpoint-vacuum nodes carry cancelling face fluxes.
+FILE = inputs_base_3d_hybrid_shape_tail
+max_step = 2
+geometry.prob_lo = -0.0038 -0.0038 -0.0038
+geometry.prob_hi = 0.0038 0.0038 0.0038
+ions.single_particle_pos = 4.75e-9 4.75e-9 4.75e-9
+ions.single_particle_u = -6.671281903963041e-4 -6.671281903963041e-4 -6.671281903963041e-4
+diag.intervals = 2
+chk.intervals = 2

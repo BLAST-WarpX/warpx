@@ -1,0 +1,15 @@
+FILE = inputs_base_1d_packet_material_work_iteration
+particles.species_names = ions heavy
+test.material_species = ions heavy
+test.recoil_fraction = 0.2
+heavy.mass = 4*1.67262192595e-27
+heavy.charge = 2*q_e
+heavy.injection_style = NUniformPerCell
+heavy.num_particles_per_cell_each_dim = 4
+heavy.profile = constant
+heavy.density = 0.5e20
+heavy.momentum_distribution_type = constant
+heavy.ux = 0
+heavy.uy = 0
+heavy.uz = 1024/clight
+heavy.do_not_gather = 1

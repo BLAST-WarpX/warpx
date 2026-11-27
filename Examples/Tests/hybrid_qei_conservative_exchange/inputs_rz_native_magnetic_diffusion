@@ -1,0 +1,68 @@
+# Native whole-evolution check for radial magnetic diffusion in RZ HybridPIC.
+my_constants.ne = 1.e26
+my_constants.diffusivity = 0.1
+my_constants.B_background = 0.1
+my_constants.B_perturbation = 0.01
+my_constants.sigma2 = 0.04
+
+max_step = 100
+amrex.the_arena_init_size = 0
+amr.n_cell = 64 8
+amr.max_level = 0
+amr.max_grid_size = 16 8
+amr.blocking_factor = 4
+geometry.dims = RZ
+geometry.prob_lo = 0 0
+geometry.prob_hi = 1 1
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = reflecting periodic
+
+warpx.n_rz_azimuthal_modes = 1
+warpx.const_dt = 5.e-4
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+warpx.do_dynamic_scheduling = 0
+warpx.sort_intervals = -1
+warpx.synchronize_velocity_for_diagnostics = 0
+
+algo.maxwell_solver = hybrid
+algo.current_deposition = direct
+algo.particle_shape = 1
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bz_external_grid_function(x,y,z) = B_background + B_perturbation*exp(-x*x/sigma2)
+
+hybrid_pic_model.elec_temp = 0
+hybrid_pic_model.n0_ref = ne
+hybrid_pic_model.n_floor = 0.01*ne
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = mu0*diffusivity
+hybrid_pic_model.solve_electron_energy_equation = 0
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.conservative_pressure_work = 0
+
+particles.species_names = ions
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 8 1 8
+ions.radial_numpercell_power = 0
+ions.profile = constant
+ions.density = ne
+ions.momentum_distribution_type = constant
+ions.ux = 0
+ions.uy = 0
+ions.uz = 0
+ions.do_not_push = 1
+ions.do_not_gather = 1
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 100
+diag.file_prefix = diags/plt
+diag.fields_to_plot = Bz rho

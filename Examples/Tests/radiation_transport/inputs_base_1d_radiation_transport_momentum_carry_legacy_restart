@@ -1,0 +1,10 @@
+# Stop at the checkpointed step: write_diagnostics_on_restart exposes the carry
+# state before any new radiation impulse can be accumulated.
+
+FILE = inputs_test_1d_radiation_transport_momentum_carry
+
+max_step = 149
+warpx.write_diagnostics_on_restart = 1
+diagnostics.diags_names = diag chk
+diag.intervals = 149
+chk.intervals = 1000000

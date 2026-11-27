@@ -12,6 +12,9 @@
 #include "EmbeddedBoundary/Enabled.H"
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#if defined(WARPX_DIM_RZ)
+#   include "FiniteDifferenceAlgorithms/CylindricalNodalAlgorithm.H"
+#endif
 #elif !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
@@ -37,9 +40,17 @@ void FiniteDifferenceSolver::ComputeCurlA (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        ComputeCurlACylindrical <CylindricalYeeAlgorithm> (
-            Bfield, Afield, eb_update_B, lev, ngrow
-        );
+#if defined(WARPX_DIM_RZ)
+        if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated) {
+            ComputeCurlACylindrical<CylindricalNodalAlgorithm>(
+                Bfield, Afield, eb_update_B, lev, ngrow);
+        } else
+#endif
+        {
+            ComputeCurlACylindrical<CylindricalYeeAlgorithm>(
+                Bfield, Afield, eb_update_B, lev, ngrow);
+        }
 #else
     if (WarpX::grid_type == GridType::Staggered)
     {
@@ -132,6 +143,13 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
         Real const dr = m_dr;
         int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
+        bool const collocated =
+#if defined(WARPX_DIM_RZ)
+            m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated;
+#else
+            false;
+#endif
 
         // Extract tileboxes for which to loop over
         Box const& tbr  = mfi.tilebox(Bfield[0]->ixType().toIntVect());
@@ -183,6 +201,11 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                 // Skip field update in the embedded boundaries
                 if (update_Btheta_arr && update_Btheta_arr(i, j, 0) == 0) { return; }
 
+                if (collocated && rmin + i * dr == 0) {
+                    Btheta(i, j, 0, 0) = 0;
+                    return;
+                }
+
                 Btheta(i, j, 0, 0) = - (
                     T_Algo::UpwardDr(Az, coefs_r, n_coefs_r, i, j, 0, 0)
                     - T_Algo::UpwardDz(Ar, coefs_z, n_coefs_z, i, j, 0, 0)); // Mode m=0
@@ -201,7 +224,7 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
                 // Skip field update in the embedded boundaries
                 if (update_Bz_arr && update_Bz_arr(i, j, 0) == 0) { return; }
 
-                Real const r = rmin + (i + 0.5_rt)*dr; // r on a cell-centered grid (Bz is cell-centered in r)
+                Real const r = rmin + (i + (collocated ? 0.0_rt : 0.5_rt)) * dr;
                 Bz(i, j, 0, 0) =  T_Algo::UpwardDrr_over_r(At, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                 for (int m=1 ; m<nmodes ; m++) { // Higher-order modes
                     Bz(i, j, 0, 2*m-1) = - ( m * Ar(i, j, 0, 2*m  )/r

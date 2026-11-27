@@ -34,6 +34,15 @@ Plasma-Based Acceleration
    pwfa.rst
 
 
+Radiation Transport
+-------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   examples/hohlraum_radiation/README.rst
+
+
 Laser-Plasma Interaction
 ------------------------
 

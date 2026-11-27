@@ -13,7 +13,9 @@
 
 #include "Particles/WarpXParticleContainer_fwd.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_Array.H>
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>
 
@@ -79,6 +81,22 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         int lev,  amrex::Real t, amrex::Real dt) override;
 
+    /** Let radiation transport subcycle photon positions instead of PushPX. */
+    void setRadiationTransportManaged (bool const managed) noexcept
+    {
+        m_radiation_transport_managed = managed;
+    }
+
+    /** Replace the species particle-boundary faces used by ApplyBoundaryConditions.
+     *
+     * Radiation transport may set these independently of the global material
+     * particle boundaries. WarpXEvolve later uses the same species faces, so
+     * a leaked photon is not reflected by a material wall after escape.
+     */
+    void SetRadiationParticleBoundaries (
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM> const& lo,
+        amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM> const& hi);
+
     /**
      * \brief No reset is needed for photons since they are not updated during implicit iterations
      */
@@ -126,7 +144,8 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/,
-                                 int /*particle_shape*/) override {}
+                                 int /*particle_shape*/,
+                                 std::optional<CurrentDepositionAlgo> /*deposition_algo*/ = std::nullopt) override {}
 
     /**
      * \brief No-op override: photons are massless and carry no charge, so
@@ -138,6 +157,9 @@ public:
                               int /*lev*/,
                               amrex::Real /*dt*/,
                               ImplicitOptions const& /*implicit_options*/) override {}
+
+private:
+    bool m_radiation_transport_managed = false;
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_

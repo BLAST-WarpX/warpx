@@ -1,0 +1,7 @@
+FILE = inputs_base_3d_radiation_transport_group_sampling
+# The live weak-band inventory is twice its diffusion inventory, so its new
+# conversion allocation must halve (not ignore the existing streaming packet).
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.1 0.1 0.1
+photons.single_particle_u = 0 0 4.0e-15/(9.1093837139e-31*299792458.0*299792458.0)
+photons.single_particle_weight = 2.0e-4
