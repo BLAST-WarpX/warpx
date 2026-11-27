@@ -95,14 +95,13 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
 
-# If the ions carry a user-defined integer attribute, ionization must not
-# have modified it (it is stored next to ionizationLevel).
-try:
+# If the ions carry a user-defined integer attribute (only in the
+# int_attribs test), ionization must not have modified it: it is stored next
+# to ionizationLevel.
+if ("ions", "particle_user_flag") in ds.field_list:
     user_flag = ad["ions", "particle_user_flag"].v
     assert np.all(user_flag == 7), "ionization modified the user integer attribute"
     print("particle_user_flag is unchanged")
-except yt.utilities.exceptions.YTFieldNotFound:
-    pass
 
 # Check that the user runtime component (if it exists) worked as expected
 try:
