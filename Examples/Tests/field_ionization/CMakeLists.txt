@@ -23,6 +23,16 @@ add_warpx_test(
 
 
 add_warpx_test(
+    test_2d_ionization_lab_int_attribs  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_ionization_lab_int_attribs  # inputs
+    "analysis.py diags/diag1001600"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_ionization_lab_restart  # name
     2  # dims
     2  # nprocs

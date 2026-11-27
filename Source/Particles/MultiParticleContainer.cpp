@@ -1198,7 +1198,8 @@ MultiParticleContainer::doFieldIonization (int lev,
         auto *phys_pc_ptr = static_cast<PhysicalParticleContainer*>(pc_source.get());
 
         auto Copy      = copy_factory.getSmartCopy();
-        auto Transform = IonizationTransformFunc();
+        auto Transform = IonizationTransformFunc(
+            pc_source->GetIntCompIndex("ionizationLevel"));
 
         pc_source ->defineAllParticleTiles();
         pc_product->defineAllParticleTiles();

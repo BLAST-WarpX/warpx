@@ -160,13 +160,22 @@ struct IonizationFilterFunc
 
 struct IonizationTransformFunc
 {
+    /** Index of the ionizationLevel integer attribute. It is not
+     *  necessarily 0, e.g. when the species also has user-defined
+     *  integer attributes (addIntegerAttributes). */
+    int m_ion_lev_comp;
+
+    explicit IonizationTransformFunc (int a_ion_lev_comp) noexcept
+        : m_ion_lev_comp{a_ion_lev_comp}
+    {}
+
     template <typename DstData, typename SrcData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (DstData& /*dst*/, SrcData& src,
         int i_src, int /*i_dst*/,
         amrex::RandomEngine const& /*engine*/) const noexcept
     {
-        src.m_runtime_idata[0][i_src] += 1;
+        src.m_runtime_idata[m_ion_lev_comp][i_src] += 1;
     }
 };
 
