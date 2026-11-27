@@ -81,7 +81,7 @@ namespace
                 (pos[d] - plo[d] < 0.5_rt * dx[d] || phi[d] - pos[d] < 0.5_rt * dx[d]);
             vol *= on_face ? 0.5_rt * dx[d] : dx[d];
         }
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // Annulus about the node; on a radial face its centroid lies a quarter
         // cell inside (dr/4 on the axis).
         amrex::Real r = pos[0];

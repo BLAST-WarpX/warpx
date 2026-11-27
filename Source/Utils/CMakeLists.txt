@@ -3,6 +3,8 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         Interpolate.cpp
+        MaterialRegistry.cpp
+        MaterialTableIdentity.cpp
         ParticleUtils.cpp
         SpeciesUtils.cpp
         WarpXMovingWindow.cpp

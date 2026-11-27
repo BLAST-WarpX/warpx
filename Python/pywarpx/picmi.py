@@ -2215,6 +2215,9 @@ class HybridPICSolver(
         "plasma_hyper_resistivity",
         "plasma_resistivity_species",
         "electron_ion_relaxation_rate",
+        "electron_ion_relaxation_rate_species",
+        "electron_thermal_conductivity",
+        "electron_thermal_conductivity_composition",
         "Jx_external_function",
         "Jy_external_function",
         "Jz_external_function",
@@ -2249,6 +2252,59 @@ class HybridPICSolver(
         default=None,
         description="Solve the electron energy equation instead of the algebraic adiabatic pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is transported each step by QDSMC markers advected with the electron fluid velocity, the source terms below are applied per cell, and ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve. (default False)",
     )
+    electron_thermodynamics: str | None = Field(
+        default=None,
+        description="Electron caloric backend: ideal_gas or fixed_charge_latent_energy."
+        " The latter adds bounded energy shoulders, not evolving atomic populations.",
+    )
+    electron_latent_transition_temperature_eV: list[float] | None = Field(
+        default=None,
+        description="Strictly increasing latent transition temperatures in eV.",
+    )
+    electron_latent_energy_eV: list[float] | None = Field(
+        default=None,
+        description="Positive saturation energies per effective electron in eV.",
+    )
+    electron_latent_sharpness: list[float] | None = Field(
+        default=None, description="Transition exponents between two and 64."
+    )
+    electron_ion_relaxation_rate_species: dict[str, int | float | str] | None = Field(
+        default=None,
+        description="Per-species rates in 1/s; expressions accept rho_s,rho,Te,Ti,t"
+        " (charge density in C/m^3, temperature in eV).",
+    )
+    electron_energy_transport: str | None = Field(
+        default=None, description="auto, finite_volume or finite_volume_implicit."
+    )
+    conservative_pressure_work: bool | None = Field(
+        default=None,
+        description="Conservative supported particle/electron pressure-work pair.",
+    )
+    conservative_pressure_work_pec: bool | None = Field(
+        default=None,
+        description="Opt into supported PEC/reflecting-wall pressure work.",
+    )
+    electron_heat_conduction: bool | None = Field(
+        default=None,
+        description="Enable supported isotropic native-FV electron conduction.",
+    )
+    electron_thermal_conductivity: int | float | str | None = Field(
+        default=None, description="Conductivity in W/(m K); expressions accept rho,Te."
+    )
+    electron_thermal_conductivity_composition: int | float | str | None = Field(
+        default=None,
+        description="Alternative conductivity expression in rho,Te,Zbar,Zeff.",
+    )
+    electron_conduction_flux_limiter: float | None = Field(
+        default=None,
+        description="Lagged harmonic limiter; zero selects classical conduction.",
+    )
+    electron_conduction_max_substeps: int | None = Field(
+        default=None, description="Adaptive conduction attempt cap; exhaustion rejects."
+    )
+    electron_conduction_verbosity: int | None = Field(
+        default=None, description="Conduction diagnostic verbosity; zero is silent."
+    )
     include_joule_heating: bool | None = Field(
         default=None,
         description="Add the resistive (Joule) heating source to the electron temperature. Reduces to ``eta * J**2`` for a single ion species. Only used when ``solve_electron_energy_equation`` is True. (default False)",
@@ -2257,7 +2313,7 @@ class HybridPICSolver(
         default=None,
         description="Electron temperature threshold in eV above which the Joule heating of a cell is routed to the ions (as an energy-conserving stochastic kick) instead of the electrons, allowing ``Ti > Te`` to develop. Specifying a value >= 0 enables the redirect (off by default). Requires ``include_joule_heating``.",
     )
-    electron_ion_relaxation_rate: float | str | None = Field(
+    electron_ion_relaxation_rate: int | float | str | None = Field(
         default=None,
         description="Value or expression for the electron-ion energy-equilibration rate ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal equilibration ``Q_ei`` on the electron temperature, with the conjugate ion heating applied as an energy-conserving drag-diffusion kick on each ion (the required shape-aware ion temperature deposition is enabled automatically on every charged species). The expression may depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti`` (temperatures in eV) and ``t`` (time). Only used when ``solve_electron_energy_equation`` is True.",
     )
@@ -2324,6 +2380,22 @@ class HybridPICSolver(
 
     _mangle_dict: dict | None = PrivateAttr(default=None)
 
+    @property
+    def mangle_dict(self):
+        """Retain the private material adapter's expression-mangling accessor."""
+        return self._mangle_dict
+
+    @model_validator(mode="after")
+    def _exclusive_conductivity(self):
+        if (
+            self.electron_thermal_conductivity is not None
+            and self.electron_thermal_conductivity_composition is not None
+        ):
+            raise ValueError(
+                "Specify only one electron thermal conductivity expression."
+            )
+        return self
+
     def solver_initialize_inputs(self):
         # Add the user defined keywords to my_constants
         # The keywords are mangled if there is a conflicting variable already
@@ -2363,6 +2435,45 @@ class HybridPICSolver(
             pywarpx.hybridpicmodel.solve_electron_energy_equation = (
                 self.solve_electron_energy_equation
             )
+        for name in (
+            "electron_thermodynamics",
+            "electron_latent_transition_temperature_eV",
+            "electron_latent_energy_eV",
+            "electron_latent_sharpness",
+            "electron_energy_transport",
+            "conservative_pressure_work",
+            "conservative_pressure_work_pec",
+            "electron_heat_conduction",
+            "electron_conduction_flux_limiter",
+            "electron_conduction_max_substeps",
+            "electron_conduction_verbosity",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                setattr(pywarpx.hybridpicmodel, name, value)
+        if self.electron_ion_relaxation_rate_species is not None:
+            pywarpx.hybridpicmodel.electron_ion_relaxation_species = list(
+                self.electron_ion_relaxation_rate_species
+            )
+            for name, expression in self.electron_ion_relaxation_rate_species.items():
+                pywarpx.hybridpicmodel.__setattr__(
+                    f"electron_ion_relaxation_rate_{name}(rho_s,rho,Te,Ti,t)",
+                    pywarpx.my_constants.mangle_expression(
+                        str(expression), self._mangle_dict
+                    ),
+                )
+        for name, arguments in (
+            ("electron_thermal_conductivity", "rho,Te"),
+            ("electron_thermal_conductivity_composition", "rho,Te,Zbar,Zeff"),
+        ):
+            expression = getattr(self, name)
+            if expression is not None:
+                pywarpx.hybridpicmodel.__setattr__(
+                    f"electron_thermal_conductivity({arguments})",
+                    pywarpx.my_constants.mangle_expression(
+                        str(expression), self._mangle_dict
+                    ),
+                )
         if self.include_joule_heating is not None:
             pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
         if self.joule_redirect_Te_threshold is not None:
@@ -2373,7 +2484,7 @@ class HybridPICSolver(
             pywarpx.hybridpicmodel.__setattr__(
                 "electron_ion_relaxation_rate(rho,Te,Ti,t)",
                 pywarpx.my_constants.mangle_expression(
-                    self.electron_ion_relaxation_rate, self._mangle_dict
+                    str(self.electron_ion_relaxation_rate), self._mangle_dict
                 ),
             )
         pywarpx.hybridpicmodel.substeps = self.substeps
@@ -3183,6 +3294,43 @@ class FieldIonization(picmistandard.PICMI_FieldIonization):
             self.ionized_species.charge_state
         )
         self.ionized_species._species.charge = "q_e"
+
+
+class HybridIonization(
+    picmistandard.base.PICMI_Interaction, picmistandard.PICMI_ExpressionParameters
+):
+    """Adjacent charge-state ionization paired with hybrid electron energy.
+
+    This does not create a kinetic product-electron species. The rate is in
+    m^3/s and accepts x,y,z,t,ne,Te,Z (Te in eV, ne in m^-3).
+    """
+
+    ionized_species: Species = Field(
+        description="Ion species with an initial charge state."
+    )
+    rate_coefficient: float | str = Field(
+        description="Maxwellian ionization rate coefficient."
+    )
+    user_defined_kw: dict = Field(default_factory=dict)
+    _expression_fields: ClassVar[tuple[str, ...]] = ("rate_coefficient",)
+
+    def interaction_initialize_inputs(self):
+        if self.ionized_species.particle_type is None:
+            raise ValueError("HybridIonization requires ionized_species.particle_type.")
+        if self.ionized_species.charge_state is None:
+            raise ValueError("HybridIonization requires an initial charge_state.")
+        mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        species_bucket = self.ionized_species._species
+        species_bucket.do_hybrid_ionization = 1
+        species_bucket.physical_element = self.ionized_species.particle_type
+        species_bucket.ionization_initial_level = self.ionized_species.charge_state
+        species_bucket.charge = "q_e"
+        species_bucket.__setattr__(
+            "hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z)",
+            pywarpx.my_constants.mangle_expression(
+                str(self.rate_coefficient), mangle_dict
+            ),
+        )
 
 
 class CollisionBase(picmistandard.PICMI_Extension):
@@ -4140,7 +4288,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
 
         for interaction in self.interactions:
-            if not isinstance(interaction, FieldIonization):
+            if not isinstance(interaction, (FieldIonization, HybridIonization)):
                 raise TypeError(
                     f"WarpX does not support the interaction {type(interaction).__name__}"
                 )

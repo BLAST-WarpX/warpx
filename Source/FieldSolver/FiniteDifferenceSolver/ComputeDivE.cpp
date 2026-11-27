@@ -10,6 +10,9 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#if defined(WARPX_DIM_RZ)
+#include "FiniteDifferenceAlgorithms/CylindricalNodalAlgorithm.H"
+#endif
 #elif defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
@@ -54,7 +57,16 @@ void FiniteDifferenceSolver::ComputeDivE (
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC){
 
-        ComputeDivECylindrical <CylindricalYeeAlgorithm> ( Efield, divEfield );
+#if defined(WARPX_DIM_RZ)
+        if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated) {
+            ComputeDivECylindrical<CylindricalNodalAlgorithm>(Efield,
+                                                              divEfield);
+        } else
+#endif
+        {
+            ComputeDivECylindrical<CylindricalYeeAlgorithm>(Efield, divEfield);
+        }
 
 #elif defined(WARPX_DIM_RSPHERE)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
@@ -160,6 +172,13 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
         Real const dr = m_dr;
         int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
+        bool const collocated =
+#if defined(WARPX_DIM_RZ)
+            m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+            m_grid_type == ablastr::utils::enums::GridType::Collocated;
+#else
+            false;
+#endif
 
         // Extract tileboxes for which to loop
         Box const& tdive  = mfi.tilebox(divEfield.ixType().toIntVect());
@@ -187,8 +206,10 @@ void FiniteDifferenceSolver::ComputeDivECylindrical (
                     // For m==0, Er is linear in r, for small r
                     // Therefore, the formula below regularizes the singularity
                     divE(i, j, 0, 0) =
-                           4._rt*Er(i, j, 0, 0)/dr // regularization
-                         + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 0);
+                        (collocated ? 2._rt * Er(i + 1, j, 0, 0)
+                                    : 4._rt * Er(i, j, 0, 0)) /
+                            dr +
+                        T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 0);
                     // Ensure that divE remains 0 for higher-order modes
                     for (int m=1; m<nmodes; m++) {
                         divE(i, j, 0, 2*m-1) = 0._rt;
