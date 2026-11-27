@@ -317,6 +317,14 @@ jobs:
         git clone https://github.com/BLAST-WarpX/warpx-data ../warpx-data
 
         echo "=================================================================================================== "
+        echo "================ Examples/Tests/implicit/inputs_test_2d_theta_implicit_symmetry =================== "
+        echo "=================================================================================================== "
+        cd Examples/Tests/implicit
+        mpirun -n 2 ../../../build/bin/warpx.2d inputs_test_2d_theta_implicit_symmetry warpx.serialize_initial_conditions = 0
+        rm -rf ./diags
+        cd -
+
+        echo "=================================================================================================== "
         echo "======================  Examples/Physics_applications/capacitive_discharge ======================== "
         echo "=================================================================================================== "
         cd Examples/Physics_applications/capacitive_discharge
