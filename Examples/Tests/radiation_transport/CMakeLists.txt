@@ -2555,4 +2555,3 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
-

@@ -107,7 +107,9 @@ temperature_error = abs(
 ) / abs(analytic_electron_temperature)
 
 cell_volume = float(
-    np.prod(initial_dataset.domain_width.to_value("m") / initial_dataset.domain_dimensions)
+    np.prod(
+        initial_dataset.domain_width.to_value("m") / initial_dataset.domain_dimensions
+    )
 )
 electron_energy_change = float(
     np.sum(

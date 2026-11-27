@@ -13,7 +13,6 @@ from pathlib import Path
 
 import numpy as np
 import yt
-
 from analysis_flux_relaxed_roundtrip import C, load
 
 yt.funcs.mylog.setLevel(40)
@@ -48,7 +47,9 @@ def photons(path):
     order = np.lexsort((cpu, ids))
     momentum = np.stack(
         [
-            np.asarray(data["photons", "particle_momentum_" + axis].v, dtype=np.longdouble)
+            np.asarray(
+                data["photons", "particle_momentum_" + axis].v, dtype=np.longdouble
+            )
             for axis in "xyz"
         ],
         axis=1,
@@ -63,7 +64,9 @@ def photons(path):
         weight=np.asarray(data["photons", "particle_weight"].v, dtype=np.longdouble)[
             order
         ],
-        z=np.asarray(data["photons", "particle_position_z"].v, dtype=np.longdouble)[order],
+        z=np.asarray(data["photons", "particle_position_z"].v, dtype=np.longdouble)[
+            order
+        ],
         momentum=momentum[order],
         mass=mass[order],
     )
@@ -103,7 +106,9 @@ def check(directory, angular_spread=False):
     photon_momentum0 = initial_packets["momentum"][live0]
     norms0 = np.sqrt(np.sum(photon_momentum0**2, axis=1))
     directions0 = photon_momentum0 / norms0[:, None]
-    weights0 = initial_packets["weight"][live0] / np.sum(initial_packets["weight"][live0])
+    weights0 = initial_packets["weight"][live0] / np.sum(
+        initial_packets["weight"][live0]
+    )
     mean_direction0 = np.sum(weights0[:, None] * directions0, axis=0)
     direction_spread0 = np.sqrt(
         np.sum(weights0[:, None] * (directions0 - mean_direction0) ** 2, axis=0)
@@ -133,18 +138,22 @@ def check(directory, angular_spread=False):
         live = packet["weight"] != 0
         index0, index, retained_pairs = retained_photons(initial_packets, packet)
         if index:
-            assert np.array_equal(packet["mass"][index], initial_packets["mass"][index0])
-            if row["step"] > 0 and row["field_e"] > 0 and np.any(
-                (packet["z"][index] < D_ZMIN) | (packet["z"][index] >= D_ZMAX)
+            assert np.array_equal(
+                packet["mass"][index], initial_packets["mass"][index0]
+            )
+            if (
+                row["step"] > 0
+                and row["field_e"] > 0
+                and np.any(
+                    (packet["z"][index] < D_ZMIN) | (packet["z"][index] >= D_ZMAX)
+                )
             ):
                 later_retained_k = True
 
         du = row["u"] - initial["u"]
         gamma = np.sqrt(1 + np.sum(row["u"] ** 2, axis=1) / C**2)
         kinetic = np.sum(
-            mass
-            * np.sum(du * (row["u"] + initial["u"]), axis=1)
-            / (gamma + gamma0)
+            mass * np.sum(du * (row["u"] + initial["u"]), axis=1) / (gamma + gamma0)
         )
         carry_work = np.sum(mass * (row["carry_work"] - initial["carry_work"]))
         energy_error = (

@@ -50,7 +50,20 @@ def state(folder, filename="state.txt"):
 
 
 def same(a, b):
-    for name in ("step", "substeps", "B0", "B1", "B2", "E0", "E1", "E2", "U", "T", "rho", "V"):
+    for name in (
+        "step",
+        "substeps",
+        "B0",
+        "B1",
+        "B2",
+        "E0",
+        "E1",
+        "E2",
+        "U",
+        "T",
+        "rho",
+        "V",
+    ):
         assert a[name] == b[name], f"Restart changed {name}"
     assert a["kinetic"] == b["kinetic"]
     assert a["wall_work"] == b["wall_work"] == 0
@@ -82,24 +95,46 @@ if mpi:
     same(state(baseline), state(changed_rank))
     run("rollback_mpi", "test.rollback=1", ranks=2)
 
-run("changed_channel", f"amr.restart={checkpoint}",
+run(
+    "changed_channel",
+    f"amr.restart={checkpoint}",
     "hybrid_pic_model.field_evolution_channel=full",
     "hybrid_pic_model.solve_electron_energy_equation=1",
-    fail="preserve the native pressure_only field channel")
-run("changed_boundary", f"amr.restart={checkpoint}", "boundary.field_hi=pmc periodic",
-    fail="native pressure_only stencil, EOS, boundary")
-run("changed_stencil", f"amr.restart={checkpoint}",
+    fail="preserve the native pressure_only field channel",
+)
+run(
+    "changed_boundary",
+    f"amr.restart={checkpoint}",
+    "boundary.field_hi=pmc periodic",
+    fail="native pressure_only stencil, EOS, boundary",
+)
+run(
+    "changed_stencil",
+    f"amr.restart={checkpoint}",
     f"warpx.grid_type={'staggered' if grid == 'collocated' else 'collocated'}",
-    fail="native pressure_only stencil, EOS, boundary")
-run("changed_controller", f"amr.restart={checkpoint}", "hybrid_pic_model.substep_rtol=1.e-8",
-    fail="native pressure_only stencil, EOS, boundary")
+    fail="native pressure_only stencil, EOS, boundary",
+)
+run(
+    "changed_controller",
+    f"amr.restart={checkpoint}",
+    "hybrid_pic_model.substep_rtol=1.e-8",
+    fail="native pressure_only stencil, EOS, boundary",
+)
 missing_owner = pathlib.Path("missing_owner_checkpoint").absolute()
 shutil.copytree(checkpoint, missing_owner, dirs_exist_ok=True)
 owner = missing_owner / "Level_0" / "hybrid_native_pressure_energy_fp[level=0]_H"
 owner.rename(owner.with_name(owner.name + ".withheld"))
-run("missing_owner", f"amr.restart={missing_owner}",
-    fail="Missing required native pressure_only checkpoint owner")
+run(
+    "missing_owner",
+    f"amr.restart={missing_owner}",
+    fail="Missing required native pressure_only checkpoint owner",
+)
 run("moving_ions", "ions.do_not_push=0", fail="requires every species to be frozen")
-run("resistivity", "hybrid_pic_model.plasma_resistivity(rho,J,t)=1",
-    fail="pressure_only requires double-precision ideal electrons")
-print(f"Native {grid} ordinary evolution, exact normal restart, changed-rank and rejection gates passed")
+run(
+    "resistivity",
+    "hybrid_pic_model.plasma_resistivity(rho,J,t)=1",
+    fail="pressure_only requires double-precision ideal electrons",
+)
+print(
+    f"Native {grid} ordinary evolution, exact normal restart, changed-rank and rejection gates passed"
+)
