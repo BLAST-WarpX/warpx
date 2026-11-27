@@ -4362,6 +4362,8 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the maximum number of substep attempts
     (accepted and rejected combined) per half-step before the simulation aborts.
+    It also caps the substep count learned by the adaptive solver.
+    It does not apply to fixed-step RK4 half-steps.
 
 .. pp:param:: hybrid_pic_model.holmstrom_vacuum_region
     :type: ``bool``

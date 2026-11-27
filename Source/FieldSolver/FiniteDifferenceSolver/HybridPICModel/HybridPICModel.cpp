@@ -2384,10 +2384,14 @@ void HybridPICModel::BfieldEvolve (
             dt_sub *= std::max(0.1_rt, step_change_factor);
         }
 
-        if (++n_attempts > m_max_substep_attempts) { break; }
+        // The attempt limit only applies to the adaptive (RKF45) integrator;
+        // fixed-step RK4 takes exactly m_substeps/2 steps.
+        if (++n_attempts > m_max_substep_attempts && use_rkf45) { break; }
     }
 
-    // Adjust the number of substeps for the next RKF45/RK4 half-step.
+    // After an RKF45 half-step, adjust the number of substeps used for the
+    // next half-step (RKF45 initial guess, or RK4 on steps without RKF45).
+    // A fixed-step RK4 half-step leaves it unchanged.
     // Jump up immediately when this half needed more attempts; otherwise
     // slowly relax toward target = 2*n_attempts.
     // Blend on the half-step counts M = m_substeps/2 and N = n_attempts via
@@ -2396,7 +2400,7 @@ void HybridPICModel::BfieldEvolve (
     // N < M (e.g. m=40, n_attempts=10 → 38 → … → 20). Floating-point
     // 0.95*M+0.05*N can undershoot M slightly so floor would leak even at
     // equilibrium.
-    {
+    if (use_rkf45) {
         const int target = 2 * n_attempts;
         if (m_substeps < target) {
             m_substeps = target;
@@ -2423,7 +2427,7 @@ void HybridPICModel::BfieldEvolve (
             << ", m_substeps = " << m_substeps << ")\n";
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        n_attempts <= m_max_substep_attempts,
+        !use_rkf45 || n_attempts <= m_max_substep_attempts,
         "BfieldEvolve: exceeded max substep attempts;"
         "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
     );

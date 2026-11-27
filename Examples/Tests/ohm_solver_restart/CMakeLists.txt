@@ -22,6 +22,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_ohm_solver_fixed_rk4_substeps  # name
+    2  # dims
+    1  # nprocs
+    "inputs_base_2d_ohm_solver_adaptive_checkpoint hybrid_pic_model.use_rkf45=0 hybrid_pic_model.max_substep_attempts=4"  # inputs
+    "analysis_fixed_rk4_substeps.py"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_ohm_solver_checkpoint_picmi  # name
     2  # dims
     2  # nprocs
