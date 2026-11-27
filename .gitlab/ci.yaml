@@ -82,12 +82,16 @@ NVIDIA-H200:
         test_2d_langmuir_multi_shared_mem_esirkepov
         test_2d_langmuir_multi_mr_direct
         test_2d_langmuir_multi_mr_direct_shared_mem
+        test_2d_langmuir_multi_shared_mem_villasenor
         test_2d_refined_injection
         test_3d_langmuir_multi_shared_mem_esirkepov
+        test_3d_langmuir_multi_shared_mem_villasenor
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
         test_rsphere_langmuir_multi
         test_rz_electrostatic_sphere_eb
+        test_rz_langmuir_multi_direct
+        test_rz_langmuir_multi_direct_shared_mem
       )
       # Join the test names with "|" to form regex alternatives.
       GPU_TESTS_REGEX=""
@@ -146,12 +150,16 @@ AMD-MI300:
         test_2d_langmuir_multi_shared_mem_esirkepov
         test_2d_langmuir_multi_mr_direct
         test_2d_langmuir_multi_mr_direct_shared_mem
+        test_2d_langmuir_multi_shared_mem_villasenor
         test_2d_refined_injection
         test_3d_langmuir_multi_shared_mem_esirkepov
+        test_3d_langmuir_multi_shared_mem_villasenor
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
         test_rsphere_langmuir_multi
         test_rz_electrostatic_sphere_eb
+        test_rz_langmuir_multi_direct
+        test_rz_langmuir_multi_direct_shared_mem
       )
       # Join the test names with "|" to form regex alternatives.
       GPU_TESTS_REGEX=""

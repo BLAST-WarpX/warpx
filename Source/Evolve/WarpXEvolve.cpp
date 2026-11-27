@@ -242,11 +242,6 @@ WarpX::Evolve (int numsteps)
         // perform collisions and advance fields and particles by one time step
         OneStep(cur_time, dt[0], step, verbose_step);
 
-        // Resample particles
-        // +1 is necessary here because value of step seen by user (first step is 1) is different than
-        // value of step in code (first step is 0)
-        mypc->doResampling(Geom(), istep[0]+1, verbose_step);
-
         if (evolve_scheme == EvolveScheme::Explicit) {
             applyMirrors(cur_time);
             // E : guard cells are NOT up-to-date
@@ -284,6 +279,13 @@ WarpX::Evolve (int numsteps)
         mypc->ContinuousFluxInjection(cur_time, dt[0]);
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
+
+        // Resampling requires the particles to be redistributed, which the
+        // boundary handler above does.  Running resampling and Redistribute()
+        // before the boundary handler can remove particles that ought to have
+        // been handled by the boundary conditions.
+        // +1 because the user-facing step number starts at 1, while step starts at 0.
+        mypc->doResampling(Geom(), step+1, verbose_step);
 
         // Apply particle thermalizer (no-op until implemented)
         if (m_particle_thermalizer.defined()) {
@@ -1504,6 +1506,22 @@ WarpX::PushParticlesandDeposit (
     ImplicitOptions const * implicit_options
 )
 {
+    // TODO: Centralize gather-field preparation for explicit and implicit
+    // particle pushes, including paths that bypass this function (Darwin).
+    // Cache the time-scaled external particle fields in a separate container,
+    // updated at each distinct stage time, including substeps and retries. Before
+    // each gather, all solver paths should use the same centralized preparation
+    // routine to rebuild aux from the current fp fields (with any required mesh
+    // refinement corrections or centering) and add the cached external contribution.
+    // This keeps aux current during implicit iterations without recomputing the
+    // external contribution or modifying the fields used by the field solver.
+    if (implicit_options) {
+        // Implicit iterations change the simulation fields before each push.
+        // Refresh the gather fields and scale external particle maps at the stage time.
+        UpdateAuxiliaryData(cur_time);
+        FillBoundaryAux(guard_cells.ng_UpdateAux);
+    }
+
     // Evolve particles to p^{n+1/2} and x^{n+1}
     // Deposit current, j^{n+1/2}
     for (int lev = 0; lev <= finest_level; ++lev) {

@@ -36,7 +36,7 @@ normalized momenta (``'ux'``, ``'uy'``, ``'uz'``), the particle weights (``'w'``
    available in each geometry.
 
 The different methods below differ in their user-friendliness, flexibility and performance overhead.
-(For more information, see the `pyamrex documentation <http://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__.)
+(For more information, see the `pyamrex documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__.)
 
 .. tab-set::
 

@@ -14,6 +14,9 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_ParallelContext.H>
+#include <AMReX_ParallelReduce.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -28,6 +31,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
+
+    // The solver only operates on level 0
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_WarpX->maxLevel() == 0,
+        "The semi-implicit Darwin solver does not support mesh refinement "
+        "(amr.max_level must be 0).");
 
     // The guard-cell handling throughout this solver (SumBoundaryJ and
     // FillBoundaryAndSync calls using the domain periodicity) and the GMRES
@@ -69,6 +78,24 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_magnetostatic_particle_shape >= 1 && m_magnetostatic_particle_shape <= WarpX::nox,
         "implicit_evolve.magnetostatic_particle_shape must be between 1 and algo.particle_shape");
+
+    // Multiplier of the grad-div penalty coefficient (see AddGradDivZTerm)
+    utils::parser::queryWithParser(pp_implicit_evolve, "graddiv_factor", m_graddiv_factor);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_graddiv_factor >= 0.0_rt,
+        "implicit_evolve.graddiv_factor must be non-negative");
+#if !(defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D))
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_graddiv_factor == 0.0_rt,
+        "implicit_evolve.graddiv_factor is only supported in Cartesian geometries");
+#endif
+    if (m_graddiv_factor > 0.0_rt) {
+        // div(Z) of the B-staggered Z is cell-centered. One guard layer, so
+        // that its gradient can be taken without a boundary fill.
+        const auto& Zx = *m_Z.getArrayVec()[0][0];
+        m_divZ.define(amrex::convert(Zx.boxArray(), amrex::IndexType::TheCellType()),
+                      Zx.DistributionMap(), /*nvar=*/1, /*ngrow=*/amrex::IntVect(1));
+    }
 
     // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
@@ -143,11 +170,12 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
     amrex::Print()     << "Magnetostatic particle shape:                  " << m_magnetostatic_particle_shape << "\n";
+    amrex::Print()     << "Grad-div penalty factor:                       " << m_graddiv_factor << "\n";
     if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
+int SemiImplicitDarwin::OneStep ( amrex::Real  start_time,
                                                    amrex::Real  a_dt,
                                                    int          a_step,
                                                    bool verbose_step)
@@ -158,6 +186,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Set the member time step
     m_dt = a_dt;
+    // The velocity advance is centered at t^n; evaluate external maps at that time.
+    m_field_time = start_time;
 
     const int finest_level = 0;
 
@@ -372,7 +402,9 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
     // here with the magnetostatic particle shape (set in m_implicit_options).
-    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+    ImplicitOptions options = m_implicit_options;
+    options.field_time = m_field_time;
+    m_WarpX->DepositMassMatrices(m_dt, options);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete
@@ -385,6 +417,16 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
+
+    // Refresh the grad-div penalty coefficient (see AddGradDivZTerm) from the
+    // mass matrices: the row sum of a diagonal block is the local chi that
+    // curl(chi curl(Z)) applies to a uniform dA, so the domain mean, averaged
+    // over the three diagonal blocks, is the mean chi of the solenoidal modes.
+    // The coefficient must be uniform, since a varying alpha would couple the
+    // curl-free and solenoidal modes, and change dA.
+    if (m_graddiv_factor > 0.0_rt) {
+        m_graddiv_alpha = m_graddiv_factor * ComputeMeanScaledMassMatrix();
+    }
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()
@@ -674,4 +716,154 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_c
             });
         }
     }
+}
+
+amrex::Real SemiImplicitDarwin::ComputeMeanScaledMassMatrix () const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeMeanScaledMassMatrix()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    const int nc[3] = {Sdiag[0]->nComp(), Sdiag[1]->nComp(), Sdiag[2]->nComp()};
+
+    // Same row sums and index identification as ComputeScaledMassMatrixCC,
+    // reduced over the cell-centered boxes without storing them.
+    amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+    amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    for (int d = 0; d < 3; ++d) {
+        const int ncomp = nc[d];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(m_divZ, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& bx = mfi.tilebox();
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            reduce_op.eval(bx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+                amrex::Real s = 0.0;
+                for (int c = 0; c < ncomp; ++c) {
+                    s += S(i,j,k,c);
+                }
+                return {s};
+            });
+        }
+    }
+
+    amrex::Real sum = amrex::get<0>(reduce_data.value(reduce_op));
+    amrex::ParallelAllReduce::Sum(sum, amrex::ParallelContext::CommunicatorSub());
+
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
+    return fac * sum / (3.0_rt * static_cast<amrex::Real>(m_divZ.boxArray().numPts()));
+}
+
+// NOLINTNEXTLINE(readability-make-member-function-const): writes m_divZ except in RZ
+void SemiImplicitDarwin::AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
+                                           const ablastr::fields::VectorField& a_Z,
+                                           int lev )
+{
+    if (m_graddiv_alpha == 0.0_rt) { return; }
+    BL_PROFILE("SemiImplicitDarwin::AddGradDivZTerm()");
+
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+    // Each component of the B-staggered Z is nodal in its own direction, so
+    // the forward difference of each component gives a cell-centered div(Z),
+    // and the backward difference of that gives a gradient back on Z's
+    // staggering. This pair makes the term symmetric positive semidefinite,
+    // and curl-free since the backward gradient commutes with the curl
+    // stencils.
+    const auto dxinv = m_WarpX->Geom(lev).InvCellSizeArray();
+    const amrex::Real alpha = m_graddiv_alpha;
+
+    // div(Z) is evaluated on each box grown by one cell (reading the periodic
+    // image values in the guard cells of a_Z) and consumed by the
+    // gradient within the same box, which avoids a boundary fill. This is why
+    // the loop is not tiled: tiles grown by one cell would overlap.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(m_divZ, false); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real> const& divZ = m_divZ.array(mfi);
+
+        amrex::Array4<const amrex::Real> const& Zx = a_Z[0]->const_array(mfi);
+        amrex::Array4<const amrex::Real> const& Zy = a_Z[1]->const_array(mfi);
+        amrex::Array4<const amrex::Real> const& Zz = a_Z[2]->const_array(mfi);
+
+        amrex::Array4<amrex::Real> const& Fx = a_rhs[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fy = a_rhs[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fz = a_rhs[2]->array(mfi);
+
+        const amrex::Box gbx = amrex::grow(mfi.validbox(), 1);
+        const amrex::Box tbx = amrex::convert(mfi.validbox(), a_rhs[0]->ixType());
+        const amrex::Box tby = amrex::convert(mfi.validbox(), a_rhs[1]->ixType());
+        const amrex::Box tbz = amrex::convert(mfi.validbox(), a_rhs[2]->ixType());
+
+#if defined(WARPX_DIM_1D_Z)
+        // Only Zz varies along z, so only it enters div(Z) and gets a gradient
+        const amrex::Real dzi = dxinv[0];
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zz(i+1,j,k) - Zz(i,j,k))*dzi;
+        });
+        amrex::ParallelFor(tbz, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dzi;
+        });
+        amrex::ignore_unused(Zx, Zy, Fx, Fy, tbx, tby);
+#elif defined(WARPX_DIM_XZ)
+        // The out-of-plane component Zy does not enter div(Z) and gets no gradient
+        const amrex::Real dxi = dxinv[0];
+        const amrex::Real dzi = dxinv[1];
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zx(i+1,j,k) - Zx(i,j,k))*dxi
+                        + (Zz(i,j+1,k) - Zz(i,j,k))*dzi;
+        });
+        amrex::ParallelFor(tbx, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fx(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dxi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j-1,k))*dzi;
+            });
+        amrex::ignore_unused(Zy, Fy, tby);
+#else
+        const amrex::Real dxi = dxinv[0];
+        const amrex::Real dyi = dxinv[1];
+        const amrex::Real dzi = dxinv[2];
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zx(i+1,j,k) - Zx(i,j,k))*dxi
+                        + (Zy(i,j+1,k) - Zy(i,j,k))*dyi
+                        + (Zz(i,j,k+1) - Zz(i,j,k))*dzi;
+        });
+        amrex::ParallelFor(tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fx(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dxi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fy(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j-1,k))*dyi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j,k-1))*dzi;
+            });
+#endif
+    }
+#else
+    amrex::ignore_unused(a_rhs, a_Z, lev);
+#endif
 }

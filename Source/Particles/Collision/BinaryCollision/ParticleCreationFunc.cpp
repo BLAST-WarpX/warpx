@@ -17,6 +17,7 @@
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -274,6 +275,55 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
                 ".product_species to use the reaction order A + B -> C + D. cos(theta) is "
                 "the angle between the momenta of A and C in the center-of-momentum frame. "
                 "For this reaction, the required order is " + required_order + ".");
+        }
+    }
+
+    // Decide how many macroparticles to create per product.
+    if (m_collision_type == CollisionType::LinearCompton)
+    {
+        // The products (photon, lepton) are of the same type as the reactants (photon, lepton),
+        // in this order: create one photon at the position of the reactant photon and one
+        // lepton at the position of the reactant lepton.
+        m_products_per_reactant_factor = 1;
+    }
+    else if (BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
+    {
+        // If each product has the same charge as one of the reactants (e.g. D+D -> T+p,
+        // D+He3 -> He4+p), placing each product at the position of the reactant with the same
+        // charge conserves charge locally with only one macroparticle per product.
+        // Otherwise (e.g. D+T -> n+He4, D+D -> n+He3), create one product at the position of
+        // each reactant, with half of the reaction weight each (Higginson et al., JCP 2019).
+        amrex::Vector<std::string> species_names;
+        pp_collision_name.getarr("species", species_names);
+        amrex::Vector<std::string> product_species_names;
+        pp_collision_name.getarr("product_species", product_species_names);
+        auto const& reactant1 = mypc->GetParticleContainerFromName(species_names[0]);
+        auto const& reactant2 = mypc->GetParticleContainerFromName(species_names[1]);
+        auto const& product1 = mypc->GetParticleContainerFromName(product_species_names[0]);
+        auto const& product2 = mypc->GetParticleContainerFromName(product_species_names[1]);
+
+        // With field ionization, the charge of a macroparticle depends on its ionization level,
+        // so the species charge alone does not determine local charge conservation.
+        bool const any_ionizable = reactant1.DoFieldIonization() || reactant2.DoFieldIonization()
+            || product1.DoFieldIonization() || product2.DoFieldIonization();
+
+        auto const same_charge = [] (amrex::ParticleReal qa, amrex::ParticleReal qb) {
+            return std::abs(qa - qb) <= amrex::ParticleReal(1.e-6)*std::max(std::abs(qa), std::abs(qb));
+        };
+        auto const q_r1 = reactant1.getCharge();
+        auto const q_r2 = reactant2.getCharge();
+        auto const q_p1 = product1.getCharge();
+        auto const q_p2 = product2.getCharge();
+
+        if (!any_ionizable && same_charge(q_p1, q_r1) && same_charge(q_p2, q_r2))
+        {
+            m_products_per_reactant_factor = 1;
+            m_swap_product_positions = false;
+        }
+        else if (!any_ionizable && same_charge(q_p1, q_r2) && same_charge(q_p2, q_r1))
+        {
+            m_products_per_reactant_factor = 1;
+            m_swap_product_positions = true;
         }
     }
 

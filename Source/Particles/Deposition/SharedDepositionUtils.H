@@ -17,6 +17,7 @@
 #endif
 
 #include <AMReX.H>
+#include <AMReX_Algorithm.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Box.H>
@@ -36,11 +37,9 @@
  */
 AMREX_FORCE_INLINE
 int getMaxTboxAlongDim (int nCells, int tilesize){
-    int maxTilesize = 0;
-    const int nTiles = nCells / tilesize;
-    const int remainder = nCells % tilesize;
-    maxTilesize = tilesize + int(std::ceil((amrex::Real) remainder / nTiles));
-    return maxTilesize;
+    // Must be consistent with amrex::getTileIndex: a box smaller than a tile is a single tile
+    const int nTiles = amrex::max(nCells / tilesize, 1);
+    return (nCells + nTiles - 1) / nTiles;
 }
 
 /*

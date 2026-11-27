@@ -107,7 +107,7 @@ pre-commit install
 pre-commit run -a  # run on all files
 ```
 
-- **C++**: clang-format (4 spaces, 100 char line limit)
+- **C++**: not auto-formatted (do not run clang-format on whole files); follow the C++ Style section below
 - **Python**: Ruff (configured in `pyproject.toml`)
 
 Commits should limit any formatting changes of unchanged code.
@@ -139,7 +139,7 @@ Commits should limit any formatting changes of unchanged code.
 
 ## C++ Style
 
-- 4 spaces indentation, no tabs, max 100 chars/line
+- 4 spaces indentation, no tabs
 - Member variables prefixed with `m_`
 - CamelCase for files and classes
 - Space before `()` in function definitions, not in calls
@@ -160,3 +160,24 @@ When a change removes or renames a user-facing input parameter, add a guard to t
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
 - Pull requests with new features need to add a test for coverage.
+
+## Pull Requests
+
+Human developers read everything you write: PR descriptions, commit messages, and code comments. Write for them.
+
+### Keep PRs small
+
+- A PR should do one thing. Put unrelated changes (e.g., a bug fix, a refactor, a new feature) in separate PRs, even if you found them during the same task. Leave out unrelated cleanups.
+- Open preparatory changes (renaming, moving code, adding a helper) as their own PRs first, so each PR can be reviewed and merged on its own.
+- If a task seems to need a large PR, propose a split to the user before writing all the code.
+
+### PR descriptions
+
+- Write a few sentences on what changed and why, plus what reviewers need to know (e.g., changed defaults, checksum updates, open questions). A short bulleted list is fine.
+- Do not walk through the diff file by file or paste long test logs.
+
+### Code comments and commit messages
+
+- Use plain language. In comments, explain *why* when it is not obvious, not only *what* the code does.
+- Use standard physics and WarpX terms (see `Docs/source/glossary.rst`). Avoid made-up jargon, unexplained abbreviations, and references to the conversation that produced the code (e.g., "as requested", "fix from step 3").
+- Keep comments short. Do not describe past versions of the code in comments ("changed X to Y"); put that in the commit message.

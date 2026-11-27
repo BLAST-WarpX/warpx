@@ -231,6 +231,9 @@ int ImplicitSolver::OneStep (const amrex::Real  start_time,
                 amrex::Print() << "ImplicitSolver::OneStep: starting substep " << isubstep+1 << " of " << m_nsubsteps << "\n";
             }
 
+            // Refresh the stage time on every attempt, including reduced-dt retries.
+            m_field_time = substep_start_time + m_theta*m_dt;
+
             // Solve nonlinear system at t_{n+theta}
             // Disable PC lagging throughout adaptive substepping.
             m_nlsolver->ForcePreconditionerUpdate(m_nsubsteps > 1);
@@ -1125,7 +1128,10 @@ void ImplicitSolver::PreLinearSolve (const bool update_pc)
 
     // The deposit is skipped when the mass matrices are used only for a PC that is not updated
     if (m_use_mass_matrices_jacobian || (m_use_mass_matrices_pc && update_pc)) {
-        m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+        // Match the field-evaluation time used by ComputeRHS for this substep.
+        ImplicitOptions options = m_implicit_options;
+        options.field_time = m_field_time;
+        m_WarpX->DepositMassMatrices(m_dt, options);
         FinishMassMatricesDeposition();
     }
 
@@ -1163,6 +1169,7 @@ void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
 
     // Copy stable options, then set values specific to this RHS evaluation.
     ImplicitOptions options = m_implicit_options;
+    options.field_time = a_cur_time;
     options.linear_stage_of_jfnk = a_from_jacobian;
     options.evolve_suborbit_particles_only = false;
 

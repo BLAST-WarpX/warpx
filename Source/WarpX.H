@@ -683,7 +683,8 @@ public:
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
-    void UpdateAuxiliaryData ();
+    // field_time overrides the per-level t_new used to scale external particle maps.
+    void UpdateAuxiliaryData (std::optional<amrex::Real> field_time = std::nullopt);
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
 
