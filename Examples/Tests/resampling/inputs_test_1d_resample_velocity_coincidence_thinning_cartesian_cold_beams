@@ -1,0 +1,16 @@
+# Two cold, counter-propagating beams in the same cells, with no velocity
+# spread along x and y. Velocity coincidence thinning must only merge
+# particles of the same beam, so the beams must stay cold and keep their
+# velocity after resampling.
+FILE = inputs_test_1d_resample_velocity_coincidence_thinning_cartesian
+
+hydrogen.injection_style = nuniformpercell
+hydrogen.num_particles_per_cell_each_dim = 100
+hydrogen.momentum_distribution_type = parse_momentum_function
+hydrogen.momentum_function_ux(x,y,z) = "0."
+hydrogen.momentum_function_uy(x,y,z) = "0."
+# Alternate +u0 / -u0 between neighbouring particles of each cell
+my_constants.u0 = 0.01
+my_constants.dz_part = 0.1/256/100
+hydrogen.momentum_function_uz(x,y,z) = "if(floor(z/dz_part) - 2*floor(z/(2*dz_part)) < 0.5, u0, -u0)"
+hydrogen.resampling_algorithm_delta_u = 1e6 1e6 1e6
