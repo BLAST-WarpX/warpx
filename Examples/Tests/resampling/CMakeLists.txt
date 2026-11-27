@@ -22,6 +22,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_resample_velocity_coincidence_thinning_cartesian_cold_beams  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_resample_velocity_coincidence_thinning_cartesian_cold_beams  # inputs
+    "analysis_cold_beams.py diags/diag1000004"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_resample_velocity_coincidence_thinning_reflecting  # name
     1  # dims
     2  # nprocs

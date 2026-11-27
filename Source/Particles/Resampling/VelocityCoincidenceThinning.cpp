@@ -149,12 +149,16 @@ void VelocityCoincidenceThinning::operator() (
             velocityBinCalculator.uy_max = amrex::get<4>(hv);
         }
 
+        // Bin indices along x go from 0 to floor((ux_max - ux_min)/dux)
+        // (inclusive), so floor(...) + 1 bins are needed. Using ceil(...)
+        // gives 0 bins when all particles have the same ux, which makes the
+        // bin number ignore uy and uz.
         velocityBinCalculator.n1 = static_cast<int>(
-            std::ceil((velocityBinCalculator.ux_max - velocityBinCalculator.ux_min) / m_delta_u[0])
-        );
+            std::floor((velocityBinCalculator.ux_max - velocityBinCalculator.ux_min) / m_delta_u[0])
+        ) + 1;
         velocityBinCalculator.n2 = static_cast<int>(
-            std::ceil((velocityBinCalculator.uy_max - velocityBinCalculator.uy_min) / m_delta_u[1])
-        );
+            std::floor((velocityBinCalculator.uy_max - velocityBinCalculator.uy_min) / m_delta_u[1])
+        ) + 1;
     }
     auto heapSort = HeapSort();
 

@@ -135,10 +135,13 @@ public:
                     uz[indices[i]]*uz[indices[i]]
                 );
                 auto u_theta = std::atan2(uy[indices[i]], ux[indices[i]]) + MathConst::pi;
-                auto u_phi = std::acos(uz[indices[i]]/u_mag);
+                // The polar angle is undefined for u = 0; put such particles at phi = 0.
+                auto u_phi = (u_mag > 0) ? std::acos(uz[indices[i]]/u_mag) : 0;
 
-                const int ii = static_cast<int>(u_theta / dutheta);
-                const int jj = static_cast<int>(u_phi / duphi);
+                // u_theta = 2 pi and u_phi = pi are valid values; clamp them
+                // into the last bin instead of the first bin of the next row.
+                const int ii = amrex::min(static_cast<int>(u_theta / dutheta), n1 - 1);
+                const int jj = amrex::min(static_cast<int>(u_phi / duphi), n2 - 1);
                 const int kk = static_cast<int>(u_mag / dur);
 
                 bin_array[i] = ii + jj * n1 + kk * n1 * n2;
