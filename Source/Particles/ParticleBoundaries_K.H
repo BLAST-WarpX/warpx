@@ -9,11 +9,23 @@
 
 #include "ParticleBoundaries.H"
 #include "Initialization/SampleGaussianFluxDistribution.H"
+#include "Utils/WarpXConst.H"
 
 #include <AMReX_AmrCore.H>
 
 namespace ApplyParticleBoundaries {
     using namespace amrex::literals;
+
+    /** Decisions made by the existing boundary operation, without inferring
+     * reflection from before/after velocity values. In radial geometries the
+     * flags name coordinate directions, not Cartesian momentum components.
+     * A thermal event is not an elastic reflection of auxiliary particle state.
+     */
+    struct BoundaryEvent {
+        amrex::GpuArray<bool, 3> coordinate_reflection{false, false, false};
+        bool thermalized = false;
+        bool lost = false;
+    };
     /* \brief Applies the boundary condition on a specific axis
      *        This is called by apply_boundaries.
      */
@@ -108,6 +120,8 @@ namespace ApplyParticleBoundaries {
      *                    (u_r, u_theta, u_phi).
      * \param particle_lost: output, flags whether the particle was lost
      * \param boundaries: object with boundary condition settings
+     * \param engine: random engine used by stochastic or thermal boundaries
+     * \param event: optional output for reflection, thermalization and loss decisions
     */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void
@@ -118,8 +132,12 @@ namespace ApplyParticleBoundaries {
                       amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
                       bool& particle_lost,
                       ParticleBoundaries::ParticleBoundariesData const& boundaries,
-                      amrex::RandomEngine const& engine)
+                      amrex::RandomEngine const& engine,
+                      BoundaryEvent* event = nullptr)
     {
+        if (event) {
+            *event = {};
+        }
         bool change_sign_ux = false;
         bool change_sign_uy = false;
         bool change_sign_uz = false;
@@ -131,6 +149,7 @@ namespace ApplyParticleBoundaries {
                        boundaries.reflection_model_xlo(-ux), boundaries.reflection_model_xhi(ux),
                        engine);
         if (rethermalize_x) {
+            if (event) { event->thermalized = true; }
             thermalize_boundary_particle(ux, uy, uz, boundaries.m_uth, engine);
         }
 #endif
@@ -141,6 +160,7 @@ namespace ApplyParticleBoundaries {
                        boundaries.reflection_model_ylo(-uy), boundaries.reflection_model_yhi(uy),
                        engine);
         if (rethermalize_y) {
+            if (event) { event->thermalized = true; }
             thermalize_boundary_particle(uy, uz, ux, boundaries.m_uth, engine);
         }
 #endif
@@ -151,6 +171,7 @@ namespace ApplyParticleBoundaries {
                        boundaries.reflection_model_zlo(-uz), boundaries.reflection_model_zhi(uz),
                        engine);
         if (rethermalize_z) {
+            if (event) { event->thermalized = true; }
             thermalize_boundary_particle(uz, ux, uy, boundaries.m_uth, engine);
         }
 #endif
@@ -164,6 +185,10 @@ namespace ApplyParticleBoundaries {
         if (change_sign_ux) { ux = -ux; }
         if (change_sign_uy) { uy = -uy; }
         if (change_sign_uz) { uz = -uz; }
+        if (event) {
+            event->coordinate_reflection = {change_sign_ux, change_sign_uy, change_sign_uz};
+            event->lost = particle_lost;
+        }
     }
 
 }

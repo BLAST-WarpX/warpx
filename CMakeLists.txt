@@ -71,6 +71,10 @@ option(WarpX_QED_TABLE_GEN "QED table generation (requires PICSAR and Boost)"
                                                                         OFF)
 option(WarpX_QED_TOOLS     "Build external tool to generate QED lookup tables (requires PICSAR and Boost)"
                                                                         OFF)
+option(WarpX_SINGULARITY_EOS
+       "Singularity-EOS/Spiner tabulated hybrid-electron thermodynamics" OFF)
+option(WarpX_MATERIAL_OPACITY_HDF5
+       "Generator-independent HDF5 material-opacity tables"           OFF)
 
 # Advanced option to run tests
 option(WarpX_TEST_CLEANUP "Clean up automated test directories" OFF)
@@ -237,6 +241,12 @@ include(${WarpX_SOURCE_DIR}/cmake/dependencies/PICSAR.cmake)
 #   builds openPMD-api from source (default) or finds an existing install
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/openPMD.cmake)
 
+# Optional generator-independent material-opacity tables
+include(${WarpX_SOURCE_DIR}/cmake/dependencies/MaterialOpacityHDF5.cmake)
+
+# Optional package-backed electron thermodynamics
+include(${WarpX_SOURCE_DIR}/cmake/dependencies/SingularityEOS.cmake)
+
 # PSATD
 include(${WarpX_SOURCE_DIR}/cmake/dependencies/FFT.cmake)
 if(WarpX_FFT)
@@ -298,6 +308,18 @@ foreach(D IN LISTS WarpX_DIMS)
         add_library(lib_${SD})
         add_library(WarpX::lib_${SD} ALIAS lib_${SD})
         target_link_libraries(lib_${SD} PUBLIC ablastr_${SD})
+        if(WarpX_SINGULARITY_EOS)
+            target_link_libraries(
+                lib_${SD} PUBLIC singularity-eos::singularity-eos)
+            target_compile_definitions(
+                lib_${SD} PUBLIC WARPX_USE_SINGULARITY_EOS)
+        endif()
+        if(WarpX_MATERIAL_OPACITY_HDF5)
+            target_link_libraries(
+                lib_${SD} PUBLIC WarpX::thirdparty::material_opacity_hdf5)
+            target_compile_definitions(
+                lib_${SD} PUBLIC WARPX_USE_MATERIAL_OPACITY_HDF5)
+        endif()
         set(_BUILDINFO_SRC lib_${SD})
         list(APPEND _ALL_TARGETS lib_${SD})
 
@@ -509,6 +531,7 @@ if(WarpX_LIB)
     add_subdirectory(Source/Parallelization)
     add_subdirectory(Source/Particles)
     add_subdirectory(Source/Python)
+    add_subdirectory(Source/Radiation)
     add_subdirectory(Source/Utils)
 endif()
 if(WarpX_QED_TOOLS)

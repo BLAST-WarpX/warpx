@@ -26,6 +26,8 @@
 #include "ParticleMomentum.H"
 #include "ParticleNumber.H"
 #include "RhoMaximum.H"
+#include "RadiationEnergy.H"
+#include "RadiationMomentum.H"
 #include "Timestep.H"
 #include "Utils/TextMsg.H"
 
@@ -75,6 +77,8 @@ MultiReducedDiags::MultiReducedDiags ()
             {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
             {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
             {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
+            {"RadiationEnergy",       [](CS s){return std::make_unique<RadiationEnergy>(s);}},
+            {"RadiationMomentum",     [](CS s){return std::make_unique<RadiationMomentum>(s);}},
             {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
     };
     // loop over all reduced diags and fill m_multi_rd with requested reduced diags

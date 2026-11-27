@@ -29,6 +29,8 @@
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/ParticleBoundaryBuffer_fwd.H"
 #include "Particles/WarpXParticleContainer_fwd.H"
+#include "Radiation/RadiationTransport_fwd.H"
+#include "Utils/MaterialRegistry_fwd.H"
 
 #ifdef WARPX_USE_FFT
 #   ifdef WARPX_DIM_RZ
@@ -165,6 +167,8 @@ public:
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
+    [[nodiscard]] RadiationTransport& GetRadiationTransport () { return *m_radiation_transport; }
+
     /** Return the implicit solver, or nullptr when the evolve scheme is explicit */
     [[nodiscard]] ImplicitSolver * get_pointer_ImplicitSolver () const { return m_implicit_solver.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
@@ -503,13 +507,21 @@ public:
      */
     void HybridPICInitializeRhoJandB ();
 
+    /** Derive electron pressure from freshly prepared density and the selected
+     * initial/evolved thermal closure without advancing time. */
+    void HybridPICInitializeElectronPressure ();
+
+    /** Prepare a meaningful initial/restart thermal diagnostic state while
+     * preserving the current's original time staggering. */
+    void HybridPICPrepareElectronStateForDiagnostics ();
+
     /**
      * \brief Hybrid-PIC deposition function.
      * Helper function to contain all the needed logic to deposit charge and
      * current densities for use in the Ohm's law solver. The deposition is
      * done into the ``rho_fp`` and ``current_fp`` multifabs.
      */
-    void HybridPICDepositRhoAndJ ();
+    void HybridPICDepositRhoAndJ (bool deposit_energy_auxiliary);
 
     /** apply QED correction on electric field
      *
@@ -685,6 +697,7 @@ public:
     // Caller must make sure fp and cp have ghost cells filled.
     // field_time overrides the per-level t_new used to scale external particle maps.
     void UpdateAuxiliaryData (std::optional<amrex::Real> field_time = std::nullopt);
+    void UpdateHybridPressureAuxiliaryData ();
     void UpdateAuxiliaryDataStagToNodal ();
     void UpdateAuxiliaryDataSameType ();
 
@@ -910,6 +923,8 @@ public:
     [[nodiscard]] amrex::IntVect get_ng_depos_J() const {return guard_cells.ng_depos_J;}
     [[nodiscard]] amrex::IntVect get_ng_depos_rho() const {return guard_cells.ng_depos_rho;}
     [[nodiscard]] amrex::IntVect get_ng_fieldgather () const {return guard_cells.ng_FieldGather;}
+    [[nodiscard]] bool verboncoeurAxisCorrection () const
+    { return m_verboncoeur_axis_correction; }
 
     /** Coarsest-level Domain Decomposition
      *
@@ -1483,6 +1498,12 @@ private:
 
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
+
+    // Shared named-material identity and external table metadata
+    std::unique_ptr<warpx::materials::MaterialRegistry> m_material_registry;
+
+    // Photon radiation transport and material-energy coupling
+    std::unique_ptr<RadiationTransport> m_radiation_transport;
 
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file

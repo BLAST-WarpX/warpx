@@ -68,7 +68,8 @@ public:
 
     void InterpolateMFForDiag (
         amrex::MultiFab& mf_dst, const amrex::MultiFab& mf_src, int dcomp,
-        const amrex::DistributionMapping& dm, bool convertRZmodes2cartesian ) const
+        const amrex::DistributionMapping& dm, bool convertRZmodes2cartesian,
+        int const scomp=0) const
     {
 #ifdef WARPX_DIM_RZ
         if (convertRZmodes2cartesian) {
@@ -79,19 +80,19 @@ public:
                 "The RZ averaging over modes must write into one single component");
             amrex::MultiFab mf_dst_stag( mf_src.boxArray(), dm, 1, mf_src.nGrowVect() );
             // Mode 0
-            amrex::MultiFab::Copy( mf_dst_stag, mf_src, 0, 0, 1, mf_src.nGrowVect() );
-            for (int ic=1 ; ic < mf_src.nComp() ; ic += 2) {
+            amrex::MultiFab::Copy( mf_dst_stag, mf_src, scomp, 0, 1, mf_src.nGrowVect() );
+            for (int ic=scomp+1 ; ic < mf_src.nComp() ; ic += 2) {
                 // Real part of all modes > 0
                 amrex::MultiFab::Add( mf_dst_stag, mf_src, ic, 0, 1, mf_src.nGrowVect() );
             }
             ablastr::coarsen::sample::Coarsen( mf_dst, mf_dst_stag, dcomp, 0, nComp(), 0, m_crse_ratio );
         } else {
-            ablastr::coarsen::sample::Coarsen( mf_dst, mf_src, dcomp, 0, nComp(), 0, m_crse_ratio );
+            ablastr::coarsen::sample::Coarsen( mf_dst, mf_src, dcomp, scomp, nComp(), 0, m_crse_ratio );
         }
 #else
         // In Cartesian geometry, coarsen and interpolate from temporary MultiFab mf_src
         // to output diagnostic MultiFab mf_dst
-        ablastr::coarsen::sample::Coarsen(mf_dst, mf_src, dcomp, 0, nComp(), mf_dst.nGrowVect(), m_crse_ratio );
+        ablastr::coarsen::sample::Coarsen(mf_dst, mf_src, dcomp, scomp, nComp(), mf_dst.nGrowVect(), m_crse_ratio );
         amrex::ignore_unused(convertRZmodes2cartesian, dm);
 #endif
     }
