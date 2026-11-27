@@ -1,0 +1,15 @@
+# Exercise multiple simultaneously compiled radiation-group profiles and an
+# omitted middle group. Reuse the material-free base setup.
+
+FILE = inputs_base_1d_radiation_transport_cold_start_profiles
+
+max_step = 0
+
+radiation_transport.energy_group_boundaries = 1.602176634e-19 3.204353268e-19
+radiation_transport.group_photon_energies = 0.801088317e-19 2.403264951e-19 6.408706536e-19
+radiation_transport.initial_diffusion_energy_density_g0(x,y,z) = 1.0 + 2.0*z
+radiation_transport.initial_diffusion_energy_density_g2(x,y,z) = 3.0 + 4.0*z
+
+diag1.fields_to_plot = radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1 \
+    radiation_diffusion_energy_g2

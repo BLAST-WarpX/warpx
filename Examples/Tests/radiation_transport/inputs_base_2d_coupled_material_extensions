@@ -1,0 +1,14 @@
+# Cartesian companion for native P40 MPI+CUDA qualification.
+FILE = inputs_base_1d_coupled_material_extensions
+geometry.dims = 2
+geometry.prob_lo = 0 0
+geometry.prob_hi = 1.e-3 1.e-3
+amr.n_cell = 8 8
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+ions.num_particles_per_cell_each_dim = 4 4
+radiation_transport.initial_diffusion_energy_density(x,y,z) = "2.e9*(1+0.3*cos(2*pi*x/1.e-3)*cos(2*pi*z/1.e-3))"

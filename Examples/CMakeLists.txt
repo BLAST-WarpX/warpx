@@ -181,6 +181,10 @@ function(add_warpx_test
         )
     endif()
 
+    if(WarpX_MPI)
+        set_property(TEST ${name}.run PROPERTY PROCESSORS ${nprocs})
+    endif()
+
     # AMReX ParmParse prefix: FILE = <prefix><filename>
     set_property(TEST ${name}.run APPEND PROPERTY ENVIRONMENT "AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
 

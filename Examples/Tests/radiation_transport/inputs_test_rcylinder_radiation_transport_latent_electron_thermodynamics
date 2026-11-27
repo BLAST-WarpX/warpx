@@ -1,0 +1,45 @@
+# ET-3: exercise nonlinear caloric electron storage through one conservative
+# hybrid-electron LTE source/remap in cylindrical geometry.  This inherits the
+# ET-2 density-floor fixture so the deposited density is deliberately only one
+# quarter of the thermodynamic density used by the EOS.
+
+FILE = inputs_test_rcylinder_radiation_transport_electron_thermodynamics
+
+boundary.particle_hi = reflecting
+
+my_constants.n0 = 1.0e25
+my_constants.Te0_eV = 100.0
+my_constants.dt = 4.0e-13
+my_constants.alpha_planck = 5.0e2
+my_constants.c0 = 2.99792458e8
+my_constants.dr = 0.01/31.0
+my_constants.nominal_exchange_fraction = 1.0-exp(-alpha_planck*c0*dt)
+
+# With an odd cell count, depositing source in every even cell makes each node
+# receive exactly one cell contribution.  Scale each emitting cell by the sum
+# of its two RCYL nodal dual volumes divided by its cell volume.  The resulting
+# electron-energy decrement is spatially uniform, including at both physical
+# boundaries, so the following QDSMC gather/scatter preserves it exactly.
+amr.n_cell = 31
+amr.blocking_factor = 1
+amr.max_grid_size = 31
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, \
+        if(floor(x/dr)-2.0*floor(0.5*floor(x/dr)) < 0.5, \
+            -log(1.0-nominal_exchange_fraction* \
+                if(x < dr, 2.25, if(x > 30.0*dr, 90.75/61.0, 2.0))) \
+                /(c0*dt), \
+            0.0), \
+        0.0)
+
+hybrid_pic_model.electron_thermodynamics = fixed_charge_latent_energy
+hybrid_pic_model.electron_latent_transition_temperature_eV = 100.0
+hybrid_pic_model.electron_latent_energy_eV = 1000.0
+hybrid_pic_model.electron_latent_sharpness = 4.0
+
+# The frozen-temperature LTE operator emits from the beginning-of-step state;
+# ApplyElectronEnergySource must then invert the nonlinear caloric EOS exactly.
+radiation_transport.lte_exchange_solver = frozen_temperature
+
+diag.fields_to_plot = rho Te Pe hybrid_qdsmc_thermodynamic_fp \
+    radiation_material_energy radiation_diffusion_energy

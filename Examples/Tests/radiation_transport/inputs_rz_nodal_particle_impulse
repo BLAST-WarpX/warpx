@@ -1,0 +1,7 @@
+FILE = inputs_base_rz_particle_impulse
+amr.n_cell = 8 4
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+ions.profile = parse_density_function
+ions.density_function(x,y,z) = "if(sqrt(x*x+y*y)>=0.25 and sqrt(x*x+y*y)<0.75,1.e20,0)"
+test.nodal_assignment = 1

@@ -1,0 +1,3 @@
+FILE = inputs_base_1d_radiation_transport_registered_material_opacity
+
+materials.names = material_b material_a

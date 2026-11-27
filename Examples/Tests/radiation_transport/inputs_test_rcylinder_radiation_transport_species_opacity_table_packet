@@ -1,0 +1,140 @@
+# Additive per-species table/parser opacity with fully kinetic electrons in
+# RCYLINDER. Two counter-propagating packets cross a mixed-material cell and
+# two identical control packets cross a cell containing neither named species.
+
+my_constants.n0 = 1.0e20
+my_constants.ni0 = 1.25*n0
+my_constants.Te0_eV = 100.0
+my_constants.photon_energy = 200.0*q_e
+my_constants.photon_u = photon_energy/(m_e*clight^2)
+my_constants.photon_weight = 1.0e15
+my_constants.dr = 1.0e-3
+my_constants.dt = 1.0e-12
+my_constants.u0 = sqrt(3.0*q_e*Te0_eV/m_e)/clight
+
+max_step = 1
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 4
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 4.0*dr
+
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons foam tungsten photons
+
+# Opposite equal-weight electrons give an exact zero drift and Te=Te0_eV in
+# every cell while retaining deterministic kinetic-energy coupling.
+electrons.species_type = electron
+electrons.injection_style = MultipleParticles
+electrons.multiple_particles_pos_x = \
+    0.5*dr 0.5*dr 1.5*dr 1.5*dr 2.5*dr 2.5*dr 3.5*dr 3.5*dr
+electrons.multiple_particles_pos_y = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_pos_z = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_ux = u0 -u0 u0 -u0 u0 -u0 u0 -u0
+electrons.multiple_particles_uy = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_uz = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_weight = \
+    0.5*n0*pi*dr^2 0.5*n0*pi*dr^2 \
+    1.5*n0*pi*dr^2 1.5*n0*pi*dr^2 \
+    2.5*n0*pi*dr^2 2.5*n0*pi*dr^2 \
+    3.5*n0*pi*dr^2 3.5*n0*pi*dr^2
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+# Each one-particle tracer deposits ni=1.25*n0 exactly in radial cell 2.
+foam.species_type = proton
+foam.injection_style = SingleParticle
+foam.single_particle_pos = 2.5*dr 0.0 0.0
+foam.single_particle_u = 0.0 0.0 0.0
+foam.single_particle_weight = 5.0*ni0*pi*dr^2
+foam.do_not_deposit = 1
+foam.do_not_push = 1
+
+tungsten.species_type = proton
+tungsten.injection_style = SingleParticle
+tungsten.single_particle_pos = 2.5*dr 0.0 0.0
+tungsten.single_particle_u = 0.0 0.0 0.0
+tungsten.single_particle_weight = 5.0*ni0*pi*dr^2
+tungsten.do_not_deposit = 1
+tungsten.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = MultipleParticles
+photons.multiple_particles_pos_x = 1.5*dr 1.5*dr 2.5*dr 2.5*dr
+photons.multiple_particles_pos_y = 0.0 0.0 0.0 0.0
+photons.multiple_particles_pos_z = 0.0 0.0 0.0 0.0
+photons.multiple_particles_ux = 0.0 0.0 0.0 0.0
+photons.multiple_particles_uy = 0.0 0.0 0.0 0.0
+# Axial motion is suppressed spatially in RCYLINDER, so every packet remains
+# in its initial radial cell while accumulating the complete path c*dt.
+photons.multiple_particles_uz = photon_u -photon_u photon_u -photon_u
+photons.multiple_particles_weight = \
+    photon_weight photon_weight photon_weight photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.opacity_species = foam tungsten
+radiation_transport.opacity_table_interpolation = linear
+# Foam uses a spectral table supplied by CMake while tungsten independently
+# uses an analytic parser. At the manufactured state alpha_W=4*alpha_foam.
+radiation_transport.absorption_coefficient_tungsten(x,y,z,t,photon_energy,ni,ne,Te) = \
+    800.0*ni/n0 + 8.0*Te*kb/q_e + 12.0*photon_energy/q_e
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 0
+diag1.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = radiation_energy particle_energy \
+    particle_momentum particle_number
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+
+particle_momentum.type = ParticleMomentum
+particle_momentum.intervals = 1
+particle_momentum.path = diags/
+particle_momentum.precision = 17
+
+particle_number.type = ParticleNumber
+particle_number.intervals = 1
+particle_number.path = diags/
+particle_number.precision = 17

@@ -1,0 +1,6 @@
+FILE = inputs_test_1d_radiation_transport_cold_start_profiles
+
+# A deliberately different profile must not overwrite checkpointed radiation.
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 100.0 + 2.0*z
+
+warpx.write_diagnostics_on_restart = 1

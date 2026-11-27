@@ -1,0 +1,2 @@
+FILE = inputs_base_1d_radiation_transport_diffusion_boundary
+radiation_transport.diffusion_boundary_hi = vacuum

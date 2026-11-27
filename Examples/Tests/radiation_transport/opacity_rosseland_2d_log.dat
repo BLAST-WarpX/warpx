@@ -1,0 +1,7 @@
+# Structured grey Rosseland transport-opacity table:
+# n_ne n_temperature
+2 2
+1.0e19 1.0e21
+1.0e3 1.0e6
+# alpha_R [m^-1], density-major / temperature-fastest
+3.2 3.2 320.0 320.0

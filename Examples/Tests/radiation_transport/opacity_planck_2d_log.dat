@@ -1,0 +1,7 @@
+# Structured grey Planck opacity table:
+# n_ne n_temperature
+2 2
+1.0e19 1.0e21
+5.80225906077504e3 2.320903624310016e4
+# alpha_P [m^-1], density-major / temperature-fastest
+10.0 40.0 10.0 40.0

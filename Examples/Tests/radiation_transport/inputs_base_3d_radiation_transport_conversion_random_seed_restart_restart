@@ -1,0 +1,3 @@
+FILE = inputs_base_3d_radiation_transport_conversion_random_seed_restart
+
+warpx.write_diagnostics_on_restart = 1

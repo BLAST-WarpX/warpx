@@ -1,0 +1,13 @@
+# Restart-safe diffusion-boundary energy and momentum accounting.
+
+FILE = inputs_test_1d_radiation_transport_diffusion_boundary_vacuum
+
+max_step = 12
+amr.max_grid_size = 4
+warpx.serialize_initial_conditions = 1
+
+diagnostics.diags_names = chk
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 6
+chk.file_prefix = diags/chk

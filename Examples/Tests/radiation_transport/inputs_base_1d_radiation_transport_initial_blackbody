@@ -1,0 +1,6 @@
+FILE = inputs_test_1d_radiation_transport_lte_hybrid
+max_step = 0
+radiation_transport.energy_group_boundaries = 1.0e-19
+radiation_transport.group_photon_energies = 0.5e-19 2.0e-19
+radiation_transport.initial_diffusion_temperature(x,y,z) = 10000*(1+0.1*cos(2*pi*z))
+diag1.fields_to_plot = radiation_diffusion_energy_g0 radiation_diffusion_energy_g1

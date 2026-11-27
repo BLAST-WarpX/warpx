@@ -1,0 +1,5 @@
+# alpha_R=1.e5*(Te/1.e6)^2 m^-1; exact log-log interpolation.
+2 2
+1.e24 1.e26
+5.e5 2.e6
+25000 400000 25000 400000

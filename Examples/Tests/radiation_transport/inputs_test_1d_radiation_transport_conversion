@@ -1,0 +1,86 @@
+# LTE emission, thick-cell diffusion and conservative conversion to streaming photons.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 1.0
+my_constants.alpha_planck = 20.0
+my_constants.alpha_rosseland = 32.0
+
+max_step = 1
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 1.0e-10
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.01*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+
+particles.species_names = ions photons
+
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 8
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 0.25
+photons.single_particle_u = 1.0 0.0 0.0
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(z > 0.499, if(z < 0.5625, alpha_planck, 0.0), 0.0)
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te) = \
+    if(z < 0.5625, alpha_rosseland, 0.0)
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.1
+radiation_transport.enable_particle_conversion = 1
+radiation_transport.emission_photon_energy = 1.0e-13
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.fields_to_plot = rho Te radiation_material_energy radiation_diffusion_energy
+
+warpx.reduced_diags_names = particle_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17

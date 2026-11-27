@@ -1,0 +1,103 @@
+# Geometry-aware fully kinetic radiation heating in RZ.
+#
+# The two equal-weight electrons are injected at opposite Cartesian azimuths
+# in one annular (r,z) cell. Their Cartesian proper velocities are opposite,
+# but both have the same local radial proper velocity u0. The cell is therefore
+# exactly cold in the cylindrical moment frame. An axial photon remains in the
+# one-cell periodic z extent and is partially absorbed with LTE disabled.
+
+my_constants.n0 = 1.0e20
+my_constants.dr = 1.0e-3
+my_constants.dz = dr
+my_constants.dt = 1.0e-12
+my_constants.u0 = 0.1
+my_constants.photon_u = 1.0e-3
+my_constants.photon_weight = 1.0e17
+my_constants.alpha = 1.0e3
+
+max_step = 1
+amr.n_cell = 4 1
+amr.max_level = 0
+amr.blocking_factor = 1 1
+amr.max_grid_size = 2 1
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -0.5*dz
+geometry.prob_hi = 4.0*dr 0.5*dz
+warpx.n_rz_azimuthal_modes = 1
+
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = reflecting periodic
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons photons
+
+electrons.species_type = electron
+electrons.injection_style = MultipleParticles
+electrons.multiple_particles_pos_x = 2.5*dr -2.5*dr
+electrons.multiple_particles_pos_y = 0.0 0.0
+electrons.multiple_particles_pos_z = 0.0 0.0
+electrons.multiple_particles_ux = u0 -u0
+electrons.multiple_particles_uy = 0.0 0.0
+electrons.multiple_particles_uz = 0.0 0.0
+electrons.multiple_particles_weight = 2.5*n0*pi*dr^2*dz 2.5*n0*pi*dr^2*dz
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 2.5*dr 0.0 0.0
+photons.single_particle_u = 0.0 0.0 photon_u
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.absorption_coefficient = alpha
+radiation_transport.path_cell_fraction = 0.5
+radiation_transport.max_transport_substeps = 16
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 1
+diag1.species = electrons
+diag1.electrons.variables = x z theta w ux uy uz
+diag1.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1
