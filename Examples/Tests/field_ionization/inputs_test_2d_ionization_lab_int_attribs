@@ -5,5 +5,3 @@ FILE = inputs_test_2d_ionization_lab
 
 ions.addIntegerAttributes = user_flag
 ions.attribute.user_flag(x,y,z,ux,uy,uz,t) = 7
-
-diagnostics.diags_names = diag1
