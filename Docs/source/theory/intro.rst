@@ -73,6 +73,7 @@ Multiphysics Processes
    :maxdepth: 1
 
    multiphysics_extensions
+   radiation_qualification_wrapup
 
 Advanced Modes of Running
 =========================
