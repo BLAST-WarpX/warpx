@@ -1,0 +1,36 @@
+# Regression test for ProjectionDivCleaner PMC boundary conditions on a 3D Yee
+# grid. A PMC-compatible divergent external B field (analytic B_t = 0 on all
+# domain faces) is cleaned under all-PMC boundaries; cleaning must drive div(B)
+# near machine precision across all cells while preserving tangential B_t near
+# the PMC walls (Dirichlet phi = 0 instead of Neumann).
+
+max_step = 4
+amr.n_cell = 16 16 16
+amr.max_level = 0
+amr.max_grid_size = 8
+
+geometry.dims = 3
+geometry.prob_lo = -12.0e-6 -12.0e-6 -12.0e-6
+geometry.prob_hi =  12.0e-6  12.0e-6  12.0e-6
+
+boundary.field_lo = pmc pmc pmc
+boundary.field_hi = pmc pmc pmc
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+warpx.const_dt = 8.33910237995e-16
+warpx.use_filter = 0
+warpx.do_initial_div_cleaning = 1
+warpx.projection_div_cleaner.rtol = 5e-12
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "1704.509018 * cos(pi*x/12e-6) * sin(pi*y/12e-6) * sin(pi*z/12e-6)"
+warpx.By_external_grid_function(x,y,z) = "852.254509 * sin(pi*x/12e-6) * cos(pi*y/12e-6) * sin(pi*z/12e-6)"
+warpx.Bz_external_grid_function(x,y,z) = "0.0"
+
+diagnostics.diags_names = diag1
+diag1.intervals = 4
+diag1.diag_type = Full
+diag1.fields_to_plot = Bx By Bz divB
+diag1.plot_raw_fields = true
+diag1.format = plotfile

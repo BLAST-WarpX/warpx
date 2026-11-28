@@ -1,0 +1,45 @@
+# Regression test for ProjectionDivCleaner PEC boundary conditions and final
+# MLMG ghost-cell fill on a 3D Yee grid with particles (ng_alloc_EB > 1).
+# A divergent external B field with nonzero normal wall component is cleaned
+# under all-PEC boundaries; after initialization and 4 Yee steps, discrete
+# div(B) must remain near machine precision in every cell including the
+# boundary shell.
+
+max_step = 4
+amr.n_cell = 16 16 16
+amr.max_level = 0
+amr.max_grid_size = 8
+
+geometry.dims = 3
+geometry.prob_lo = -12.0e-6 -12.0e-6 -12.0e-6
+geometry.prob_hi =  12.0e-6  12.0e-6  12.0e-6
+
+boundary.field_lo = pec pec pec
+boundary.field_hi = pec pec pec
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+algo.particle_shape = 2
+warpx.const_dt = 8.33910237995e-16
+warpx.use_filter = 0
+warpx.do_initial_div_cleaning = 1
+warpx.projection_div_cleaner.rtol = 5e-12
+
+particles.species_names = electrons
+electrons.species_type = electron
+electrons.injection_style = SingleParticle
+electrons.single_particle_pos = 0.0 0.0 0.0
+electrons.single_particle_u = 0.0 0.0 0.0
+electrons.single_particle_weight = 1.0
+
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "1704.509018 * cos(0.7*pi*x/12e-6) * cos(pi*y/12e-6) * cos(pi*z/12e-6)"
+warpx.By_external_grid_function(x,y,z) = "852.254509 * cos(pi*x/12e-6) * cos(0.6*pi*y/12e-6) * cos(pi*z/12e-6)"
+warpx.Bz_external_grid_function(x,y,z) = "0.0"
+
+diagnostics.diags_names = diag1
+diag1.intervals = 4
+diag1.diag_type = Full
+diag1.fields_to_plot = Bx By Bz divB
+diag1.plot_raw_fields = true
+diag1.format = plotfile

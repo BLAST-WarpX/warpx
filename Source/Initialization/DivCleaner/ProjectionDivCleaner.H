@@ -105,6 +105,7 @@ private:
         mlmg.setBottomVerbose(m_bottom_verbose);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
+        mlmg.setFinalFillBC(true);
         mlmg.solve({m_solution[lev].get()}, {m_source[lev].get()}, m_rtol, m_atol);
     }
 
@@ -125,6 +126,10 @@ public:
                                    int a_comp=0);
 
     void ReadParameters ();
+
+    void setRtol (amrex::Real a_rtol) { m_rtol = a_rtol; }
+    [[nodiscard]] amrex::Real getRtol () const { return m_rtol; }
+    [[nodiscard]] amrex::Real sourceNormInf () const { return m_source[0]->norm0(0, 0, false); }
 
     void solve ();
     void setSourceFromField ();

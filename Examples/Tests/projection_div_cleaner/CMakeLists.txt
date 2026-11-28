@@ -32,12 +32,32 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_projection_div_cleaner_pec_boundary  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_projection_div_cleaner_pec_boundary  # inputs
+    "analysis_pec_pmc_boundary.py pec"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_projection_div_cleaner_picmi  # name
     3  # dims
     1  # nprocs
     inputs_test_3d_projection_div_cleaner_picmi.py  # inputs
     OFF  # analysis
     "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_projection_div_cleaner_pmc_boundary  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_projection_div_cleaner_pmc_boundary  # inputs
+    "analysis_pec_pmc_boundary.py pmc"  # analysis
+    OFF  # checksum
     OFF  # dependency
 )
 
