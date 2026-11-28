@@ -191,25 +191,25 @@ void warpx_interp (int j, int k, int l,
     nk = (AMREX_SPACEDIM > 1) ? 2 : 1;
     nl = (AMREX_SPACEDIM > 2) ? 2 : 1;
 
-    const int jn = (sj_cp == 1) ? j : j - rj / 2;
-    const int kn = (sk_cp == 1) ? k : k - rk / 2;
-    const int ln = (sl_cp == 1) ? l : l - rl / 2;
+    // A cell-centered coarse sample sits half a coarse cell from a node.
+    // Keep this offset in the weights even when the refinement ratio is odd
+    // (including an unrefined direction, where the two neighbors weigh 1/2).
+    jc = amrex::coarsen(j - (1 - sj_cp) * ((rj + 1) / 2), rj);
+    kc = amrex::coarsen(k - (1 - sk_cp) * ((rk + 1) / 2), rk);
+    lc = amrex::coarsen(l - (1 - sl_cp) * ((rl + 1) / 2), rl);
 
-    jc = amrex::coarsen(jn, rj);
-    kc = amrex::coarsen(kn, rk);
-    lc = amrex::coarsen(ln, rl);
+    const Real xhi = static_cast<Real>(j - jc * rj) / rj - 0.5_rt * (1 - sj_cp);
+    const Real yhi = static_cast<Real>(k - kc * rk) / rk - 0.5_rt * (1 - sk_cp);
+    const Real zhi = static_cast<Real>(l - lc * rl) / rl - 0.5_rt * (1 - sl_cp);
+    const GpuArray<Real, 2> wx{1.0_rt - xhi, xhi};
+    const GpuArray<Real, 2> wy{1.0_rt - yhi, yhi};
+    const GpuArray<Real, 2> wz{1.0_rt - zhi, zhi};
 
     for         (int jj = 0; jj < nj; jj++) {
         for     (int kk = 0; kk < nk; kk++) {
             for (int ll = 0; ll < nl; ll++) {
                 auto c = arr_coarse_zeropad(jc+jj,kc+kk,lc+ll);
-                c *= (rj - amrex::Math::abs(jn - (jc + jj) * rj)) / static_cast<amrex::Real>(rj);
-#if (AMREX_SPACEDIM > 1)
-                c *= (rk - amrex::Math::abs(kn - (kc + kk) * rk)) / static_cast<amrex::Real>(rk);
-#if (AMREX_SPACEDIM > 2)
-                c *= (rl - amrex::Math::abs(ln - (lc + ll) * rl)) / static_cast<amrex::Real>(rl);
-#endif
-#endif
+                c *= wx[jj] * wy[kk] * wz[ll];
                 coarse += c;
             }
         }
