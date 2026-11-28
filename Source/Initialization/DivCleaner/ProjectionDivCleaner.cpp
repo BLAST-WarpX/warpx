@@ -167,19 +167,26 @@ ProjectionDivCleaner::solve ()
                                                                 LinOpBCType::bogus,
                                                                 LinOpBCType::bogus)});
 
-    // Vector potential A obeys E-like PEC/PMC boundary conditions (A_t = 0 on PEC -> Dirichlet phi;
-    // A_n = 0 on PMC -> Neumann phi), whereas magnetic field B obeys the dual conditions
-    // (B_n = 0 on PEC -> Neumann phi; B_t = 0 on PMC -> Dirichlet phi).
-    const std::map<FieldBoundaryType, LinOpBCType> bcmap = m_vector_potential
+    // In electromagnetic solvers (Yee, HybridPIC), grid B fields obey magnetic PEC/PMC
+    // boundary conditions (B_n = 0 on PEC -> Neumann phi; B_t = 0 on PMC -> Dirichlet phi),
+    // which are dual to the E-like boundary conditions obeyed by vector potential A.
+    // In electrostatic/magnetostatic modes (and for externally-applied particle B fields),
+    // field_boundary_lo/hi specifies electrostatic potential BCs (Dirichlet/Neumann on phi_E)
+    // rather than superconducting walls excluding external magnet coils, so keep the
+    // original Dirichlet-on-PEC / Neumann-on-Neumann mapping.
+    const bool use_em_bfield_bc = !m_vector_potential
+        && (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::None)
+        && (m_field_name == "Bfield_fp_external");
+    const std::map<FieldBoundaryType, LinOpBCType> bcmap = use_em_bfield_bc
         ? std::map<FieldBoundaryType, LinOpBCType>{
-            {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
-            {FieldBoundaryType::Neumann, LinOpBCType::Neumann}, // Note that PMC is the same as Neumann
+            {FieldBoundaryType::PEC, LinOpBCType::Neumann},
+            {FieldBoundaryType::Neumann, LinOpBCType::Dirichlet}, // Note that PMC is the same as Neumann
             {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
             {FieldBoundaryType::None, LinOpBCType::Neumann}
         }
         : std::map<FieldBoundaryType, LinOpBCType>{
-            {FieldBoundaryType::PEC, LinOpBCType::Neumann},
-            {FieldBoundaryType::Neumann, LinOpBCType::Dirichlet}, // Note that PMC is the same as Neumann
+            {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
+            {FieldBoundaryType::Neumann, LinOpBCType::Neumann}, // Note that PMC is the same as Neumann
             {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
             {FieldBoundaryType::None, LinOpBCType::Neumann}
         };
@@ -456,29 +463,52 @@ WarpX::ProjectionCleanDivB() {
         // LoadInitialField / AnalyticInitialField / LoadInitialFieldFromPython). It is added
         // directly to the solver B field and is a single component.
         if (warpx.m_fields.has_vector("Bfield_fp_external", 0)) {
-            // Apply PEC/PMC magnetic boundary conditions before computing div(B) so that
-            // normal B vanishes on PEC walls prior to the Neumann projection (ensuring
-            // discrete compatibility on all-PEC domains and matching ApplyBfieldBoundary).
-            const auto has_bc = [&](FieldBoundaryType bc) {
-                return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(),
-                                   [bc](FieldBoundaryType b) { return b == bc; })
-                    || std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(),
-                                   [bc](FieldBoundaryType b) { return b == bc; });
-            };
-            if (has_bc(FieldBoundaryType::PEC)) {
-                PEC::ApplyPECtoBfield(
-                    m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
-                    field_boundary_lo, field_boundary_hi, FieldBoundaryType::PEC,
-                    get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
-            }
-            if (has_bc(FieldBoundaryType::PMC)) {
-                PEC::ApplyPECtoEfield(
-                    m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
-                    field_boundary_lo, field_boundary_hi, FieldBoundaryType::PMC,
-                    get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
-            }
             warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
-            dc.setSourceFromField();
+            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
+                // In electromagnetic solvers, ApplyBfieldBoundary enforces B_n = 0 on PEC
+                // and B_t = 0 on PMC walls. Apply those conditions before computing div(B)
+                // so the Neumann projection is compatible on all-PEC domains and matches
+                // ApplyBfieldBoundary without re-injecting boundary div(B).
+                const auto has_bc = [&](FieldBoundaryType bc) {
+                    return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(),
+                                       [bc](FieldBoundaryType b) { return b == bc; })
+                        || std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(),
+                                       [bc](FieldBoundaryType b) { return b == bc; });
+                };
+                const bool has_pec = has_bc(FieldBoundaryType::PEC);
+                const bool has_pmc = has_bc(FieldBoundaryType::PMC);
+                amrex::Real bnorm_before = 0.0_rt;
+                if (has_pec || has_pmc) {
+                    dc.setSourceFromField();
+                    bnorm_before = dc.sourceNormInf();
+                }
+                if (has_pec) {
+                    PEC::ApplyPECtoBfield(
+                        m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
+                        field_boundary_lo, field_boundary_hi, FieldBoundaryType::PEC,
+                        get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
+                }
+                if (has_pmc) {
+                    PEC::ApplyPECtoEfield(
+                        m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
+                        field_boundary_lo, field_boundary_hi, FieldBoundaryType::PMC,
+                        get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
+                }
+                dc.setSourceFromField();
+                if (has_pec || has_pmc) {
+                    // Clamping a non-zero boundary normal component introduces an O(1/dx)
+                    // boundary jump in div(B); scale rtol so MLMG's relative-to-bnorm stopping
+                    // criterion still converges interior div(B) to the requested tolerance.
+                    const amrex::Real bnorm_after = dc.sourceNormInf();
+                    if (bnorm_before > 0.0_rt && bnorm_after > bnorm_before) {
+                        const amrex::Real min_rtol = std::is_same_v<amrex::Real, float>
+                            ? amrex::Real(1e-6) : amrex::Real(1e-14);
+                        dc.setRtol(std::max(dc.getRtol() * (bnorm_before / bnorm_after), min_rtol));
+                    }
+                }
+            } else {
+                dc.setSourceFromField();
+            }
             dc.solve();
             dc.correctField();
             cleaned_any = true;

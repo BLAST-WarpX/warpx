@@ -127,6 +127,10 @@ public:
 
     void ReadParameters ();
 
+    void setRtol (amrex::Real a_rtol) { m_rtol = a_rtol; }
+    [[nodiscard]] amrex::Real getRtol () const { return m_rtol; }
+    [[nodiscard]] amrex::Real sourceNormInf () const { return m_source[0]->norm0(0, 0, false); }
+
     void solve ();
     void setSourceFromField ();
     void correctField ();
