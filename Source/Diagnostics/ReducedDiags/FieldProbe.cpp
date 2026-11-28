@@ -209,29 +209,30 @@ FieldProbe::FieldProbe (const std::string& rd_name)
                     {FieldProbePIdx::S , "-(W/m^2)"}
                 };
             }
-            for (int lev = 0; lev < nLevel; ++lev)
-            {
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_x_lev" + std::to_string(lev) + "-(m)";
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_y_lev" + std::to_string(lev) + "-(m)";
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_z_lev" + std::to_string(lev) + "-(m)";
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_Ex_lev" + std::to_string(lev) + u_map[FieldProbePIdx::Ex];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_Ey_lev" + std::to_string(lev) + u_map[FieldProbePIdx::Ey];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_Ez_lev" + std::to_string(lev) + u_map[FieldProbePIdx::Ez];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_Bx_lev" + std::to_string(lev) + u_map[FieldProbePIdx::Bx];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_By_lev" + std::to_string(lev) + u_map[FieldProbePIdx::By];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_Bz_lev" + std::to_string(lev) + u_map[FieldProbePIdx::Bz];
-                ofs << m_sep;
-                ofs << "[" << c++ << "]part_S_lev" + std::to_string(lev) + u_map[FieldProbePIdx::S];
-            }
+            // Each row is one probe sampled on its owning (finest available) level.
+            // Preserve the single-level header; refined runs do not have one
+            // group of values per level in each row.
+            std::string const level_suffix = nLevel == 1 ? "_lev0" : "";
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_x" + level_suffix + "-(m)";
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_y" + level_suffix + "-(m)";
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_z" + level_suffix + "-(m)";
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_Ex" + level_suffix + u_map[FieldProbePIdx::Ex];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_Ey" + level_suffix + u_map[FieldProbePIdx::Ey];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_Ez" + level_suffix + u_map[FieldProbePIdx::Ez];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_Bx" + level_suffix + u_map[FieldProbePIdx::Bx];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_By" + level_suffix + u_map[FieldProbePIdx::By];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_Bz" + level_suffix + u_map[FieldProbePIdx::Bz];
+            ofs << m_sep;
+            ofs << "[" << c++ << "]part_S" + level_suffix + u_map[FieldProbePIdx::S];
             ofs << "\n";
 
             // close file
@@ -392,6 +393,10 @@ void FieldProbe::ComputeDiags (int step)
 
     using ablastr::fields::Direction;
 
+    if (m_intervals.contains(step+1)) {
+        m_data.clear();
+    }
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
@@ -463,10 +468,8 @@ void FieldProbe::ComputeDiags (int step)
 
         if (m_intervals.contains(step+1))
         {
-            // reset m_data vector to clear pushed values. Reserves data
-            m_data.clear();
-            m_data.shrink_to_fit();
-            m_data.reserve(numparticles * noutputs);
+            // Retain samples collected from previous refinement levels.
+            m_data.reserve(m_data.size() + numparticles * noutputs);
         }
 
         for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti)
@@ -620,48 +623,51 @@ void FieldProbe::ComputeDiags (int step)
             }
         } // end particle iterator loop
 
-        if (m_intervals.contains(step+1))
-        {
-            // returns total number of mpi notes into mpisize
-            const int mpisize = ParallelDescriptor::NProcs();
-
-            // allocates data space for length_array. Will contain size of m_data from each processor
-            amrex::Vector<int> length_vector;
-            amrex::Vector<int> localsize;
-
-            if (amrex::ParallelDescriptor::IOProcessor()) {
-                length_vector.resize(mpisize, 0);
-            }
-            localsize.resize(1, static_cast<int>(m_data.size()));
-
-            // gather size of m_data from each processor
-            amrex::ParallelDescriptor::Gather(localsize.data(), 1,
-                                              length_vector.data(), 1,
-                                              amrex::ParallelDescriptor::IOProcessorNumber());
-
-            // IO processor sums values from length_array to get size of total output array.
-            /* displs records the size of each m_data as well as previous displs. This array
-             * tells Gatherv where in the m_data_out array allocation to write incoming data. */
-            long total_data_size = 0;
-            amrex::Vector<int> displs_vector;
-            if (amrex::ParallelDescriptor::IOProcessor()) {
-                displs_vector.assign(mpisize, 0);
-                total_data_size += length_vector[0];
-                for (int i=1; i<mpisize; i++) {
-                    displs_vector[i] = (displs_vector[i-1] + length_vector[i-1]);
-                    total_data_size += length_vector[i];
-                }
-                // valid particles are counted (for all MPI ranks) to inform output processes as to size of output
-                m_valid_particles = total_data_size / noutputs;
-                m_data_out.resize(total_data_size, 0);
-            }
-            // resize receive buffer (resize, initialize 0)
-            // gather m_data of varied lengths from all processors. Prints to m_data_out
-            amrex::ParallelDescriptor::Gatherv(m_data.data(), localsize[0],
-                                               m_data_out.data(), length_vector, displs_vector,
-                                               amrex::ParallelDescriptor::IOProcessorNumber());
-        }
     }// end loop over refinement levels
+
+    // Gather all levels together so later, possibly empty levels cannot
+    // discard samples already collected on the parent grid.
+    if (m_intervals.contains(step+1))
+    {
+        // returns total number of mpi notes into mpisize
+        const int mpisize = ParallelDescriptor::NProcs();
+
+        // allocates data space for length_array. Will contain size of m_data from each processor
+        amrex::Vector<int> length_vector;
+        amrex::Vector<int> localsize;
+
+        if (amrex::ParallelDescriptor::IOProcessor()) {
+            length_vector.resize(mpisize, 0);
+        }
+        localsize.resize(1, static_cast<int>(m_data.size()));
+
+        // gather size of m_data from each processor
+        amrex::ParallelDescriptor::Gather(localsize.data(), 1,
+                                          length_vector.data(), 1,
+                                          amrex::ParallelDescriptor::IOProcessorNumber());
+
+        // IO processor sums values from length_array to get size of total output array.
+        /* displs records the size of each m_data as well as previous displs. This array
+         * tells Gatherv where in the m_data_out array allocation to write incoming data. */
+        long total_data_size = 0;
+        amrex::Vector<int> displs_vector;
+        if (amrex::ParallelDescriptor::IOProcessor()) {
+            displs_vector.assign(mpisize, 0);
+            total_data_size += length_vector[0];
+            for (int i=1; i<mpisize; i++) {
+                displs_vector[i] = (displs_vector[i-1] + length_vector[i-1]);
+                total_data_size += length_vector[i];
+            }
+            // valid particles are counted (for all MPI ranks) to inform output processes as to size of output
+            m_valid_particles = total_data_size / noutputs;
+            m_data_out.resize(total_data_size, 0);
+        }
+        // resize receive buffer (resize, initialize 0)
+        // gather m_data of varied lengths from all processors. Prints to m_data_out
+        amrex::ParallelDescriptor::Gatherv(m_data.data(), localsize[0],
+                                           m_data_out.data(), length_vector, displs_vector,
+                                           amrex::ParallelDescriptor::IOProcessorNumber());
+    }
     // make sure data is in m_data on the IOProcessor
     // TODO: In the future, we want to use a parallel I/O method instead (plotfiles or openPMD)
     m_last_compute_step = step;
@@ -670,6 +676,7 @@ void FieldProbe::ComputeDiags (int step)
 void FieldProbe::WriteToFile (int step) const
 {
     if (!(ProbeInDomain() && amrex::ParallelDescriptor::IOProcessor())) { return; }
+    if (m_data_out.empty()) { return; }
 
     // loop over num valid particles to find the lowest particle ID for later sorting
     auto first_id = static_cast<long int>(m_data_out[0]);
