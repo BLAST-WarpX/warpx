@@ -49,14 +49,17 @@ def check_plotfile(path: str, bc_mode: str) -> None:
     if bc_mode == "pmc":
         # Check tangential cell-centered B near walls (Dirichlet phi preserves
         # small near-wall |B_t|; inverted Neumann phi amplifies it > 0.5 B_ref).
-        bt_wall = max(
-            float(np.max(np.abs(bx[:, [0, -1], :]))),
-            float(np.max(np.abs(bx[:, :, [0, -1]]))),
-            float(np.max(np.abs(by[[0, -1], :, :]))),
-            float(np.max(np.abs(by[:, :, [0, -1]]))),
-            float(np.max(np.abs(bz[[0, -1], :, :]))),
-            float(np.max(np.abs(bz[:, [0, -1], :]))),
-        ) / B_REF
+        bt_wall = (
+            max(
+                float(np.max(np.abs(bx[:, [0, -1], :]))),
+                float(np.max(np.abs(bx[:, :, [0, -1]]))),
+                float(np.max(np.abs(by[[0, -1], :, :]))),
+                float(np.max(np.abs(by[:, :, [0, -1]]))),
+                float(np.max(np.abs(bz[[0, -1], :, :]))),
+                float(np.max(np.abs(bz[:, [0, -1], :]))),
+            )
+            / B_REF
+        )
         print(f"{path} (pmc): near-wall max|B_t|/B_ref = {bt_wall:.3e}")
         assert bt_wall < 0.15, (
             f"PMC near-wall tangential |B_t|/B_ref too large: {bt_wall:.3e}"
