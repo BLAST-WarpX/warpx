@@ -9,10 +9,9 @@
 
 #include "ProjectionDivCleaner.H"
 
-#include <AMReX_MLPoisson.H>
-#include <AMReX_MLNodeLaplacian.H>
-#include <AMReX_MultiFabUtil.H>
-
+#include "BoundaryConditions/WarpX_PEC.H"
+#include "Fields.H"
+#include <Initialization/ExternalField.H>
 #include <WarpX.H>
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H>
@@ -22,11 +21,14 @@
     #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
     #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H>
 #endif
-#include "Fields.H"
-#include <Initialization/ExternalField.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
+#include <AMReX_MLPoisson.H>
+#include <AMReX_MLNodeLaplacian.H>
+#include <AMReX_MultiFabUtil.H>
+
+#include <algorithm>
 #include <map>
 
 using namespace amrex;
@@ -56,7 +58,9 @@ ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool
     m_source.resize(m_levels);
 
     const int ncomps = WarpX::ncomps;
-    auto const& ng = warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect();
+    const amrex::IntVect ng = amrex::max(
+        warpx.m_fields.get(m_field_name, Direction{0}, 0)->nGrowVect(),
+        amrex::IntVect(1));
 
     IntVect nodal_flag{};
     if (m_grid_type == GridType::Collocated || m_vector_potential) {
@@ -163,12 +167,22 @@ ProjectionDivCleaner::solve ()
                                                                 LinOpBCType::bogus,
                                                                 LinOpBCType::bogus)});
 
-    std::map<FieldBoundaryType, LinOpBCType> bcmap{
-        {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
-        {FieldBoundaryType::Neumann, LinOpBCType::Neumann}, // Note that PMC is the same as Neumann
-        {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
-        {FieldBoundaryType::None, LinOpBCType::Neumann}
-    };
+    // Vector potential A obeys E-like PEC/PMC boundary conditions (A_t = 0 on PEC -> Dirichlet phi;
+    // A_n = 0 on PMC -> Neumann phi), whereas magnetic field B obeys the dual conditions
+    // (B_n = 0 on PEC -> Neumann phi; B_t = 0 on PMC -> Dirichlet phi).
+    const std::map<FieldBoundaryType, LinOpBCType> bcmap = m_vector_potential
+        ? std::map<FieldBoundaryType, LinOpBCType>{
+            {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
+            {FieldBoundaryType::Neumann, LinOpBCType::Neumann}, // Note that PMC is the same as Neumann
+            {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
+            {FieldBoundaryType::None, LinOpBCType::Neumann}
+        }
+        : std::map<FieldBoundaryType, LinOpBCType>{
+            {FieldBoundaryType::PEC, LinOpBCType::Neumann},
+            {FieldBoundaryType::Neumann, LinOpBCType::Dirichlet}, // Note that PMC is the same as Neumann
+            {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
+            {FieldBoundaryType::None, LinOpBCType::Neumann}
+        };
 
     for (int idim=0; idim<AMREX_SPACEDIM; idim++){
         auto itlo = bcmap.find(WarpX::field_boundary_lo[idim]);
@@ -180,8 +194,8 @@ ProjectionDivCleaner::solve ()
             );
         }
 
-        lobc[idim] = bcmap[WarpX::field_boundary_lo[idim]];
-        hibc[idim] = bcmap[WarpX::field_boundary_hi[idim]];
+        lobc[idim] = itlo->second;
+        hibc[idim] = ithi->second;
     }
 
     LPInfo info;
@@ -442,6 +456,27 @@ WarpX::ProjectionCleanDivB() {
         // LoadInitialField / AnalyticInitialField / LoadInitialFieldFromPython). It is added
         // directly to the solver B field and is a single component.
         if (warpx.m_fields.has_vector("Bfield_fp_external", 0)) {
+            // Apply PEC/PMC magnetic boundary conditions before computing div(B) so that
+            // normal B vanishes on PEC walls prior to the Neumann projection (ensuring
+            // discrete compatibility on all-PEC domains and matching ApplyBfieldBoundary).
+            const auto has_bc = [&](FieldBoundaryType bc) {
+                return std::any_of(field_boundary_lo.begin(), field_boundary_lo.end(),
+                                   [bc](FieldBoundaryType b) { return b == bc; })
+                    || std::any_of(field_boundary_hi.begin(), field_boundary_hi.end(),
+                                   [bc](FieldBoundaryType b) { return b == bc; });
+            };
+            if (has_bc(FieldBoundaryType::PEC)) {
+                PEC::ApplyPECtoBfield(
+                    m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
+                    field_boundary_lo, field_boundary_hi, FieldBoundaryType::PEC,
+                    get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
+            }
+            if (has_bc(FieldBoundaryType::PMC)) {
+                PEC::ApplyPECtoEfield(
+                    m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp_external, 0),
+                    field_boundary_lo, field_boundary_hi, FieldBoundaryType::PMC,
+                    get_ng_fieldgather(), Geom(0), 0, PatchType::fine, ref_ratio);
+            }
             warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
             dc.setSourceFromField();
             dc.solve();
